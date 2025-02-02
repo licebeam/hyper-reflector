@@ -29,19 +29,21 @@
 import './index.css';
 
 
-console.log('👋 This message is being logged by "renderer.ts", included via Vite');
+document.getElementById("sendTextBtn").addEventListener("click", () => {
+    var text = document.getElementById("inputText").value; // typescript error, works fine
+    window.api.sendText(text);
+});
+
+document.getElementById("apiBtn").addEventListener("click", () => {
+    window.api.sendCommand("resume");
+});
 
 document.getElementById("testBtn").addEventListener("click", () => {
-    window.api.sendCommand("width");
+    window.api.sendCommand("game_name");
 });
 
 document.getElementById("ggpoBtn").addEventListener("click", () => {
     window.api.openGGPO();
-});
-
-document.getElementById("apiBtn").addEventListener("click", () => {
-    console.log('hit api button')
-    window.api.hitApi();
 });
 
 document.getElementById("api-serve-btn").addEventListener("click", () => {

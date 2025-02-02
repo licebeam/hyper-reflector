@@ -1,41 +1,26 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import sendCommand from './dusty_reader';
+import {sendCommand, readCommand} from './dusty_reader';
 import launchGGPO from './loadFbNeo';
 
 const express = require("express");
 const serverApp = express();
 const port = 8089;
 
-const myLogger = function (req, res, next) {
-  console.log('LOGGED')
-  next()
-}
-
-serverApp.get('/test', (req, res) => {
-  console.log("hey")
-  res.send('Hello World!')
-})
-
 serverApp.get('/serve', (req, res) => {
-  const openPort = 7000;
+  const localPort = 7000;
   const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
-  const fakeQuarkID = 'ABC123XYZ789';
-  const directCommand = `"${fightcadePath}" -game sfiii3nr1 quark:direct,sfiii3nr1,${openPort},192.168.11.5,7000,0,0,1`; // direct, working wtf
+  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/dusty_file_reader.lua'
+  const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},127.0.0.1,7001,0,1,0 ${luaPath}`;
   launchGGPO(directCommand)
-  // const serveCommand = `"${fightcadePath}" -game sfiii3nr1 quark:served,sfiii3nr1,${fakeQuarkID},${openPort},0,1`; // served, load into dc - works
-  // launchGGPO(serveCommand)
 })
-
 serverApp.get('/connect', (req, res) => {
-  const openPort = 7000;
+  const localPort = 7001;
   const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
-  const fakeQuarkID = 'ABC123XYZ789';
-  // sscanf(connect, "quark:stream,%[^,],%[^,],%d", game, quarkid, &remotePort);
-  const command = `"${fightcadePath}" -game sfiii3nr1 quark:direct,sfiii3nr1,${openPort},192.168.11.5,7000,1,0,1`; // direct, working wtf
-  // const command = `"${fightcadePath}" -game sfiii3nr1 quark:stream,sfiii3nr1],${fakeQuarkID},${openPort}`; // direct, working wtf
-  launchGGPO(command)
+  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/dusty_file_reader.lua'
+  const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},127.0.0.1,7000,1,1,0 ${luaPath}`;
+  launchGGPO(directCommand)
 })
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -55,8 +40,15 @@ const createWindow = () => {
 
 
   // handle ipc calls
+  // receives text from front end sends it to emulator
+  ipcMain.on("send-text", (event, text:string) => {
+    sendCommand(`textinput:${text}`);
+    readCommand();
+  });
+
   ipcMain.on("send-command", (event, command) => {
     sendCommand(command);
+    readCommand();
   });
 
   ipcMain.on("open-ggpo", (event, command) => {
@@ -98,6 +90,11 @@ const createWindow = () => {
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
 };
+
+// read files
+setInterval(() => {
+  readCommand();
+}, 1000); // read from reflector.text every 100 ms 
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
