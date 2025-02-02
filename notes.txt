@@ -1,0 +1,11 @@
+Things I want to add - BIG
+1: direct connect just like private connections using inputs to handle the ip's
+2: An actual server maybe firebase? so people can just connect to eachother from there, similar to fightcade
+3: ability to janken for 1st or 2nd player
+
+
+Things I want to add - Small
+1: svelte or react for UI? something easy to write
+
+Things I'm trying to do - to help
+1: refactor grouflons training mode so we can just use it as a middleware to collect stats.
