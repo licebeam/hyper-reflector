@@ -90,3 +90,12 @@ typings/
 
 # Electron-Forge
 out/
+
+# remove all extra changes to config .txt from git for security -- these are all written / read from at runtime on the first line to create a file system api
+./src/config.txt
+./src/fbneo_commands.txt
+./src/reflector_commands.txt
+
+# hyper reflector team projects that are not open source
+private
+backend
