@@ -140,7 +140,7 @@ ipcMain.on('request-data', (event) => {
 // read files
 setInterval(() => {
   readCommand();
-}, 1000); // read from reflector.text every 100 ms 
+}, 1000); // read from reflector.text every 1000 ms 
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

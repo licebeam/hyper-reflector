@@ -12,15 +12,7 @@ contextBridge.exposeInMainWorld("api", {
     startSoloTraining: () => ipcRenderer.send("start-solo-mode"),
 });
 
-
+// testing sending messages from ipc main to ipcrenderer
 ipcRenderer.on('message-from-main', (event, message) => {
     console.log('Received:', message);
 });
-
-// // Request data from ipcMain
-// ipcRenderer.send('request-data');
-
-// // Handle the response
-// ipcRenderer.on('response-data', (event, data) => {
-//     console.log('Received data:', data);
-// });
