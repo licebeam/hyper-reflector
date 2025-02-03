@@ -1,27 +1,37 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import {sendCommand, readCommand} from './dusty_reader';
+import { sendCommand, readCommand } from './dusty_reader';
 import launchGGPO from './loadFbNeo';
 
 const express = require("express");
 const serverApp = express();
 const port = 8089;
 
+
+// for these file paths like fightcade path and lua path, we need some way to access this directly through electron so we do no need to update all of the time.
 serverApp.get('/serve', (req, res) => {
   const localPort = 7000;
   const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
-  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/dusty_file_reader.lua'
+  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/lua/3rd_training_lua/dusty_file_reader.lua'
   const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},127.0.0.1,7001,0,1,0 ${luaPath}`;
   launchGGPO(directCommand)
 })
+
 serverApp.get('/connect', (req, res) => {
   const localPort = 7001;
   const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
-  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/dusty_file_reader.lua'
+  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/lua/3rd_training_lua/dusty_file_reader.lua'
   const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},127.0.0.1,7000,1,1,0 ${luaPath}`;
   launchGGPO(directCommand)
 })
+
+const startSoloMode = () => {
+  const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
+  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/lua/3rd_training_lua/3rd_training.lua'
+  const directCommand = `"${fightcadePath}" -game sfiii3nr1 ${luaPath}`;
+  launchGGPO(directCommand)
+}
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -41,7 +51,7 @@ const createWindow = () => {
 
   // handle ipc calls
   // receives text from front end sends it to emulator
-  ipcMain.on("send-text", (event, text:string) => {
+  ipcMain.on("send-text", (event, text: string) => {
     sendCommand(`textinput:${text}`);
     readCommand();
   });
@@ -78,6 +88,10 @@ const createWindow = () => {
     } catch (error) {
       console.log(error);
     }
+  });
+
+  ipcMain.on("start-solo-mode", (event) => {
+    startSoloMode();
   });
 
   // and load the index.html of the app.

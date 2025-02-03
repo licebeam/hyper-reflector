@@ -16,4 +16,6 @@ within src, there is the main lua script which is being run when we open the fbn
 it also writes to reflector_commands.txt which is then sometimes parsed on command by the electron frontend. 
 essentially we are usinga text based file system read/write api. 
 
-that's the gist of it and there isn't much going on at the time of writing. Currently the app only allows for running commands/emu on your local machine.s
+that's the gist of it and there isn't much going on at the time of writing. Currently the app only allows for running commands/emu on your local machine.
+
+check the notes.txt to see what i'm currently thinking about approaching.

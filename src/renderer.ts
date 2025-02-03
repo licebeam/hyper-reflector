@@ -55,3 +55,8 @@ document.getElementById("api-connect-btn").addEventListener("click", () => {
     console.log('connecting')
     window.api.connectMatch();
 });
+
+document.getElementById("start-solo-btn").addEventListener("click", () => {
+    console.log('starting solo training')
+    window.api.startSoloTraining();
+});

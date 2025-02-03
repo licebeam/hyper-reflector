@@ -1,5 +1,7 @@
-local util_draw = require("lua/utils/draw");
-local util_colors = require("lua/utils/colors")
+-- BEFORE BUILDING COPY THIS FILE TO lua/3rd_training_lua/ in order for the scripts to use the same root directories.
+
+local util_draw = require("lua/3rd_training_lua/src/utils/draw");
+local util_colors = require("lua/3rd_training_lua/src/utils/colors")
 local command_file = "fbneo_commands.txt"
 local ext_command_file = "reflector_commands.txt" -- this is for sending back commands to electron.
 

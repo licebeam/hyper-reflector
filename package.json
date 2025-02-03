@@ -1,8 +1,8 @@
 {
-  "name": "dusty_networking",
-  "productName": "dusty_networking",
-  "version": "1.0.0",
-  "description": "My Electron application description",
+  "name": "hyper-reflector",
+  "productName": "hyper-reflector",
+  "version": "0.0.1",
+  "description": "3rd Strike matchmaking and stat tracking application",
   "main": ".vite/build/main.js",
   "scripts": {
     "start": "electron-forge start",
@@ -31,11 +31,6 @@
     "vite": "^5.4.14"
   },
   "keywords": [],
-  "author": {
-    "name": "Dustin Walker!",
-    "email": "dustinwalkerart@gmail.com"
-  },
-  "license": "MIT",
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1",
     "express": "^4.21.2"

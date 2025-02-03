@@ -10,4 +10,5 @@ contextBridge.exposeInMainWorld("api", {
     hitApi: () => ipcRenderer.send('hit-api'),
     serveMatch: () => ipcRenderer.send('serve-api'),
     connectMatch: () => ipcRenderer.send('connect-api'),
+    startSoloTraining:(text: string) => ipcRenderer.send("start-solo-mode"),
 });
