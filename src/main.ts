@@ -48,12 +48,13 @@ const createWindow = () => {
     readCommand();
   });
 
-  ipcMain.on("startP1", () => {
-    startPlayingOnline(0, 7001, "127.0.0.1", 0)
+  ipcMain.on("startP1", (event, data) => {
+    console.log(data)
+    startPlayingOnline(0, data.port || 7001, data.ip || "127.0.0.1", 0)
   });
 
-  ipcMain.on("startP2", () => {
-    startPlayingOnline(1, 7000, "127.0.0.1", 0)
+  ipcMain.on("startP2", (event, data) => {
+    startPlayingOnline(1, data.port || 7000, data.ip || "127.0.0.1", 0)
   });
 
   ipcMain.on("start-solo-mode", (event) => {

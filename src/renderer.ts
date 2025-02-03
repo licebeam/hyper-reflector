@@ -28,23 +28,27 @@
 
 import './index.css';
 
-document.getElementById("sendTextBtn").addEventListener("click", () => {
-    var text = document.getElementById("inputText").value; // typescript error, works fine
-    window.api.sendText(text);
-});
+// document.getElementById("sendTextBtn").addEventListener("click", () => {
+//     var text = document.getElementById("inputText").value; // typescript error, works fine
+//     window.api.sendText(text);
+// });
 
-document.getElementById("testBtn").addEventListener("click", () => {
-    window.api.sendCommand("game_name");
-});
+// document.getElementById("testBtn").addEventListener("click", () => {
+//     window.api.sendCommand("game_name");
+// });
 
 document.getElementById("api-serve-btn").addEventListener("click", () => {
-    console.log('serving')
-    window.api.serveMatch();
+    var port = document.getElementById("externalPort").value; // typescript error, works fine
+    var ip = document.getElementById("externalIp").value; // typescript error, works fine
+    console.log('starting match with: ', ip, ":", port)
+    window.api.serveMatch(ip, port);
 });
 
 document.getElementById("api-connect-btn").addEventListener("click", () => {
-    console.log('connecting')
-    window.api.connectMatch();
+    var port = document.getElementById("externalPort").value; // typescript error, works fine
+    var ip = document.getElementById("externalIp").value; // typescript error, works fine
+    console.log('starting match with: ', ip, ":", port)
+    window.api.connectMatch(ip, port);
 });
 
 document.getElementById("start-solo-btn").addEventListener("click", () => {
