@@ -6,9 +6,7 @@ contextBridge.exposeInMainWorld("api", {
     // sends text to the emulator using the fbneo_commands.txt
     sendText:(text: string) => ipcRenderer.send("send-text", text),
     sendCommand: (command: string) => ipcRenderer.send("send-command", command),
-    openGGPO: () => ipcRenderer.send("open-ggpo"),
-    hitApi: () => ipcRenderer.send('hit-api'),
-    serveMatch: () => ipcRenderer.send('serve-api'),
-    connectMatch: () => ipcRenderer.send('connect-api'),
-    startSoloTraining:(text: string) => ipcRenderer.send("start-solo-mode"),
+    serveMatch: () => ipcRenderer.send('startP1'),
+    connectMatch: () => ipcRenderer.send('startP2'),
+    startSoloTraining:() => ipcRenderer.send("start-solo-mode"),
 });

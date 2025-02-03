@@ -4,27 +4,14 @@ import started from 'electron-squirrel-startup';
 import { sendCommand, readCommand } from './dusty_reader';
 import launchGGPO from './loadFbNeo';
 
-const express = require("express");
-const serverApp = express();
-const port = 8089;
-
-
 // for these file paths like fightcade path and lua path, we need some way to access this directly through electron so we do no need to update all of the time.
-serverApp.get('/serve', (req, res) => {
+const startPlayingOnline = (player: number, remotePort: number, remoteIp: string, delay: number = 0) => {
   const localPort = 7000;
   const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
   const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/lua/3rd_training_lua/dusty_file_reader.lua'
-  const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},127.0.0.1,7001,0,1,0 ${luaPath}`;
+  const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`;
   launchGGPO(directCommand)
-})
-
-serverApp.get('/connect', (req, res) => {
-  const localPort = 7001;
-  const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
-  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/lua/3rd_training_lua/dusty_file_reader.lua'
-  const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},127.0.0.1,7000,1,1,0 ${luaPath}`;
-  launchGGPO(directCommand)
-})
+}
 
 const startSoloMode = () => {
   const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
@@ -61,33 +48,12 @@ const createWindow = () => {
     readCommand();
   });
 
-  ipcMain.on("open-ggpo", (event, command) => {
-    // launchGGPO()
+  ipcMain.on("startP1", () => {
+    startPlayingOnline(0, 7001, "127.0.0.1", 0)
   });
 
-  ipcMain.on("hit-api", () => {
-    try {
-      fetch('http://localhost:8089/test').catch(err => console.log(err))
-    } catch (error) {
-      console.log(error);
-    }
-  });
-
-  ipcMain.on("serve-api", () => {
-    try {
-      console.log('test')
-      fetch('http://localhost:8089/serve').catch(err => console.log(err))
-    } catch (error) {
-      console.log(error);
-    }
-  });
-
-  ipcMain.on("connect-api", () => {
-    try {
-      fetch('http://localhost:8089/connect').catch(err => console.log(err))
-    } catch (error) {
-      console.log(error);
-    }
+  ipcMain.on("startP2", () => {
+    startPlayingOnline(1, 7000, "127.0.0.1", 0)
   });
 
   ipcMain.on("start-solo-mode", (event) => {
