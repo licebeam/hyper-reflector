@@ -90,3 +90,7 @@ typings/
 
 # Electron-Forge
 out/
+
+# hyper reflector team projects that are not open source
+private
+backend

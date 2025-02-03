@@ -4,11 +4,15 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
     // sends text to the emulator using the fbneo_commands.txt
-    sendText:(text: string) => ipcRenderer.send("send-text", text),
+    setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
+    sendText: (text: string) => ipcRenderer.send("send-text", text),
     sendCommand: (command: string) => ipcRenderer.send("send-command", command),
-    openGGPO: () => ipcRenderer.send("open-ggpo"),
-    hitApi: () => ipcRenderer.send('hit-api'),
-    serveMatch: () => ipcRenderer.send('serve-api'),
-    connectMatch: () => ipcRenderer.send('connect-api'),
-    startSoloTraining:(text: string) => ipcRenderer.send("start-solo-mode"),
+    serveMatch: (ip: string, port: number) => ipcRenderer.send('startP1', { ip, port }),
+    connectMatch: (ip: string, port: number) => ipcRenderer.send('startP2', { ip, port }),
+    startSoloTraining: () => ipcRenderer.send("start-solo-mode"),
+});
+
+// testing sending messages from ipc main to ipcrenderer
+ipcRenderer.on('message-from-main', (event, message) => {
+    console.log('Received:', message);
 });
