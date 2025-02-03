@@ -34,5 +34,13 @@
   "author": "Hyper Reflector Team",
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1"
+  },
+  "build": {
+    "extraResources": [
+      {
+        "from": "src/",
+        "to": "src/"
+      }
+    ]
   }
 }

@@ -5,62 +5,12 @@ import { sendCommand, readCommand } from './dusty_reader';
 import launchGGPO from './loadFbNeo';
 const fs = require("fs");
 
-// for these file paths like fightcade path and lua path, we need some way to access this directly through electron so we do no need to update all of the time.
-const startPlayingOnline = (player: number, remotePort: number, remoteIp: string, delay: number = 0) => {
-  if (getEmulatorPath() == "undefined") {
-    new Notification({
-      title: 'error',
-      body: 'incorrect file path for your emulator'
-    }).show()
-    return
-  }
-  const localPort = 7000;
-  const fightcadePath = `${getEmulatorPath()}\\fcadefbneo.exe`;
-  const luaPath = path.join(path.join(app.getAppPath(), 'src/lua/3rd_training_lua/dusty_file_reader.lua'));
-  const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`;
-  launchGGPO(directCommand)
-}
+const isDev = !app.isPackaged;
 
-const startSoloMode = () => {
-  if (getEmulatorPath() == "undefined") {
-    new Notification({
-      title: 'error',
-      body: 'incorrect file path for your emulator'
-    }).show()
-    return
-  }
-  const fightcadePath = `${getEmulatorPath()}\\fcadefbneo.exe`;
-  const luaPath = path.join(path.join(app.getAppPath(), 'src/lua/3rd_training_lua/3rd_training.lua'));
-  const directCommand = `"${fightcadePath}" -game sfiii3nr1 ${luaPath}`;
-  launchGGPO(directCommand)
-}
-
-const setEmulatorPath = async () => {
-  try {
-    await dialog.showOpenDialog({ properties: ['openFile', 'openDirectory'] }).then(res => {
-      try {
-        // write our file path to the config.txt file
-        const filePath = path.join(path.join(app.getAppPath(), 'src/config.txt'));
-        console.log('writing to: ', res)
-        fs.writeFileSync(filePath, `emuPath=${res.filePaths[0]}`, { encoding: 'utf8' });
-      } catch (error) {
-        console.error("Failed to write to config file:", error);
-      }
-    }).catch(err => console.log(err))
-    getEmulatorPath()
-  } catch (error) {
-    console.log(error)
-  }
-}
-
-const getEmulatorPath = () => {
-  try {
-    const filePath = path.join(path.join(app.getAppPath(), 'src/config.txt'));
-    const data = fs.readFileSync(filePath, { encoding: 'utf8' });
-    return data.split("=")[1]
-  } catch (error) {
-    console.error("Failed to read file:", error);
-  }
+let filePathBase = process.resourcesPath;
+//handle dev mode toggle for file paths.
+if (isDev) {
+  filePathBase = app.getAppPath() + "\\src"
 }
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -79,6 +29,67 @@ const createWindow = () => {
     autoHideMenuBar: true,
   });
 
+  // for these file paths like fightcade path and lua path, we need some way to access this directly through electron so we do no need to update all of the time.
+  const startPlayingOnline = (player: number, remotePort: number, remoteIp: string, delay: number = 0) => {
+    if (getEmulatorPath() == "undefined" || "") {
+      new Notification({
+        title: 'error',
+        body: 'incorrect file path for your emulator'
+      }).show()
+      return
+    }
+    const localPort = 7000;
+    const fightcadePath = `${getEmulatorPath()}\\fcadefbneo.exe`;
+    const luaPath = path.join(filePathBase, '/lua/3rd_training_lua/dusty_file_reader.lua');
+    const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`;
+    launchGGPO(directCommand)
+  }
+
+  const startSoloMode = () => {
+    if (getEmulatorPath() == "undefined" || "") {
+      new Notification({
+        title: 'error',
+        body: 'incorrect file path for your emulator'
+      }).show()
+      return
+    }
+    const fightcadePath = `${getEmulatorPath()}\\fcadefbneo.exe`;
+    const luaPath = path.join(filePathBase, '/lua/3rd_training_lua/3rd_training.lua');
+    const directCommand = `"${fightcadePath}" -game sfiii3nr1 ${luaPath}`;
+    launchGGPO(directCommand)
+  }
+
+  const getEmulatorPath = () => {
+    try {
+      const filePath = path.join(filePathBase, 'config.txt');
+      const data = fs.readFileSync(filePath, { encoding: 'utf8' });
+      console.log(data.split("=")[1])
+      return data.split("=")[1]
+    } catch (error) {
+      mainWindow.webContents.send('message-from-main', error);
+      console.error("Failed to read file:", error);
+    }
+  }
+
+  const setEmulatorPath = async () => {
+    try {
+      await dialog.showOpenDialog({ properties: ['openFile', 'openDirectory'] }).then(res => {
+        try {
+          // write our file path to the config.txt file
+          const filePath = path.join(filePathBase, 'config.txt');
+          mainWindow.webContents.send('message-from-main', res);
+          console.log('writing to: ', res)
+          fs.writeFileSync(filePath, `emuPath=${res.filePaths[0]}`, { encoding: 'utf8' });
+        } catch (error) {
+          mainWindow.webContents.send('message-from-main', error);
+          console.error("Failed to write to config file:", error);
+        }
+      }).catch(err => console.log(err))
+      getEmulatorPath()
+    } catch (error) {
+      console.log(error)
+    }
+  }
 
   // handle ipc calls
   ipcMain.on("setEmulatorPath", () => {
@@ -97,6 +108,7 @@ const createWindow = () => {
   });
 
   ipcMain.on("startP1", (event, data) => {
+    mainWindow.webContents.send('message-from-main', 'starting 1p mode');
     console.log(data)
     startPlayingOnline(0, data.port || 7001, data.ip || "127.0.0.1", 0)
   });
@@ -119,6 +131,11 @@ const createWindow = () => {
   // Open the DevTools.
   // mainWindow.webContents.openDevTools();
 };
+
+// Listen for a request and respond to it
+ipcMain.on('request-data', (event) => {
+  event.sender.send('response-data', { msg: 'Here is some data from ipcMain' });
+});
 
 // read files
 setInterval(() => {
@@ -148,7 +165,6 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(() => {
-  win.setMenu(false)
 })
 
 // In this file you can include the rest of your app's specific main process

@@ -59,3 +59,10 @@ document.getElementById("start-solo-btn").addEventListener("click", () => {
     console.log('starting solo training')
     window.api.startSoloTraining();
 });
+
+// const test = async () => {
+//     const response = await window.api.ping()
+//     console.log(response) // prints out 'pong'
+//   }
+  
+//   test()
