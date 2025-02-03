@@ -7,7 +7,7 @@ const isDev = !app.isPackaged;
 let filePathBase = process.resourcesPath;
 //handle dev mode toggle for file paths.
 if (isDev) {
-    filePathBase = app.getAppPath()
+    filePathBase = app.getAppPath() + "\\src"
 }
 
 export function sendCommand(command: string = "dummy") {

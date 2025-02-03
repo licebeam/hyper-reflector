@@ -1,7 +1,7 @@
 {
   "name": "hyper-reflector",
   "productName": "hyper-reflector",
-  "version": "0.0.1",
+  "version": "0.0.1a",
   "description": "3rd Strike matchmaking and stat tracking application",
   "main": ".vite/build/main.js",
   "scripts": {
