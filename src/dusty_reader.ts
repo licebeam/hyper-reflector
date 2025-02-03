@@ -1,10 +1,11 @@
+import { app } from 'electron';
 const fs = require("fs");
 const path = require("path");
 
 
 export function sendCommand(command: string = "dummy") {
     try {
-        const filePath = "./src/fbneo_commands.txt";
+        const filePath = path.join(path.join(app.getAppPath(), 'src/fbneo_commands.txt'));
         console.log('writing to: ', filePath)
         fs.writeFileSync(filePath, command, { encoding: 'utf8' });
         console.log(`Command written: ${command}`);
@@ -15,7 +16,7 @@ export function sendCommand(command: string = "dummy") {
 
 export function readCommand() {
     try {
-        const filePath = "./src/reflector_commands.txt";
+        const filePath = path.join(path.join(app.getAppPath(), 'src/reflector_commands.txt'));
         // console.log('read from: ', filePath)
         const data = fs.readFileSync(filePath, { encoding: 'utf8' });
         console.log('file read ', data);

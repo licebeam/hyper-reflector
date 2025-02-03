@@ -1,23 +1,66 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { sendCommand, readCommand } from './dusty_reader';
 import launchGGPO from './loadFbNeo';
+const fs = require("fs");
 
 // for these file paths like fightcade path and lua path, we need some way to access this directly through electron so we do no need to update all of the time.
 const startPlayingOnline = (player: number, remotePort: number, remoteIp: string, delay: number = 0) => {
+  if (getEmulatorPath() == "undefined") {
+    new Notification({
+      title: 'error',
+      body: 'incorrect file path for your emulator'
+    }).show()
+    return
+  }
   const localPort = 7000;
-  const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
-  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/lua/3rd_training_lua/dusty_file_reader.lua'
+  const fightcadePath = `${getEmulatorPath()}\\fcadefbneo.exe`;
+  const luaPath = path.join(path.join(app.getAppPath(), 'src/lua/3rd_training_lua/dusty_file_reader.lua'));
   const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`;
   launchGGPO(directCommand)
 }
 
 const startSoloMode = () => {
-  const fightcadePath = "C:/Users/dusti/Documents/Fightcade/emulator/fbneo/fcadefbneo.exe";
-  const luaPath = 'C:/Users/dusti/Documents/3rd_training_lua/dusty_networking/dusty_networking/src/lua/3rd_training_lua/3rd_training.lua'
+  if (getEmulatorPath() == "undefined") {
+    new Notification({
+      title: 'error',
+      body: 'incorrect file path for your emulator'
+    }).show()
+    return
+  }
+  const fightcadePath = `${getEmulatorPath()}\\fcadefbneo.exe`;
+  const luaPath = path.join(path.join(app.getAppPath(), 'src/lua/3rd_training_lua/3rd_training.lua'));
   const directCommand = `"${fightcadePath}" -game sfiii3nr1 ${luaPath}`;
   launchGGPO(directCommand)
+}
+
+const setEmulatorPath = async () => {
+  try {
+    await dialog.showOpenDialog({ properties: ['openFile', 'openDirectory'] }).then(res => {
+      try {
+        // write our file path to the config.txt file
+        const filePath = path.join(path.join(app.getAppPath(), 'src/config.txt'));
+        console.log('writing to: ', res)
+        fs.writeFileSync(filePath, `emuPath=${res.filePaths[0]}`, { encoding: 'utf8' });
+      } catch (error) {
+        console.error("Failed to write to config file:", error);
+      }
+    }).catch(err => console.log(err))
+    getEmulatorPath()
+  } catch (error) {
+    console.log(error)
+  }
+}
+
+const getEmulatorPath = () => {
+  try {
+    const filePath = path.join(path.join(app.getAppPath(), 'src/config.txt'));
+    const data = fs.readFileSync(filePath, { encoding: 'utf8' });
+    return data.split("=")[1]
+  } catch (error) {
+    console.error("Failed to read file:", error);
+  }
 }
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -33,10 +76,15 @@ const createWindow = () => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
+    autoHideMenuBar: true,
   });
 
 
   // handle ipc calls
+  ipcMain.on("setEmulatorPath", () => {
+    setEmulatorPath();
+  });
+
   // receives text from front end sends it to emulator
   ipcMain.on("send-text", (event, text: string) => {
     sendCommand(`textinput:${text}`);
@@ -69,7 +117,7 @@ const createWindow = () => {
   }
 
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 };
 
 // read files
@@ -100,11 +148,7 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(() => {
-  serverApp.listen(port, () => {
-    console.log('listening to port: ', port)
-  });
-
-  serverApp.use(myLogger)
+  win.setMenu(false)
 })
 
 // In this file you can include the rest of your app's specific main process

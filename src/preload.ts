@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
     // sends text to the emulator using the fbneo_commands.txt
+    setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     sendText: (text: string) => ipcRenderer.send("send-text", text),
     sendCommand: (command: string) => ipcRenderer.send("send-command", command),
     serveMatch: (ip: string, port: number) => ipcRenderer.send('startP1', { ip, port }),

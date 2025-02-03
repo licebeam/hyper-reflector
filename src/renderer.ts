@@ -37,6 +37,10 @@ import './index.css';
 //     window.api.sendCommand("game_name");
 // });
 
+document.getElementById("setEmuPathBtn").addEventListener("click", () => {
+    window.api.setEmulatorPath();
+});
+
 document.getElementById("api-serve-btn").addEventListener("click", () => {
     var port = document.getElementById("externalPort").value; // typescript error, works fine
     var ip = document.getElementById("externalIp").value; // typescript error, works fine
