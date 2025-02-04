@@ -28,14 +28,14 @@
 
 import './index.css';
 
-// document.getElementById("sendTextBtn").addEventListener("click", () => {
-//     var text = document.getElementById("inputText").value; // typescript error, works fine
-//     window.api.sendText(text);
-// });
+document.getElementById("sendTextBtn").addEventListener("click", () => {
+    var text = document.getElementById("inputText").value; // typescript error, works fine
+    window.api.sendText(text);
+});
 
-// document.getElementById("testBtn").addEventListener("click", () => {
-//     window.api.sendCommand("game_name");
-// });
+document.getElementById("testBtn").addEventListener("click", () => {
+    window.api.sendCommand("game_name");
+});
 
 document.getElementById("setEmuPathBtn").addEventListener("click", () => {
     window.api.setEmulatorPath();

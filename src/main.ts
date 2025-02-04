@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import { sendCommand, readCommand } from './dusty_reader';
+import { sendCommand, readCommand, readStatFile } from './sendHyperCommands';
 import launchGGPO from './loadFbNeo';
 const fs = require("fs");
 
@@ -40,7 +40,7 @@ const createWindow = () => {
     }
     const localPort = 7000;
     const fightcadePath = `${getEmulatorPath()}\\fcadefbneo.exe`;
-    const luaPath = path.join(filePathBase, '/lua/3rd_training_lua/dusty_file_reader.lua');
+    const luaPath = path.join(filePathBase, '/lua/3rd_training_lua/readHyperCommands.lua');
     const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`;
     launchGGPO(directCommand)
   }
@@ -100,6 +100,7 @@ const createWindow = () => {
   ipcMain.on("send-text", (event, text: string) => {
     sendCommand(`textinput:${text}`);
     readCommand();
+    readStatFile(mainWindow);
   });
 
   ipcMain.on("send-command", (event, command) => {
