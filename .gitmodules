@@ -1,0 +1,3 @@
+[submodule "src/lua/3rd_training_lua"]
+	path = src/lua/3rd_training_lua
+	url = https://github.com/licebeam/3rd_training_lua.git
