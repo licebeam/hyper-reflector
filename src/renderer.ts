@@ -142,6 +142,7 @@ signalingServer.onmessage = async (message) => {
 
 // Create an offer and send it to the other peer
 async function startCall() {
+    createDataChannel()
     console.log('test')
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
