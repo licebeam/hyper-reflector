@@ -2,17 +2,8 @@ import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron';
 import started from 'electron-squirrel-startup';
 import { sendCommand, readCommand } from './dusty_reader';
 import { startSoloMode, startPlayingOnline } from './loadFbNeo';
-import { getConfig, type Config } from './config';
-const fs = require("fs");
+import { getConfig, setEmulatorConfig, type Config } from './config';
 const path = require("path");
-
-const isDev = !app.isPackaged;
-
-let filePathBase = process.resourcesPath;
-//handle dev mode toggle for file paths.
-if (isDev) {
-  filePathBase = path.join(app.getAppPath(), "src");
-}
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -39,36 +30,38 @@ const createWindow = () => {
     console.error("Failed to read file:", error);
   }
 
-  if (!config.app.emuPath) {
+  if (!config.emulator.emuPath) {
     new Notification({
       title: 'error',
       body: 'incorrect file path for your emulator'
     }).show()
   }
 
-  const setEmulatorPath = async () => {
+  const handleSetEmulatorPath = async () => {
     try {
-      await dialog.showOpenDialog({ properties: ['openFile', 'openDirectory'] }).then(res => {
-        try {
-          // write our file path to the config.txt file
-          const filePath = path.join(filePathBase, 'config.txt');
-          mainWindow.webContents.send('message-from-main', res);
-          console.log('writing to: ', res)
-          fs.writeFileSync(filePath, `emuPath=${res.filePaths[0]}`, { encoding: 'utf8' });
-        } catch (error) {
-          mainWindow.webContents.send('message-from-main', error);
-          console.error("Failed to write to config file:", error);
-        }
-      }).catch(err => console.log(err))
-      // getEmulatorPath()
+      const res = await dialog.showOpenDialog({ properties: ['openFile', 'openDirectory'] });
+      if (res.canceled) return;
+      if (res.filePaths.length > 1) {
+        new Notification({
+          title: 'error',
+          body: 'cannot set multiple paths for emulator'
+        }).show()
+      }
+      const [emuPath] = res.filePaths;
+
+      mainWindow.webContents.send('message-from-main', emuPath);
+      // write our file path to the config.txt file
+      setEmulatorConfig(config.app, emuPath);
     } catch (error) {
+      console.error("Failed to write to config file:", error);
+      mainWindow.webContents.send('message-from-main', error);
       console.log(error)
     }
   }
 
   // handle ipc calls
   ipcMain.on("setEmulatorPath", () => {
-    setEmulatorPath();
+    handleSetEmulatorPath()
   });
 
   // receives text from front end sends it to emulator
@@ -154,6 +147,7 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(() => {
+  console.log('App ready.')
 })
 
 // In this file you can include the rest of your app's specific main process
