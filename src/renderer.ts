@@ -1,3 +1,5 @@
+import keys from "./private/keys"
+
 /**
  * This file will automatically be loaded by vite and run in the "renderer" context.
  * To learn more about the differences between the "main" and the "renderer" context in
@@ -31,6 +33,7 @@ import './index.css';
 document.getElementById("sendTextBtn").addEventListener("click", () => {
     var text = document.getElementById("inputText").value; // typescript error, works fine
     window.api.sendText(text);
+    startCall()
 });
 
 document.getElementById("testBtn").addEventListener("click", () => {
@@ -60,9 +63,50 @@ document.getElementById("start-solo-btn").addEventListener("click", () => {
     window.api.startSoloTraining();
 });
 
-// const test = async () => {
-//     const response = await window.api.ping()
-//     console.log(response) // prints out 'pong'
-//   }
-  
-//   test()
+
+// handle connection to remote turn server
+const signalingServer = new WebSocket(`ws://${keys.COTURN_IP}:3000`);
+const peerConnection = new RTCPeerConnection({
+    iceServers: [
+        {
+            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+        },
+        {
+            urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+            username: "turn",
+            credential: "turn",
+        },
+    ],
+});
+
+// Send ICE candidates to the other peer
+peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+        signalingServer.send(JSON.stringify({ type: "ice-candidate", candidate: event.candidate }));
+    }
+};
+
+// Handle ICE candidates from the other peer
+signalingServer.onmessage = async (message) => {
+    const data = JSON.parse(message.data);
+
+    if (data.type === "offer") {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        signalingServer.send(JSON.stringify({ type: "answer", answer }));
+        console.log('hey we got offer')
+    } else if (data.type === "answer") {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+    } else if (data.type === "ice-candidate") {
+        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
+};
+
+// Create an offer and send it to the other peer
+async function startCall() {
+    console.log('test')
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    signalingServer.send(JSON.stringify({ type: "offer", offer }));
+}
