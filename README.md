@@ -19,3 +19,8 @@ essentially we are usinga text based file system read/write api.
 that's the gist of it and there isn't much going on at the time of writing. Currently the app only allows for running commands/emu on your local machine.
 
 check the notes.txt to see what i'm currently thinking about approaching.
+
+# Config
+
+EmuPath should be something like:
+emuPath=C:\Users\dusti\Documents\Fightcade\emulator\fbneo
