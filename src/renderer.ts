@@ -88,8 +88,10 @@ peerConnection.onicecandidate = (event) => {
 
 // Handle ICE candidates from the other peer
 signalingServer.onmessage = async (message) => {
-    const data = JSON.parse(message.data);
+    console.log(JSON.stringify(message))
+    const data = message.data;
 
+    console.log(data)
     if (data.type === "offer") {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
         const answer = await peerConnection.createAnswer();
@@ -97,8 +99,10 @@ signalingServer.onmessage = async (message) => {
         signalingServer.send(JSON.stringify({ type: "answer", answer }));
         console.log('hey we got offer')
     } else if (data.type === "answer") {
+        console.log('hey we got answer')
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
     } else if (data.type === "ice-candidate") {
+        console.log('hey we got candidate')
         await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
     }
 };
