@@ -10,7 +10,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
-    extraResource: ['./src/lua', './src/fbneo_commands.txt', './src/reflector_commands.txt', './src/config.txt']
+    extraResource: ['./src/lua', './src/fbneo_commands.txt', './src/reflector_commands.txt', './src/config.txt', './resources/config.json']
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
