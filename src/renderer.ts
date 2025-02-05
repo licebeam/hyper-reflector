@@ -86,11 +86,25 @@ peerConnection.onicecandidate = (event) => {
     }
 };
 
+async function convertBlob(event: any){
+    try {
+        // check if event is not JSON but is blob
+        if (event.data instanceof Blob) {
+          const text = await event.data.text();
+          const data = JSON.parse(text);
+          return data
+        } else {
+          const data = JSON.parse(event.data);
+          return data
+        }
+      } catch (error) {
+        console.error("could not convert data:", event.data, error);
+      }
+}
+
 // Handle ICE candidates from the other peer
 signalingServer.onmessage = async (message) => {
-    console.log(JSON.stringify(message))
-    const data = message.data;
-
+    const data = await convertBlob(message).then(res => res);
     console.log(data)
     if (data.type === "offer") {
         await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
