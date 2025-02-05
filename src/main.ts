@@ -1,16 +1,17 @@
 import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron';
-import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { sendCommand, readCommand, readStatFile } from './sendHyperCommands';
-import launchGGPO from './loadFbNeo';
+import {startPlayingOnline, startSoloMode} from './loadFbNeo';
+import { getConfig, type Config } from './config';
 const fs = require("fs");
+const path = require("path");
 
 const isDev = !app.isPackaged;
 
 let filePathBase = process.resourcesPath;
 //handle dev mode toggle for file paths.
 if (isDev) {
-  filePathBase = app.getAppPath() + "\\src"
+  filePathBase = path.join(app.getAppPath(), "src");
 }
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -29,46 +30,20 @@ const createWindow = () => {
     autoHideMenuBar: true,
   });
 
-  // for these file paths like fightcade path and lua path, we need some way to access this directly through electron so we do no need to update all of the time.
-  const startPlayingOnline = (player: number, remotePort: number, remoteIp: string, delay: number = 0) => {
-    if (getEmulatorPath() == "undefined" || "") {
-      new Notification({
-        title: 'error',
-        body: 'incorrect file path for your emulator'
-      }).show()
-      return
-    }
-    const localPort = 7000;
-    const fightcadePath = `${getEmulatorPath()}\\fcadefbneo.exe`;
-    const luaPath = path.join(filePathBase, '/lua/3rd_training_lua/readHyperCommands.lua');
-    const directCommand = `"${fightcadePath}" quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`;
-    launchGGPO(directCommand)
+  let config: Config
+  try {
+    config = getConfig();
+    console.log({ config })
+  } catch (error) {
+    mainWindow.webContents.send('message-from-main', error);
+    console.error("Failed to read file:", error);
   }
 
-  const startSoloMode = () => {
-    if (getEmulatorPath() == "undefined" || "") {
-      new Notification({
-        title: 'error',
-        body: 'incorrect file path for your emulator'
-      }).show()
-      return
-    }
-    const fightcadePath = `${getEmulatorPath()}\\fcadefbneo.exe`;
-    const luaPath = path.join(filePathBase, '/lua/3rd_training_lua/3rd_training.lua');
-    const directCommand = `"${fightcadePath}" -game sfiii3nr1 ${luaPath}`;
-    launchGGPO(directCommand)
-  }
-
-  const getEmulatorPath = () => {
-    try {
-      const filePath = path.join(filePathBase, 'config.txt');
-      const data = fs.readFileSync(filePath, { encoding: 'utf8' });
-      console.log(data.split("=")[1])
-      return data.split("=")[1]
-    } catch (error) {
-      mainWindow.webContents.send('message-from-main', error);
-      console.error("Failed to read file:", error);
-    }
+  if (!config.app.emuPath) {
+    new Notification({
+      title: 'error',
+      body: 'incorrect file path for your emulator'
+    }).show()
   }
 
   const setEmulatorPath = async () => {
@@ -85,7 +60,7 @@ const createWindow = () => {
           console.error("Failed to write to config file:", error);
         }
       }).catch(err => console.log(err))
-      getEmulatorPath()
+      // getEmulatorPath()
     } catch (error) {
       console.log(error)
     }
@@ -111,15 +86,29 @@ const createWindow = () => {
   ipcMain.on("startP1", (event, data) => {
     mainWindow.webContents.send('message-from-main', 'starting 1p mode');
     console.log(data)
-    startPlayingOnline(0, data.port || 7001, data.ip || "127.0.0.1", 0)
+    startPlayingOnline({
+      config,
+      localPort: 7000,
+      remoteIp: data.ip || "127.0.0.1",
+      remotePort: data.port || 7001,
+      player: 0,
+      delay: 0, 
+    })
   });
 
   ipcMain.on("startP2", (event, data) => {
-    startPlayingOnline(1, data.port || 7000, data.ip || "127.0.0.1", 0)
+    startPlayingOnline({
+      config,
+      localPort: 7001,
+      remoteIp: data.ip || "127.0.0.1",
+      remotePort: data.port || 7000,
+      player: 1,
+      delay: 0, 
+    })
   });
 
   ipcMain.on("start-solo-mode", (event) => {
-    startSoloMode();
+    startSoloMode({ config });
   });
 
   // and load the index.html of the app.
