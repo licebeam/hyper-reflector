@@ -30,6 +30,9 @@ import keys from "./private/keys"
 
 import './index.css';
 
+let connectPort = 0;
+let connectIp = '0.0.0.0';
+
 document.getElementById("sendTextBtn").addEventListener("click", () => {
     var text = document.getElementById("inputText").value; // typescript error, works fine
     window.api.sendText(text);
@@ -48,15 +51,15 @@ document.getElementById("setEmuPathBtn").addEventListener("click", () => {
 document.getElementById("api-serve-btn").addEventListener("click", () => {
     var port = document.getElementById("externalPort").value; // typescript error, works fine
     var ip = document.getElementById("externalIp").value; // typescript error, works fine
-    console.log('starting match with: ', ip, ":", port)
-    window.api.serveMatch(ip, port);
+    console.log('starting match with: ', connectIp, ":", connectPort)
+    window.api.serveMatch(connectIp, connectPort);
 });
 
 document.getElementById("api-connect-btn").addEventListener("click", () => {
     var port = document.getElementById("externalPort").value; // typescript error, works fine
     var ip = document.getElementById("externalIp").value; // typescript error, works fine
-    console.log('starting match with: ', ip, ":", port)
-    window.api.connectMatch(ip, port);
+    console.log('starting match with: ', connectIp, ":", connectPort)
+    window.api.connectMatch(connectIp, connectPort);
 });
 
 document.getElementById("start-solo-btn").addEventListener("click", () => {
@@ -97,10 +100,19 @@ peerConnection.ondatachannel = (event) => {
     dataChannel.onmessage = (event) => console.log("Received:", event.data);
 };
 
-// Send ICE candidates to the other peer
+// Send ICE candidates to the other peer - ie users
 peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
         signalingServer.send(JSON.stringify({ type: "ice-candidate", candidate: event.candidate }));
+        // if the below is true it means we've successfully ud tunnelled to the candidate...
+        if (event.candidate.type === "relay") {
+            // we should be able use the below information on relayed players to connect via fbneo
+            console.log("ICE Candidate:", event.candidate);
+            console.log(event.candidate.address, event.candidate.port)
+            connectPort=event.candidate.port
+            connectIp=event.candidate.address
+            console.log("UDP tunneled through TURN server!");
+        }
     }
 };
 
@@ -153,6 +165,6 @@ async function startCall() {
 function sendGameData(data) {
     console.log('sending data')
     if (dataChannel && dataChannel.readyState === "open") {
-      dataChannel.send(JSON.stringify(data));
+        dataChannel.send(JSON.stringify(data));
     }
-  }
+}

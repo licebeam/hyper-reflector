@@ -4,23 +4,6 @@ import { sendCommand, readCommand, readStatFile } from './sendHyperCommands';
 import {startPlayingOnline, startSoloMode} from './loadFbNeo';
 import { getConfig, type Config } from './config';
 
-
-const WebSocket = require("ws");
-const wss = new WebSocket.Server({ port: 3000 });
-
-// Start out signaling server
-wss.on("connection", (ws) => {
-  ws.on("message", (message) => {
-    // Broadcast message to all clients except sender
-    wss.clients.forEach((client) => {
-      if (client !== ws && client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    });
-  });
-});
-// end signal server
-
 const fs = require("fs");
 const path = require("path");
 
