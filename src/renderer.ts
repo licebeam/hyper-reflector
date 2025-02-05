@@ -38,6 +38,7 @@ document.getElementById("sendTextBtn").addEventListener("click", () => {
 
 document.getElementById("testBtn").addEventListener("click", () => {
     window.api.sendCommand("game_name");
+    sendGameData('some number etc')
 });
 
 document.getElementById("setEmuPathBtn").addEventListener("click", () => {
@@ -79,6 +80,23 @@ const peerConnection = new RTCPeerConnection({
     ],
 });
 
+let dataChannel; // Will store the game data channel
+
+// Create Data Channel (for the player who starts the connection)
+function createDataChannel() {
+    dataChannel = peerConnection.createDataChannel("game", { reliable: true });
+
+    dataChannel.onopen = () => console.log("Data Channel Open!");
+    dataChannel.onmessage = (event) => console.log("Received:", event.data);
+}
+
+// Handle Incoming Data Channel (for the player receiving the connection)
+peerConnection.ondatachannel = (event) => {
+    dataChannel = event.channel;
+    dataChannel.onopen = () => console.log("Data Channel Open!");
+    dataChannel.onmessage = (event) => console.log("Received:", event.data);
+};
+
 // Send ICE candidates to the other peer
 peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
@@ -86,20 +104,21 @@ peerConnection.onicecandidate = (event) => {
     }
 };
 
-async function convertBlob(event: any){
+async function convertBlob(event: any) {
     try {
         // check if event is not JSON but is blob
         if (event.data instanceof Blob) {
-          const text = await event.data.text();
-          const data = JSON.parse(text);
-          return data
+            const text = await event.data.text();
+            const data = JSON.parse(text);
+            console.log(data)
+            return data
         } else {
-          const data = JSON.parse(event.data);
-          return data
+            const data = JSON.parse(event.data);
+            return data
         }
-      } catch (error) {
+    } catch (error) {
         console.error("could not convert data:", event.data, error);
-      }
+    }
 }
 
 // Handle ICE candidates from the other peer
@@ -128,3 +147,11 @@ async function startCall() {
     await peerConnection.setLocalDescription(offer);
     signalingServer.send(JSON.stringify({ type: "offer", offer }));
 }
+
+// Send Game Data
+function sendGameData(data) {
+    console.log('sending data')
+    if (dataChannel && dataChannel.readyState === "open") {
+      dataChannel.send(JSON.stringify(data));
+    }
+  }
