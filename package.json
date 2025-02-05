@@ -33,6 +33,7 @@
   "keywords": [],
   "author": "Hyper Reflector Team",
   "dependencies": {
+    "@types/node": "^22.13.1",
     "electron-squirrel-startup": "^1.0.1"
   },
   "build": {

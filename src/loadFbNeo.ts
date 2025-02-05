@@ -1,4 +1,7 @@
 const { exec } = require('child_process');
+const path = require('path');
+
+import { Config } from './config';
 
 export default function launchGGPO(command){
     try {
@@ -16,5 +19,51 @@ export default function launchGGPO(command){
     } catch (error) {
         console.log(error)
     }
-
 }
+
+function fightcadeCmd(config: Config) {
+  const { fightcadePath } = config.emulator;
+  console.log({ platform: process.platform });
+  switch(process.platform) {
+    case "linux":
+      return `wine "${fightcadePath}"`
+    default:
+      return `"${fightcadePath}"`
+  }
+}
+
+/**
+ * for these file paths like fightcade path and lua path, we need some way to access this directly through electron so we do no need to update all of the time.
+ */
+export function startPlayingOnline({
+  config,
+  localPort,
+  remoteIp,
+  remotePort,
+  player,
+  delay, 
+}: {
+  config: Config;
+  localPort: number;
+  remoteIp: string;
+  remotePort: number;
+  player: number;
+  delay: number;
+}) {
+  const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${config.emulator.luaPath}`;
+  console.log({ directCommand });
+
+  launchGGPO(directCommand);
+}
+
+
+export function startSoloMode({
+  config,
+}: {
+  config: Config;
+}) {
+  const directCommand = `${fightcadeCmd(config)} -game sfiii3nr1 ${config.emulator.luaPath}`;
+  console.log({ directCommand });
+  launchGGPO(directCommand)
+}
+
