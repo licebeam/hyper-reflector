@@ -1,8 +1,24 @@
 import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron';
 import started from 'electron-squirrel-startup';
 import { sendCommand, readCommand, readStatFile } from './sendHyperCommands';
-import {startPlayingOnline, startSoloMode} from './loadFbNeo';
+import { startPlayingOnline, startSoloMode } from './loadFbNeo';
 import { getConfig, type Config } from './config';
+
+// - FIREBASE CODE
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { firebaseConfig } from './private/firebase';
+
+// TODO: Replace the following with your app's Firebase project configuration
+// See: https://firebase.google.com/docs/web/learn-more#config-object
+// Initialize Firebase
+const fbapp = initializeApp(firebaseConfig);
+
+
+// Initialize Firebase Authentication and get a reference to the service
+const auth = getAuth(fbapp);
+// END FIREBASE
+
 
 const fs = require("fs");
 const path = require("path");
@@ -67,6 +83,28 @@ const createWindow = () => {
     }
   }
 
+  // firebase test
+  function handleLogin(email, password) {
+    console.log('attempting to log in ---------------------------------------------')
+    // test login
+    try {
+      signInWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+          // Signed in 
+          const user = userCredential.user;
+          console.log('logged in')
+          // ...
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          console.log('failed to log in', error.code)
+        });
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
   // handle ipc calls
   ipcMain.on("setEmulatorPath", () => {
     setEmulatorPath();
@@ -75,11 +113,14 @@ const createWindow = () => {
   // receives text from front end sends it to emulator
   ipcMain.on("send-text", (event, text: string) => {
     sendCommand(`textinput:${text}`);
+    // test functions
     readCommand();
     readStatFile(mainWindow);
+    handleLogin('dustinwalkerart@gmail.com', 'testpass')
   });
 
   ipcMain.on("send-command", (event, command) => {
+    handleLogin('hey', 'hey')
     sendCommand(command);
     readCommand();
   });
@@ -93,7 +134,7 @@ const createWindow = () => {
       remoteIp: data.ip || "127.0.0.1",
       remotePort: data.port || 7001,
       player: 0,
-      delay: 0, 
+      delay: 0,
     })
   });
 
@@ -104,7 +145,7 @@ const createWindow = () => {
       remoteIp: data.ip || "127.0.0.1",
       remotePort: data.port || 7000,
       player: 1,
-      delay: 0, 
+      delay: 0,
     })
   });
 
@@ -130,7 +171,8 @@ ipcMain.on('request-data', (event) => {
 
 // read files
 setInterval(() => {
-  readCommand();
+  // currently we aren't really using this polling, but we will eventually need something like this
+  // readCommand();
 }, 1000); // read from reflector.text every 1000 ms 
 
 // This method will be called when Electron has finished
@@ -156,6 +198,7 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(() => {
+
 })
 
 // In this file you can include the rest of your app's specific main process

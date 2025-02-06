@@ -1,5 +1,4 @@
 import keys from "./private/keys"
-
 /**
  * This file will automatically be loaded by vite and run in the "renderer" context.
  * To learn more about the differences between the "main" and the "renderer" context in
@@ -109,8 +108,8 @@ peerConnection.onicecandidate = (event) => {
             // we should be able use the below information on relayed players to connect via fbneo
             console.log("ICE Candidate:", event.candidate);
             console.log(event.candidate.address, event.candidate.port)
-            connectPort=event.candidate.port
-            connectIp=event.candidate.address
+            connectPort = event.candidate.port
+            connectIp = event.candidate.address
             console.log("UDP tunneled through TURN server!");
         }
     }
