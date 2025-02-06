@@ -3,22 +3,20 @@ import started from 'electron-squirrel-startup';
 import { sendCommand, readCommand, readStatFile } from './sendHyperCommands';
 import { startPlayingOnline, startSoloMode } from './loadFbNeo';
 import { getConfig, type Config } from './config';
+// external api
+import api from './external-api/requests'
 
-// - FIREBASE CODE
+// - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { firebaseConfig } from './private/firebase';
 
-// TODO: Replace the following with your app's Firebase project configuration
-// See: https://firebase.google.com/docs/web/learn-more#config-object
 // Initialize Firebase
 const fbapp = initializeApp(firebaseConfig);
-
 
 // Initialize Firebase Authentication and get a reference to the service
 const auth = getAuth(fbapp);
 // END FIREBASE
-
 
 const fs = require("fs");
 const path = require("path");
@@ -92,7 +90,7 @@ const createWindow = () => {
         .then((userCredential) => {
           // Signed in 
           const user = userCredential.user;
-          console.log('logged in')
+          console.log('logged in', userCredential)
           // ...
         })
         .catch((error) => {
@@ -116,13 +114,16 @@ const createWindow = () => {
     // test functions
     readCommand();
     readStatFile(mainWindow);
-    handleLogin('dustinwalkerart@gmail.com', 'testpass')
+    // firebase testing delete me later
+    handleLogin('testguy@gmail.com', 'testpass')
   });
 
   ipcMain.on("send-command", (event, command) => {
-    handleLogin('hey', 'hey')
     sendCommand(command);
-    readCommand();
+    readCommand(); 
+    // external api testing delete me later
+    api.externalApiDoSomething(auth);
+    //console.log(auth)
   });
 
   ipcMain.on("startP1", (event, data) => {
