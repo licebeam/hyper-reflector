@@ -10,10 +10,17 @@ function checkCurrentAuthState(auth) {
 
 async function externalApiDoSomething(auth) {
     if (checkCurrentAuthState(auth)) {
+        const idToken = await auth.currentUser.getIdToken().then((res) => res);
         try {
+            // ${keys.COTURN_IP}
             // works but maybe we should move to an ssl cert for https
-            const response = await fetch(`http://${keys.COTURN_IP}:${keys.API_PORT}/test`)
-            console.log(response)
+            fetch(`http://127.0.0.1:${keys.API_PORT}/test`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ idToken: idToken || 'not real' })
+            })
         } catch (error) {
             console.log(error)
             console.error(error.message)
