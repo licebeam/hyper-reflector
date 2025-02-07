@@ -10,12 +10,20 @@ contextBridge.exposeInMainWorld("api", {
     serveMatch: (ip: string, port: number) => ipcRenderer.send('startP1', { ip, port }),
     connectMatch: (ip: string, port: number) => ipcRenderer.send('startP2', { ip, port }),
     startSoloTraining: () => ipcRenderer.send("start-solo-mode"),
+    loginUser: (loginObject: { name: string, pass: string }) => ipcRenderer.send('login-user', loginObject),
+    // testing on functionality
+    on: (channel, callback) => {
+        ipcRenderer.on(channel, (event, ...args) => callback(...args));
+    },
+    removeListener: (channel, callback) => {
+        ipcRenderer.removeListener(channel, callback);
+    },
 });
 
-// testing sending messages from ipc main to ipcrenderer
-ipcRenderer.on('message-from-main', (event, message) => {
-    console.log('Received:', message);
-});
+// // testing sending messages from ipc main to ipcrenderer
+// ipcRenderer.on('message-from-main', (event, message) => {
+//     console.log('Received:', message);
+// });
 
 ipcRenderer.on('stats-from-main', (event, message) => {
     console.log('Stats to update the UI with:', message);

@@ -13,6 +13,5 @@
     "resolveJsonModule": true,
     "types": ["node"],
     "jsx": "react",
-    "tsx": "react"
   }
 }

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
-import TestComponent from './TestComponent';
+import StartPage from './pages/StartPage';
 
 const root = createRoot(document.body);
-root.render(<TestComponent/>);
+root.render(<StartPage/>);

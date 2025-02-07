@@ -40,6 +40,11 @@ const createWindow = () => {
     width: 800,
     height: 600,
     webPreferences: {
+      // potential security issue = https://stackoverflow.com/questions/48148021/how-to-import-ipcrenderer-in-react
+      // but this allows us to use ipc calls in useEffects in react
+      // nodeIntegration: true, 
+      // contextIsolation: false,
+      // 
       preload: path.join(__dirname, 'preload.js'),
     },
     autoHideMenuBar: true,
@@ -82,21 +87,20 @@ const createWindow = () => {
   }
 
   // firebase test
-  function handleLogin(email, password) {
-    console.log('attempting to log in ---------------------------------------------')
-    // test login
+  async function handleLogin(email: string, password: string) {
+    mainWindow.webContents.send('logging-in', 'trying to log in');
     try {
-      signInWithEmailAndPassword(auth, email, password)
+      await signInWithEmailAndPassword(auth, email, password)
         .then((userCredential) => {
-          // Signed in 
+          // successful sign in, send data to front end!
           const user = userCredential.user;
-          console.log('logged in', userCredential)
-          // ...
+          mainWindow.webContents.send('login-success', { name: user.displayName, email: user.email, uid: user.uid });
         })
         .catch((error) => {
           const errorCode = error.code;
           const errorMessage = error.message;
           console.log('failed to log in', error.code)
+          mainWindow.webContents.send('login-failed', 'login failed');
         });
     } catch (error) {
       console.log(error)
@@ -104,6 +108,11 @@ const createWindow = () => {
   }
 
   // handle ipc calls
+  ipcMain.on("login-user", (event, login) => {
+    console.log('should login user', login)
+    handleLogin(login.name, login.pass);
+  });
+
   ipcMain.on("setEmulatorPath", () => {
     setEmulatorPath();
   });
@@ -114,13 +123,11 @@ const createWindow = () => {
     // test functions
     readCommand();
     readStatFile(mainWindow);
-    // firebase testing delete me later
-    handleLogin('testguy@gmail.com', 'testpass')
   });
 
   ipcMain.on("send-command", (event, command) => {
     sendCommand(command);
-    readCommand(); 
+    readCommand();
     // external api testing delete me later
     api.externalApiDoSomething(auth);
     //console.log(auth)
