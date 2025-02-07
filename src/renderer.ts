@@ -126,9 +126,12 @@ function connectWebSocket(user) {
     };
 
     signalServerSocket.onmessage = async (message) => {
-        console.log('recieved message', message)
+        // console.log('recieved message', message)
         const data = await convertBlob(message).then(res => res);
         console.log(data)
+        if (data.type === "user-message") {
+            console.log(data)
+        }
         if (data.type === "offer") {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
             const answer = await peerConnection.createAnswer();
@@ -147,7 +150,7 @@ function connectWebSocket(user) {
     //allow users to chat
     window.api.on('user-message', (text: string) => {
         // sends a message over to another user
-        signalServerSocket.send(JSON.stringify(`${user.email}:${text}`))
+        signalServerSocket.send(JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.email }))
     });
 
 
