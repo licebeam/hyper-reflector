@@ -34,8 +34,11 @@
   "author": "Hyper Reflector Team",
   "dependencies": {
     "@types/node": "^22.13.1",
+    "@types/react": "^19.0.8",
     "electron-squirrel-startup": "^1.0.1",
-    "firebase": "^11.2.0"
+    "firebase": "^11.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "build": {
     "extraResources": [

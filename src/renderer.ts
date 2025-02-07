@@ -28,6 +28,7 @@ import keys from "./private/keys"
  */
 
 import './index.css';
+import './app.tsx'
 
 let connectPort = 0;
 let connectIp = '0.0.0.0';
