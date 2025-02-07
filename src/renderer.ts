@@ -125,6 +125,32 @@ function connectWebSocket(user) {
         console.error("WebSocket Error:", error);
     };
 
+    signalServerSocket.onmessage = async (message) => {
+        console.log('recieved message', message)
+        const data = await convertBlob(message).then(res => res);
+        console.log(data)
+        if (data.type === "offer") {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            signalServerSocket.send(JSON.stringify({ type: "answer", answer }));
+            console.log('hey we got offer')
+        } else if (data.type === "answer") {
+            console.log('hey we got answer')
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        } else if (data.type === "ice-candidate") {
+            console.log('hey we got candidate')
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }
+    };
+
+    //allow users to chat
+    window.api.on('user-message', (text: string) => {
+        // sends a message over to another user
+        signalServerSocket.send(JSON.stringify(`${user.email}:${text}`))
+    });
+
+
     // create data channel
     function createDataChannel() {
         dataChannel = peerConnection.createDataChannel("game", { reliable: true });
@@ -178,23 +204,6 @@ function connectWebSocket(user) {
         }
     }
 
-    signalServerSocket.onmessage = async (message) => {
-        const data = await convertBlob(message).then(res => res);
-        console.log(data)
-        if (data.type === "offer") {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            signalServerSocket.send(JSON.stringify({ type: "answer", answer }));
-            console.log('hey we got offer')
-        } else if (data.type === "answer") {
-            console.log('hey we got answer')
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        } else if (data.type === "ice-candidate") {
-            console.log('hey we got candidate')
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-        }
-    };
 
     // Create an offer and send it to the other peer
     async function startCall() {

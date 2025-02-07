@@ -7,6 +7,7 @@ const Input = styled('input')(() => ({
 }))
 
 export default function LoginBlock() {
+    const [message, setMessage] = React.useState('')
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const failedLogin = useLoginStore((state) => state.failedLogin)
     const successLogin = useLoginStore((state) => state.successLogin)
@@ -52,6 +53,16 @@ export default function LoginBlock() {
                     window.api.loginUser(login);
                 }}>Log In</button>
                 {isLoggedIn}
+            </>
+            }
+            {isLoggedIn &&
+            <>
+            <Input onChange={(e) => setMessage(e.target.value)} type='text' value={message}/>
+            <button id='login-btn' onClick={() => {
+                    console.log('sending message', message)
+                    window.api.sendMessage(message)
+                    setMessage('')
+                }}>send message</button>
             </>
             }
         </div>

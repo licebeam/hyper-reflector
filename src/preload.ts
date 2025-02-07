@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("api", {
     connectMatch: (ip: string, port: number) => ipcRenderer.send('startP2', { ip, port }),
     startSoloTraining: () => ipcRenderer.send("start-solo-mode"),
     loginUser: (loginObject: { name: string, pass: string }) => ipcRenderer.send('login-user', loginObject),
+    sendMessage: (text: string) => ipcRenderer.send("sendMessage", text),
     // testing on functionality
     on: (channel, callback) => {
         ipcRenderer.on(channel, (event, ...args) => callback(...args));

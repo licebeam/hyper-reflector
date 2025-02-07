@@ -161,6 +161,11 @@ const createWindow = () => {
     startSoloMode({ config });
   });
 
+  ipcMain.on("sendMessage", (event, text: string) => {
+    // here we can parse the string etc
+    mainWindow.webContents.send('user-message', text);
+  });
+
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
