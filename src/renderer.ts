@@ -131,7 +131,7 @@ function connectWebSocket(user) {
         console.log(data)
         if (data.type === "user-message") {
             console.log(data.sender, data.message)
-            
+            window.api.sendRoomMessage(data)
         }
         if (data.type === "offer") {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));

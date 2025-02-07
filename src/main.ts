@@ -162,9 +162,17 @@ const createWindow = () => {
     startSoloMode({ config });
   });
 
+  // send a message off to websockets for other users to see and save our message on our front end.
   ipcMain.on("sendMessage", (event, text: string) => {
     // here we can parse the string etc
     mainWindow.webContents.send('user-message', text);
+  });
+
+  // this is used by websockets to populate our chat room with other peoples messages
+  ipcMain.on("roomMessage", (event, messageObject) => {
+    // here we can parse the string etc
+    console.log(messageObject)
+    mainWindow.webContents.send('room-message', messageObject);
   });
 
   // and load the index.html of the app.
