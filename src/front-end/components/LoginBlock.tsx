@@ -7,62 +7,50 @@ const Input = styled('input')(() => ({
 }))
 
 export default function LoginBlock() {
-    const [message, setMessage] = React.useState('')
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const failedLogin = useLoginStore((state) => state.failedLogin)
     const successLogin = useLoginStore((state) => state.successLogin)
-    const [login, setLogin] = React.useState({ name: '', pass: '' })
+    const setUserState = useLoginStore((state) => state.setUserState)
+    const [login, setLogin] = React.useState({ name: 'test@test.com', pass: 'test123' })
 
     React.useEffect(() => {
+        // if(loginState){
+
+        // }
         // Listen for updates from Electron
-        window.api.on('logging-in', (event, message) => {
-            console.log('Received:', message);
-            // handle do some funky stateful call for logging in redirect etc
+        window.api.on('logging-in', (event) => {
+            console.log('what is going on', event)
         });
 
-        window.api.on('login-success', (event, message) => {
-            //console.log('Received:', message);
+        window.api.on('login-success', (loginInfo) => {
+            console.log('login success, whats the info:', loginInfo);
+            setUserState(loginInfo)
             successLogin()
             // handle do some funky stateful call for logging in redirect etc
         });
 
-        window.api.on('loging-failed', (event, message) => {
-            console.log('Received:', message);
+        window.api.on('loging-failed', (event) => {
+            console.log('Received:', event);
             failedLogin()
-            // handle do some funky stateful call for logging in redirect etc
         });
-
-        return () => {
-            window.api.removeListener("logging-in");
-        };
-    }, []);
+    });
 
     return (
         <div style={{ display: 'flex' }}>
             {!isLoggedIn && <>
                 <div>
                     <p>User Name</p>
-                    <Input onChange={(e) => setLogin({ name: e.target.value, pass: login.pass })} type='text'/>
+                    <Input onChange={(e) => setLogin({ name: e.target.value, pass: login.pass })} type='text' value={login.name}/>
                 </div>
                 <div>
                     <p>User Name</p>
-                    <Input onChange={(e) => setLogin({ name: login.name, pass: e.target.value })} type='password'/>
+                    <Input onChange={(e) => setLogin({ name: login.name, pass: e.target.value })} type='password' value={login.pass}/>
                 </div>
                 <button id='login-btn' onClick={() => {
                     console.log('whats up')
                     window.api.loginUser(login);
                 }}>Log In</button>
                 {isLoggedIn}
-            </>
-            }
-            {isLoggedIn &&
-            <>
-            <Input onChange={(e) => setMessage(e.target.value)} type='text' value={message}/>
-            <button id='login-btn' onClick={() => {
-                    console.log('sending message', message)
-                    window.api.sendMessage(message)
-                    setMessage('')
-                }}>send message</button>
             </>
             }
         </div>

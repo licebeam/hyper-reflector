@@ -94,6 +94,7 @@ const createWindow = () => {
         .then((userCredential) => {
           // successful sign in, send data to front end!
           const user = userCredential.user;
+          console.log({ name: user.displayName, email: user.email, uid: user.uid })
           mainWindow.webContents.send('login-success', { name: user.displayName, email: user.email, uid: user.uid });
         })
         .catch((error) => {
