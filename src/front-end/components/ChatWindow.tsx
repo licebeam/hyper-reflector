@@ -13,30 +13,34 @@ export default function ChatWindow() {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }
 
+    const handleRoomMessage = (messageObject) => {
+        pushMessage({ sender: messageObject.sender, message: messageObject.message });
+    };
 
     // get message from websockets
     React.useEffect(() => {
-        const handleMessage = (messageObject) => {
-            pushMessage({ sender: messageObject.sender, message: messageObject.message });
-        };
-
-        window.api.on('room-message', handleMessage);
+        window.api.removeAllListeners("room-message");
+        window.api.on('room-message', handleRoomMessage);
 
         return () => {
-            window.api.removeListener('room-message', handleMessage);
+            console.log("Cleaning up 'room-message' listener");
+            window.api.removeListener('room-message', handleRoomMessage);
         };
     }, []);
 
+    const handleMessage = (text: string) => {
+        const currentUser = useLoginStore.getState().userState;
+        console.log("Adding message to store:", { sender: currentUser.email, message: text });
+        pushMessage({ sender: currentUser.email, message: text });
+    };
+
     // show our own message, but probably need to have the server handle this too
     React.useEffect(() => {
-        const handleMessage = (text: string) => {
-            const currentUser = useLoginStore.getState().userState;
-            pushMessage({ sender: currentUser.email, message: text });
-        };
-
+        window.api.removeAllListeners("user-message");
         window.api.on('user-message', handleMessage);
 
         return () => {
+            console.log("Cleaning up 'user-message' listener");
             window.api.removeListener('user-message', handleMessage);
         };
     }, []);
@@ -56,7 +60,7 @@ export default function ChatWindow() {
     }
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div key={'my-chatroom'} style={{ display: 'flex', flexDirection: 'column' }}>
             {isLoggedIn &&
                 <div id='chatbox-id' style={{ height: 300, overflowY: 'scroll' }}>
                     <p> messages</p>

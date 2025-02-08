@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld("api", {
     removeListener: (channel, callback) => {
         ipcRenderer.removeListener(channel, callback);
     },
+    removeAllListeners: (channel, callback) => {
+        ipcRenderer.removeAllListeners(channel, callback);
+    },
 });
 
 // // testing sending messages from ipc main to ipcrenderer

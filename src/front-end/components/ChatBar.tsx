@@ -11,7 +11,9 @@ export default function ChatBar() {
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
 
     const sendMessage = () => {
-        window.api.sendMessage(message)
+        if(message.length >= 1){
+            window.api.sendMessage(message)
+        }
         setMessage('')
     }
 

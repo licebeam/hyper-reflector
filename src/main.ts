@@ -165,6 +165,7 @@ const createWindow = () => {
   // send a message off to websockets for other users to see and save our message on our front end.
   ipcMain.on("sendMessage", (event, text: string) => {
     // here we can parse the string etc
+    console.log("Main process received message:", text);
     mainWindow.webContents.send('user-message', text);
   });
 
