@@ -3,6 +3,11 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
+    // server and online
+    loginUser: (loginObject: { name: string, pass: string }) => ipcRenderer.send('login-user', loginObject),
+    logOut: () => ipcRenderer.send('log-out'),
+    sendMessage: (text: string) => ipcRenderer.send("sendMessage", text),
+    sendRoomMessage: (text: string) => ipcRenderer.send("roomMessage", text),
     // sends text to the emulator using the fbneo_commands.txt
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     sendText: (text: string) => ipcRenderer.send("send-text", text),
@@ -10,10 +15,7 @@ contextBridge.exposeInMainWorld("api", {
     serveMatch: (ip: string, port: number) => ipcRenderer.send('startP1', { ip, port }),
     connectMatch: (ip: string, port: number) => ipcRenderer.send('startP2', { ip, port }),
     startSoloTraining: () => ipcRenderer.send("start-solo-mode"),
-    loginUser: (loginObject: { name: string, pass: string }) => ipcRenderer.send('login-user', loginObject),
-    sendMessage: (text: string) => ipcRenderer.send("sendMessage", text),
-    sendRoomMessage: (text: string) => ipcRenderer.send("roomMessage", text),
-    // testing on functionality
+    // ipc call stuff
     on: (channel, callback) => {
         ipcRenderer.on(channel, (event, ...args) => callback(...args));
     },

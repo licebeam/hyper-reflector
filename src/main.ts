@@ -8,7 +8,7 @@ import api from './external-api/requests'
 
 // - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { getAuth, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { firebaseConfig } from './private/firebase';
 
 // Initialize Firebase
@@ -108,10 +108,28 @@ const createWindow = () => {
     }
   }
 
+  async function handleLogOut() {
+    try {
+      signOut(auth).then(() => {
+        console.log('user logging out')
+        mainWindow.webContents.send('logged-out', 'user logged out');
+      }).catch((error) => {
+        console.log('user logging out failed', error)
+      });
+    } catch (error) {
+      console.log(error)
+    }
+  }
+
   // handle ipc calls
   ipcMain.on("login-user", (event, login) => {
     console.log('should login user', login)
     handleLogin(login.name, login.pass);
+  });
+
+  ipcMain.on("log-out", (event, login) => {
+    console.log('should log out user', login)
+    handleLogOut();
   });
 
   ipcMain.on("setEmulatorPath", () => {

@@ -1,5 +1,8 @@
 import * as React from 'react'
 import styled from 'styled-components'
+import {
+    useNavigate,
+} from '@tanstack/react-router'
 import { useLoginStore } from '../state/store'
 
 const Input = styled('input')(() => ({
@@ -12,11 +15,9 @@ export default function LoginBlock() {
     const successLogin = useLoginStore((state) => state.successLogin)
     const setUserState = useLoginStore((state) => state.setUserState)
     const [login, setLogin] = React.useState({ name: 'test@test.com', pass: 'test123' })
+    const navigate = useNavigate()
 
     React.useEffect(() => {
-        // if(loginState){
-
-        // }
         // Listen for updates from Electron
         window.api.on('logging-in', (event) => {
             console.log('what is going on', event)
@@ -26,25 +27,27 @@ export default function LoginBlock() {
             console.log('login success, whats the info:', loginInfo);
             setUserState(loginInfo)
             successLogin()
+            navigate({ to: '/chat' })
             // handle do some funky stateful call for logging in redirect etc
         });
 
         window.api.on('loging-failed', (event) => {
             console.log('Received:', event);
             failedLogin()
+            navigate({ to: '/' })
         });
-    });
+    }, []);
 
     return (
         <div style={{ display: 'flex' }}>
             {!isLoggedIn && <>
                 <div>
                     <p>User Name</p>
-                    <Input onChange={(e) => setLogin({ name: e.target.value, pass: login.pass })} type='text' value={login.name}/>
+                    <Input onChange={(e) => setLogin({ name: e.target.value, pass: login.pass })} type='text' value={login.name} />
                 </div>
                 <div>
                     <p>User Name</p>
-                    <Input onChange={(e) => setLogin({ name: login.name, pass: e.target.value })} type='password' value={login.pass}/>
+                    <Input onChange={(e) => setLogin({ name: login.name, pass: e.target.value })} type='password' value={login.pass} />
                 </div>
                 <button id='login-btn' onClick={() => {
                     console.log('whats up')
