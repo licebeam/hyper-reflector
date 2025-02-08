@@ -12,6 +12,6 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "types": ["node"],
-    "jsx": "react",
+    "jsx": "react-jsx"
   }
 }
