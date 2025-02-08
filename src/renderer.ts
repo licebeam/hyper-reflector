@@ -151,6 +151,7 @@ function connectWebSocket(user) {
     //allow users to chat
     window.api.on('user-message', (text: string) => {
         // sends a message over to another user
+        console.log('this should get sent to websockets')
         if(text.length){
             signalServerSocket.send(JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.email }))
         }

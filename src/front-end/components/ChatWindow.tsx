@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { useRef, useEffect } from 'react'
 import styled from 'styled-components'
 import { useLoginStore, useMessageStore } from '../state/store'
 
@@ -7,7 +7,7 @@ export default function ChatWindow() {
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const pushMessage = useMessageStore((state) => state.pushMessage)
 
-    const chatEndRef = React.useRef<null | HTMLDivElement>(null)
+    const chatEndRef = useRef<null | HTMLDivElement>(null)
 
     const scrollToBottom = () => {
         chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -18,8 +18,7 @@ export default function ChatWindow() {
     };
 
     // get message from websockets
-    React.useEffect(() => {
-        window.api.removeAllListeners("room-message");
+    useEffect(() => {
         window.api.on('room-message', handleRoomMessage);
 
         return () => {
@@ -35,17 +34,17 @@ export default function ChatWindow() {
     };
 
     // show our own message, but probably need to have the server handle this too
-    React.useEffect(() => {
-        window.api.removeAllListeners("user-message");
+    useEffect(() => {
         window.api.on('user-message', handleMessage);
 
         return () => {
             console.log("Cleaning up 'user-message' listener");
             window.api.removeListener('user-message', handleMessage);
+            window.api.removeAllListeners('user-message');
         };
     }, []);
 
-    React.useEffect(() => {
+    useEffect(() => {
         console.log('new messages')
         scrollToBottom()
     }, [messageState])
