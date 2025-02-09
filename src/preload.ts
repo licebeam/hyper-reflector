@@ -26,11 +26,12 @@ contextBridge.exposeInMainWorld("api", {
         ipcRenderer.removeAllListeners(channel, callback);
     },
     removeExtraListeners: (channel, callback) => {
-        console.log(ipcRenderer.eventNames())
-        console.log(ipcRenderer.rawListeners(channel))
-        ipcRenderer.rawListeners(channel).forEach(listener => {
+        console.log('we have this many listeners on ', channel, ipcRenderer.rawListeners(channel).length)
+        ipcRenderer.rawListeners(channel).forEach((listener, index) => {
             console.log(listener)
-            if (ipcRenderer.rawListeners(channel).length >= 1) {
+            if (ipcRenderer.rawListeners(channel).length > 1) {
+                // we need to make sure we always keep alive our first index here, its the one we use in renderer.ts
+                if (index === 0) return
                 return ipcRenderer.removeListener(channel, listener);
             }
             return console.log('saving last listener')
