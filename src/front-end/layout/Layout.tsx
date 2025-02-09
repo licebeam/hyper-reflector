@@ -3,20 +3,24 @@ import {
     Link,
     useNavigate,
 } from '@tanstack/react-router'
-import { useLoginStore } from '../state/store'
+import { useLoginStore, useMessageStore } from '../state/store'
 
 export default function Layout({ children }) {
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
+    const userState = useLoginStore((state) => state.userState)
     const setUserState = useLoginStore((state) => state.setUserState)
     const loggedOut = useLoginStore((state) => state.loggedOut)
+    const clearMessageState = useMessageStore((state) => state.clearMessageState)
+    const clearUserList = useMessageStore((state) => state.clearUserList)
     const navigate = useNavigate()
 
     React.useEffect(() => {
         window.api.on('logged-out', (event) => {
-            console.log('logged out, whats the info:', event);
+            clearUserList()
+            clearMessageState();
             setUserState({ email: '' })
             loggedOut()
-            navigate({to: '/'})
+            navigate({ to: '/' })
             // handle do some funky stateful call for logging in redirect etc
         });
     }, []);

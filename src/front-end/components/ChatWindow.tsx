@@ -21,38 +21,31 @@ export default function ChatWindow() {
     useEffect(() => {
         window.api.removeAllListeners('room-message', handleRoomMessage);
         window.api.on('room-message', handleRoomMessage);
-
         return () => {
-            console.log('clean up room message event listeners')
             window.api.removeListener('room-message', handleRoomMessage);
         };
     }, []);
 
     const handleMessage = (text: string) => {
         const currentUser = useLoginStore.getState().userState;
-        console.log("Adding message to store:", { sender: currentUser.email, message: text });
+        // console.log("Adding message to store:", { sender: currentUser.email, message: text });
         pushMessage({ sender: currentUser.email, message: text });
     };
 
     // show our own message, but probably need to have the server handle this too
     useEffect(() => {
         window.api.removeExtraListeners('user-message', handleMessage);
-        console.log('is this firing off how much')
         window.api.on('user-message', handleMessage);
-
         return () => {
-            console.log("Cleaning up 'user-message' listener");
             window.api.removeListener('user-message', handleMessage);
         };
     }, []);
 
     useEffect(() => {
-        console.log('new messages')
         scrollToBottom()
     }, [messageState])
 
     const renderMessages = () => {
-        console.log('rendering messages')
         return messageState.map((message, index) => {
             var timestamp = new Date
             // really simple chat display

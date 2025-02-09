@@ -194,6 +194,18 @@ const createWindow = () => {
     mainWindow.webContents.send('room-message', messageObject);
   });
 
+  // add a user to the current chat room
+  ipcMain.on("addUserToRoom", (event, userObject) => {
+    console.log('adding', userObject)
+    mainWindow.webContents.send('room-users-add', userObject);
+  });
+
+  // remove user from the current chat room
+  ipcMain.on("removeUserFromRoom", (event, userObject) => {
+    console.log('removing', userObject)
+    mainWindow.webContents.send('room-users-remove', userObject);
+  });
+
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

@@ -109,11 +109,11 @@ window.api.on('login-failed', () => {
 });
 
 function connectWebSocket(user) {
-    if (signalServerSocket) return; // Prevent duplicate ws connections form same client
+    if (signalServerSocket) return; // Prevent duplicate ws connections from same client
     signalServerSocket = new WebSocket(`ws://${keys.COTURN_IP}:3000`);
     signalServerSocket.onopen = () => {
         console.log("WebSocket connected");
-        // 🔹 Send Firebase user authentication token to the WebSocket server
+        window.api.addUserToRoom(user)
     };
 
     signalServerSocket.onclose = () => {
@@ -126,11 +126,9 @@ function connectWebSocket(user) {
     };
 
     signalServerSocket.onmessage = async (message) => {
-        // console.log('recieved message', message)
         const data = await convertBlob(message).then(res => res);
-        console.log(data)
+        // console.log(data)
         if (data.type === "user-message") {
-            console.log(data.sender, data.message)
             window.api.sendRoomMessage(data)
         }
         if (data.type === "offer") {
@@ -215,7 +213,6 @@ function connectWebSocket(user) {
     // Create an offer and send it to the other peer
     async function startCall() {
         createDataChannel()
-        console.log('test')
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
         signalServerSocket.send(JSON.stringify({ type: "offer", offer }));

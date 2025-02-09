@@ -3,7 +3,7 @@ import styled from 'styled-components'
 import {
     useNavigate,
 } from '@tanstack/react-router'
-import { useLoginStore } from '../state/store'
+import { useLoginStore, useMessageStore } from '../state/store'
 
 const Input = styled('input')(() => ({
     width: '100px'
@@ -14,28 +14,46 @@ export default function LoginBlock() {
     const failedLogin = useLoginStore((state) => state.failedLogin)
     const successLogin = useLoginStore((state) => state.successLogin)
     const setUserState = useLoginStore((state) => state.setUserState)
+    const addUser = useMessageStore((state) => state.pushUser)
+    const clearUserList = useMessageStore((state) => state.clearUserList)
     const [login, setLogin] = React.useState({ name: 'test@test.com', pass: 'test123' })
     const navigate = useNavigate()
 
+    const handleIsLoggingIn = () => {
+        console.log('logging in')
+    }
+
+    const handleLogIn = (loginInfo) => {
+        console.log('login success, whats the info:', loginInfo);
+        setUserState(loginInfo)
+        addUser(loginInfo)
+        successLogin()
+        navigate({ to: '/chat' })
+        // handle do some funky stateful call for logging in redirect etc
+    }
+
+    const handleLoginFail = (event) => {
+        console.log('Received:', event);
+        clearUserList()
+        failedLogin()
+        navigate({ to: '/' })
+    }
+
     React.useEffect(() => {
         // Listen for updates from Electron
-        window.api.on('logging-in', (event) => {
-            console.log('what is going on', event)
-        });
+        window.api.on('logging-in', handleIsLoggingIn);
 
-        window.api.on('login-success', (loginInfo) => {
-            console.log('login success, whats the info:', loginInfo);
-            setUserState(loginInfo)
-            successLogin()
-            navigate({ to: '/chat' })
-            // handle do some funky stateful call for logging in redirect etc
-        });
+        window.api.removeExtraListeners('login-success', handleLogIn);
+        window.api.on('login-success', handleLogIn);
+        
+        window.api.removeExtraListeners('login-failed', handleLoginFail);
+        window.api.on('login-failed', handleLoginFail);
 
-        window.api.on('loging-failed', (event) => {
-            console.log('Received:', event);
-            failedLogin()
-            navigate({ to: '/' })
-        });
+        return (() => {
+            window.api.removeListener('logging-in', handleIsLoggingIn);
+            window.api.removeListener('login-success', handleLogIn);
+            window.api.removeListener('login-failed', handleLoginFail);
+        })
     }, []);
 
     return (
@@ -50,7 +68,6 @@ export default function LoginBlock() {
                     <Input onChange={(e) => setLogin({ name: login.name, pass: e.target.value })} type='password' value={login.pass} />
                 </div>
                 <button id='login-btn' onClick={() => {
-                    console.log('whats up')
                     window.api.loginUser(login);
                 }}>Log In</button>
                 {isLoggedIn}

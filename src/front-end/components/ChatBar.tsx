@@ -1,6 +1,6 @@
 import * as React from 'react'
 import styled from 'styled-components'
-import { useLoginStore, useMessageStore } from '../state/store'
+import { useLoginStore } from '../state/store'
 
 const Input = styled('input')(() => ({
     width: '100px'
@@ -11,7 +11,7 @@ export default function ChatBar() {
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
 
     const sendMessage = () => {
-        if(message.length >= 1){
+        if (message.length >= 1) {
             window.api.sendMessage(message)
         }
         setMessage('')
@@ -21,7 +21,7 @@ export default function ChatBar() {
         <div style={{ display: 'flex' }}>
             {isLoggedIn &&
                 <>
-                    <Input onChange={(e) => setMessage(e.target.value)} type='text' value={message} onKeyDown={(e) => {
+                    <Input autoFocus onChange={(e) => setMessage(e.target.value)} type='text' value={message} onKeyDown={(e) => {
                         if (e.key === "Enter") {
                             sendMessage()
                         }
