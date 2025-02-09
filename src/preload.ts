@@ -25,6 +25,17 @@ contextBridge.exposeInMainWorld("api", {
     removeAllListeners: (channel, callback) => {
         ipcRenderer.removeAllListeners(channel, callback);
     },
+    removeExtraListeners: (channel, callback) => {
+        console.log(ipcRenderer.eventNames())
+        console.log(ipcRenderer.rawListeners(channel))
+        ipcRenderer.rawListeners(channel).forEach(listener => {
+            console.log(listener)
+            if (ipcRenderer.rawListeners(channel).length >= 1) {
+                return ipcRenderer.removeListener(channel, listener);
+            }
+            return console.log('saving last listener')
+        });
+    },
 });
 
 // // testing sending messages from ipc main to ipcrenderer

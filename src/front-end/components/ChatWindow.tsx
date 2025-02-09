@@ -22,8 +22,7 @@ export default function ChatWindow() {
         window.api.on('room-message', handleRoomMessage);
 
         return () => {
-            console.log("Cleaning up 'room-message' listener");
-            window.api.removeListener('room-message', handleRoomMessage);
+            window.api.removeExtraListeners('room-message', handleRoomMessage);
         };
     }, []);
 
@@ -39,8 +38,7 @@ export default function ChatWindow() {
 
         return () => {
             console.log("Cleaning up 'user-message' listener");
-            window.api.removeListener('user-message', handleMessage);
-            window.api.removeAllListeners('user-message');
+            window.api.removeExtraListeners('user-message', handleMessage);
         };
     }, []);
 
