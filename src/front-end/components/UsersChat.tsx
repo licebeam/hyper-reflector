@@ -7,10 +7,19 @@ export default function UsersChat() {
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const userState = useLoginStore((state) => state.userState)
     const userList = useMessageStore((state) => state.userList)
+    const setUsersList = useMessageStore((state) => state.setUsersList)
     const addUser = useMessageStore((state) => state.pushUser)
     const removeUser = useMessageStore((state) => state.removeUser)
+    const clearUserList = useMessageStore((state) => state.clearUserList)
 
     // user has joined lobby
+    const handleUserJoinGroup = (users) => {
+        clearUserList();
+        console.log(users)
+        // sets the list of users from the websocket server
+        setUsersList(users)
+    }
+
     const handleUserJoin = (user) => {
         console.log(user)
         addUser(user)
@@ -22,6 +31,15 @@ export default function UsersChat() {
     }
 
     // get users from websockets
+    useEffect(() => {
+        window.api.removeAllListeners('room-users-add-group', handleUserJoinGroup);
+        window.api.on('room-users-add-group', handleUserJoinGroup);
+        return () => {
+            window.api.removeListener('room-users-add-group', handleUserJoinGroup);
+        };
+    }, []);
+
+
     useEffect(() => {
         window.api.removeAllListeners('room-users-add', handleUserJoin);
         window.api.on('room-users-add', handleUserJoin);
@@ -37,6 +55,10 @@ export default function UsersChat() {
             window.api.removeListener('room-users-remove', handleUserLeave);
         };
     }, []);
+
+    useEffect(()=> {
+        console.log('users updated',userList)
+    }, [userList])
 
 
     const renderUsers = () => {

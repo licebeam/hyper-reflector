@@ -16,6 +16,7 @@ export const useMessageStore = create((set) => ({
   clearMessageState: () => set((state) => ({ messageState: [] })),
   //room users
   userList: [],
+  setUsersList: (usersArray) => set((state) => ({ userList: [...usersArray] })),
   pushUser: (user) => set((state) => ({ userList: [...state.userList, user] })),
   removeUser: (user) => set((state) => ({ userList: [...state.userList.filter(u => u === user)] })),
   clearUserList: () => set((state) => ({ userList: [] })),

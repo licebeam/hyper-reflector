@@ -206,6 +206,10 @@ const createWindow = () => {
     mainWindow.webContents.send('room-users-remove', userObject);
   });
 
+  ipcMain.on("addUserGroupToRoom", (event, users) => {
+    mainWindow.webContents.send('room-users-add-group', users);
+  });
+
   // and load the index.html of the app.
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);

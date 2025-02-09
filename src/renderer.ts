@@ -142,6 +142,11 @@ function connectWebSocket(user) {
     signalServerSocket.onmessage = async (message) => {
         const data = await convertBlob(message).then(res => res);
         console.log(data)
+        if (data.type === "connected-users") {
+            if (data.users.length){
+                window.api.addUserGroupToRoom(data.users)
+            }
+        }
         if (data.type === "user-connect") {
             window.api.addUserToRoom(user)
         }
