@@ -108,15 +108,27 @@ window.api.on('login-failed', () => {
     }
 });
 
+window.api.on('logged-out', (user) => {
+    // kill the socket connection
+    if (signalServerSocket) {
+        signalServerSocket.send(JSON.stringify({ type: "user-disconnect", user }));
+        signalServerSocket.close();
+        signalServerSocket = null;
+    }
+});
+
 function connectWebSocket(user) {
     if (signalServerSocket) return; // Prevent duplicate ws connections from same client
     signalServerSocket = new WebSocket(`ws://${keys.COTURN_IP}:3000`);
     signalServerSocket.onopen = () => {
-        console.log("WebSocket connected");
-        window.api.addUserToRoom(user)
+        console.log("WebSocket connected", user.uid);
+        signalServerSocket.send(JSON.stringify({ type: "user-connect", user }));
     };
 
-    signalServerSocket.onclose = () => {
+    signalServerSocket.onclose = async (user) => {
+        if( signalServerSocket ){
+            await signalServerSocket.send(JSON.stringify({ type: "user-disconnect", user }));
+        }
         console.log("WebSocket disconnected");
         signalServerSocket = null;
     };
@@ -127,7 +139,13 @@ function connectWebSocket(user) {
 
     signalServerSocket.onmessage = async (message) => {
         const data = await convertBlob(message).then(res => res);
-        // console.log(data)
+        console.log(data)
+        if (data.type === "user-connect") {
+            window.api.addUserToRoom(user)
+        }
+        if (data.type === "user-disconnect") {
+            window.api.removeUserFromRoom(user)
+        }
         if (data.type === "user-message") {
             window.api.sendRoomMessage(data)
         }
