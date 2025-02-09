@@ -19,9 +19,11 @@ export default function ChatWindow() {
 
     // get message from websockets
     useEffect(() => {
+        window.api.removeExtraListeners('room-message', handleRoomMessage);
         window.api.on('room-message', handleRoomMessage);
 
         return () => {
+            console.log('clean up room message event listeners')
             window.api.removeExtraListeners('room-message', handleRoomMessage);
         };
     }, []);
@@ -34,11 +36,13 @@ export default function ChatWindow() {
 
     // show our own message, but probably need to have the server handle this too
     useEffect(() => {
+        window.api.removeExtraListeners('user-message', handleMessage);
+        console.log('is this firing off how much')
         window.api.on('user-message', handleMessage);
 
         return () => {
             console.log("Cleaning up 'user-message' listener");
-            window.api.removeExtraListeners('user-message', handleMessage);
+            window.api.removeListener('user-message', handleMessage);
         };
     }, []);
 
