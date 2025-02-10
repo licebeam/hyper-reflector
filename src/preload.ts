@@ -4,7 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('api', {
     // server and online
-    loginUser: (loginObject: { name: string; pass: string }) =>
+    loginUser: (loginObject: { email: string, name: string; pass: string }) =>
         ipcRenderer.send('login-user', loginObject),
     logOut: () => ipcRenderer.send('log-out'),
     getLoggedInUser: (email: string) => ipcRenderer.send('check-logged-in', email),

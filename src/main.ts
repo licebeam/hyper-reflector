@@ -91,19 +91,7 @@ const createWindow = () => {
         mainWindow.webContents.send('logging-in', 'trying to log in')
         try {
             await signInWithEmailAndPassword(auth, email, password)
-                .then((userCredential) => {
-                    // successful sign in, send data to front end!
-                    const user = userCredential.user
-                    console.log({
-                        name: user.displayName,
-                        email: user.email,
-                        uid: user.uid,
-                    })
-                    mainWindow.webContents.send('login-success', {
-                        name: user.displayName,
-                        email: user.email,
-                        uid: user.uid,
-                    })
+                .then(() => {
                     return true
                 })
                 .catch((error) => {
@@ -133,10 +121,20 @@ const createWindow = () => {
 
     // handle ipc calls
     ipcMain.on('login-user', async (event, login) => {
-        const isLoggedIn = await api.getLoggedInUser(login.name)
+        const isLoggedIn = await api.getLoggedInUser(login.email)
         if (isLoggedIn) return
-        await handleLogin(login.name, login.pass)
+        await handleLogin(login.email, login.pass)
         await api.addLoggedInUser(auth)
+        //test first time log
+        await api.createAccount(auth, login.name, login.email)
+        const user = await api.getUserByAuth(auth)
+        // send our user object to the front end
+        mainWindow.webContents.send('login-success', {
+            name: user.userName,
+            email: user.userEmail,
+            uid: user.uid,
+        })
+        console.log('user is: ', user)
     })
 
     ipcMain.on('log-out', async (event, login) => {
@@ -220,6 +218,17 @@ const createWindow = () => {
 
     ipcMain.on('addUserGroupToRoom', (event, users) => {
         mainWindow.webContents.send('room-users-add-group', users)
+    })
+
+    // PROFILE RELATED IPC CALLS
+    ipcMain.on('changeUserName', async (event, name) => {
+        const complete = await api.changeUserName(auth, name)
+        mainWindow.webContents.send('user-name-changed', complete)
+    })
+
+    ipcMain.on('createAccount', async (event, name, email) => {
+        const complete = await api.createAccount(auth, name, email)
+        // mainWindow.webContents.send('user-account-created', complete)
     })
 
     // and load the index.html of the app.

@@ -10,36 +10,35 @@ export default function ChatWindow() {
     const chatEndRef = useRef<null | HTMLDivElement>(null)
 
     const scrollToBottom = () => {
-        chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
 
     const handleRoomMessage = (messageObject) => {
-        pushMessage({ sender: messageObject.sender, message: messageObject.message });
-    };
+        pushMessage({ sender: messageObject.sender, message: messageObject.message })
+    }
 
     // get message from websockets
     useEffect(() => {
-        window.api.removeAllListeners('room-message', handleRoomMessage);
-        window.api.on('room-message', handleRoomMessage);
+        window.api.removeAllListeners('room-message', handleRoomMessage)
+        window.api.on('room-message', handleRoomMessage)
         return () => {
-            window.api.removeListener('room-message', handleRoomMessage);
-        };
-    }, []);
+            window.api.removeListener('room-message', handleRoomMessage)
+        }
+    }, [])
 
     const handleMessage = (text: string) => {
-        const currentUser = useLoginStore.getState().userState;
-        // console.log("Adding message to store:", { sender: currentUser.email, message: text });
-        pushMessage({ sender: currentUser.email, message: text });
-    };
+        const currentUser = useLoginStore.getState().userState
+        pushMessage({ sender: currentUser.name, message: text })
+    }
 
     // show our own message, but probably need to have the server handle this too
     useEffect(() => {
-        window.api.removeExtraListeners('user-message', handleMessage);
-        window.api.on('user-message', handleMessage);
+        window.api.removeExtraListeners('user-message', handleMessage)
+        window.api.on('user-message', handleMessage)
         return () => {
-            window.api.removeListener('user-message', handleMessage);
-        };
-    }, []);
+            window.api.removeListener('user-message', handleMessage)
+        }
+    }, [])
 
     useEffect(() => {
         scrollToBottom()
@@ -47,21 +46,25 @@ export default function ChatWindow() {
 
     const renderMessages = () => {
         return messageState.map((message, index) => {
-            var timestamp = new Date
+            var timestamp = new Date()
             // really simple chat display
-            return (<div key={index + timestamp + message.message}>{message.sender}: {message.message}</div>)
+            return (
+                <div key={index + timestamp + message.message}>
+                    {message.sender}: {message.message}
+                </div>
+            )
         })
     }
 
     return (
         <div key={'my-chatroom'} style={{ display: 'flex', flexDirection: 'column' }}>
-            {isLoggedIn &&
-                <div id='chatbox-id' style={{ height: 300, overflowY: 'scroll' }}>
+            {isLoggedIn && (
+                <div id="chatbox-id" style={{ height: 300, overflowY: 'scroll' }}>
                     <p> messages</p>
                     {renderMessages()}
                     <div ref={chatEndRef} />
                 </div>
-            }
+            )}
         </div>
     )
 }

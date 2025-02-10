@@ -14,7 +14,11 @@ export default function LoginBlock() {
     const setUserState = useLoginStore((state) => state.setUserState)
     const addUser = useMessageStore((state) => state.pushUser)
     const clearUserList = useMessageStore((state) => state.clearUserList)
-    const [login, setLogin] = React.useState({ name: 'test@test.com', pass: 'test123' })
+    const [login, setLogin] = React.useState({
+        name: 'bobby-blake',
+        email: 'test@test.com',
+        pass: 'test123',
+    })
     const navigate = useNavigate()
 
     const handleIsLoggingIn = () => {
@@ -59,17 +63,29 @@ export default function LoginBlock() {
             {!isLoggedIn && (
                 <>
                     <div>
-                        <p>User Name</p>
+                        <p>User Email</p>
                         <Input
-                            onChange={(e) => setLogin({ name: e.target.value, pass: login.pass })}
+                            onChange={(e) =>
+                                setLogin({
+                                    name: login.name,
+                                    email: e.target.value,
+                                    pass: login.pass,
+                                })
+                            }
                             type="text"
-                            value={login.name}
+                            value={login.email}
                         />
                     </div>
                     <div>
-                        <p>User Name</p>
+                        <p>Password</p>
                         <Input
-                            onChange={(e) => setLogin({ name: login.name, pass: e.target.value })}
+                            onChange={(e) =>
+                                setLogin({
+                                    name: login.name,
+                                    email: login.email,
+                                    pass: e.target.value,
+                                })
+                            }
                             type="password"
                             value={login.pass}
                         />
@@ -77,7 +93,7 @@ export default function LoginBlock() {
                     <button
                         id="login-btn"
                         onClick={() => {
-                            console.log(window.api.getLoggedInUser(login.name)) // its and email
+                            console.log(window.api.getLoggedInUser(login.email)) // its and email
                             window.api.loginUser(login)
                         }}
                     >

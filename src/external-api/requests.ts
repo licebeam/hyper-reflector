@@ -1,5 +1,8 @@
 import keys from '../private/keys'
 
+// const SERVER = keys.COTURN_IP;
+const SERVER = '127.0.0.1'
+
 function checkCurrentAuthState(auth) {
     if (auth.currentUser != null) {
         return true // user is logged in successfully
@@ -14,7 +17,7 @@ async function externalApiDoSomething(auth) {
         try {
             // ${keys.COTURN_IP}
             // works but maybe we should move to an ssl cert for https
-            fetch(`http://127.0.0.1:${keys.API_PORT}/test`, {
+            fetch(`http://${SERVER}:${keys.API_PORT}/test`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -35,7 +38,7 @@ async function addLoggedInUser(auth) {
             console.log('user attempting login test')
             // ${keys.COTURN_IP}
             // works but maybe we should move to an ssl cert for https
-            fetch(`http://127.0.0.1:${keys.API_PORT}/logged-in`, {
+            fetch(`http://${SERVER}:${keys.API_PORT}/logged-in`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -54,7 +57,7 @@ async function addLoggedInUser(auth) {
 
 async function getLoggedInUser(email) {
     try {
-        const response = fetch(`http://127.0.0.1:${keys.API_PORT}/get-logged-in`, {
+        const response = fetch(`http://${SERVER}:${keys.API_PORT}/get-logged-in`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -83,7 +86,7 @@ async function removeLoggedInUser(auth) {
         try {
             // ${keys.COTURN_IP}
             // works but maybe we should move to an ssl cert for https
-            fetch(`http://127.0.0.1:${keys.API_PORT}/log-out`, {
+            fetch(`http://${SERVER}:${keys.API_PORT}/log-out`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -100,9 +103,85 @@ async function removeLoggedInUser(auth) {
     }
 }
 
+async function changeUserName(auth, name) {
+    if (checkCurrentAuthState(auth)) {
+        const idToken = await auth.currentUser.getIdToken().then((res) => res)
+        try {
+            fetch(`http://${SERVER}:${keys.API_PORT}/change-name`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken: idToken || 'not real',
+                    userName: name,
+                }),
+            })
+        } catch (error) {
+            console.log(error)
+            console.error(error.message)
+        }
+    }
+}
+
+async function createAccount(auth, name, email) {
+    if (checkCurrentAuthState(auth)) {
+        const idToken = await auth.currentUser.getIdToken().then((res) => res)
+        try {
+            console.log('trying on main to create account', name, email)
+            fetch(`http://${SERVER}:${keys.API_PORT}/create-account`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken: idToken || 'not real',
+                    name,
+                    email,
+                }),
+            })
+        } catch (error) {
+            console.log(error)
+            console.error(error.message)
+        }
+    }
+}
+
+async function getUserByAuth(auth) {
+    if (checkCurrentAuthState(auth)) {
+        console.log('attempting user fetch by auth')
+        const idToken = await auth.currentUser.getIdToken().then((res) => res)
+        try {
+            const response = await fetch(`http://${SERVER}:${keys.API_PORT}/get-user-auth`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken: idToken || 'not real',
+                }),
+            })
+
+            if (!response.ok) {
+                return false
+            }
+
+            const data = await response.json()
+            return data
+        } catch (error) {
+            console.log(error)
+            console.error(error.message)
+        }
+    }
+}
+
 export default {
     externalApiDoSomething,
     addLoggedInUser,
     getLoggedInUser,
     removeLoggedInUser,
+    //profile
+    changeUserName,
+    createAccount,
+    getUserByAuth,
 }
