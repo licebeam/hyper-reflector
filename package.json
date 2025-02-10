@@ -1,7 +1,7 @@
 {
   "name": "hyper-reflector",
   "productName": "hyper-reflector",
-  "version": "0.0.1a",
+  "version": "0.1.0",
   "description": "3rd Strike matchmaking and stat tracking application",
   "main": ".vite/build/main.js",
   "scripts": {
@@ -21,6 +21,9 @@
     "@electron-forge/plugin-fuses": "^7.6.1",
     "@electron-forge/plugin-vite": "^7.6.1",
     "@electron/fuses": "^1.8.0",
+    "@tanstack/router-devtools": "^1.99.13",
+    "@tanstack/router-plugin": "^1.99.14",
+    "@types/react-dom": "^19.0.3",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "electron": "34.0.2",
@@ -33,8 +36,16 @@
   "keywords": [],
   "author": "Hyper Reflector Team",
   "dependencies": {
+    "@tanstack/react-router": "^1.99.9",
     "@types/node": "^22.13.1",
-    "electron-squirrel-startup": "^1.0.1"
+    "@types/react": "^19.0.8",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron-squirrel-startup": "^1.0.1",
+    "firebase": "^11.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "styled-components": "^6.1.15",
+    "zustand": "^5.0.3"
   },
   "build": {
     "extraResources": [
