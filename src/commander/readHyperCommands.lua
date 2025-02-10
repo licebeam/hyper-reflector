@@ -1,9 +1,10 @@
 -- BEFORE BUILDING COPY THIS FILE TO lua/3rd_training_lua/ in order for the scripts to use the same root directories.
-
-local util_draw = require("lua/3rd_training_lua/src/utils/draw");
-local util_colors = require("lua/3rd_training_lua/src/utils/colors")
-local command_file = "fbneo_commands.txt"
-local ext_command_file = "reflector_commands.txt" -- this is for sending back commands to electron.
+local third_training = require("3rd_training")
+local util_draw = require("src/utils/draw");
+local util_colors = require("src/utils/colors")
+require("src/tools") -- TODO: refactor tools to export;
+local command_file = "../../hyper_write_commands.txt"
+local ext_command_file = "../../hyper_read_commands.txt" -- this is for sending back commands to electron.
 
 local game_name = ""
 
@@ -15,7 +16,7 @@ function check_commands()
 
         if command == "game_name" then
             local value = emu.romname()
-            game_name = value
+            memory.writebyte(0x02011388, 1)
             -- read from the current lua file and make a return an answer to fbneo_commands_commands.txt maybe better to have another file for commands sent to electron.
             local file2 = io.open(ext_command_file, "w")
             if file2 then
@@ -47,9 +48,16 @@ function check_commands()
     end
 end
 
-function on_gui()
-    gui.text(100, 20, game_name, util_colors.gui.white, util_colors.input_history.unknown2)
-end
+-- hyper-reflector commands -- this is actually global state
+GLOBAL_isHyperReflectorOnline = true
 
-emu.registerafter(check_commands) -- Runs after each frame
-gui.register(on_gui)
+emu.registerbefore(check_commands) -- Runs after each frame
+-- gui.register(on_gui)
+
+-- registers for 3rd training
+-- emu.registerstart(third_training.on_start())
+
+-- UNCOMMENT below lines  for training mode online
+-- emu.registerbefore(third_training.before_frame)
+-- gui.register(third_training.on_gui)
+-- pressing start should not pause the emulator this is not good =0
