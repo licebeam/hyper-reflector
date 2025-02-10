@@ -43,7 +43,7 @@ export default function OfflinePage() {
                     onChange={(e) => setOpponentPort(e.target.value)}
                     placeholder="port"
                 />
-                <br> user port </br>
+                <p> user port </p>
                 <input
                     type="number"
                     value={myPort}
