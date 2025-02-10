@@ -128,13 +128,15 @@ const createWindow = () => {
         //test first time log
         await api.createAccount(auth, login.name, login.email)
         const user = await api.getUserByAuth(auth)
-        // send our user object to the front end
-        mainWindow.webContents.send('login-success', {
-            name: user.userName,
-            email: user.userEmail,
-            uid: user.uid,
-        })
-        console.log('user is: ', user)
+        if (user) {
+            // send our user object to the front end
+            mainWindow.webContents.send('login-success', {
+                name: user.userName,
+                email: user.userEmail,
+                uid: user.uid,
+            })
+            console.log('user is: ', user)
+        }
     })
 
     ipcMain.on('log-out', async (event, login) => {
