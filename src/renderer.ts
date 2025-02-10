@@ -136,7 +136,7 @@ function connectWebSocket(user) {
             const answer = await peerConnection.createAnswer()
             await peerConnection.setLocalDescription(answer)
             signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
-            console.log('hey we got offer')
+            console.log('offered')
 
             setTimeout(async () => {
                 const stats = await peerConnection.getStats()
@@ -149,15 +149,20 @@ function connectWebSocket(user) {
                         console.log('Remote Candidate:', report)
                     }
                 })
+                if (peerConnection.iceConnectionState !== 'connected') {
+                    console.warn('ICE is not connected yet! Waiting...')
+                }
             }, 3000)
-        } else if (data.type === 'answer') {
-            console.log('hey we got answer')
+        } 
+        if (data.type === 'answer') {
+            console.log('answered')
             console.log(JSON.stringify(candidateList))
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
-        } else if (data.type === 'ice-candidate') {
-            console.log('hey we got candidate')
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
         }
+        if (data.type === 'ice-candidate') {
+            console.log('ice candidate:', data.candidate);
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        }}
     }
 
     //allow users to chat
@@ -192,7 +197,7 @@ function connectWebSocket(user) {
             signalServerSocket.send(
                 JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
             )
-            if (event.candidate.type === 'srflx' || event.candidate.type === 'host') {
+            if (event.candidate.type === 'srflx') {
                 // if we only require the stun server then we can break out of here.
                 console.log('STUN ICE Candidate:', event.candidate)
                 connectPort = event.candidate.port
@@ -211,7 +216,6 @@ function connectWebSocket(user) {
                 console.log(event.candidate.address, event.candidate.port)
                 connectPort = event.candidate.port
                 connectIp = event.candidate.address
-                console.log('UDP tunneled through TURN server!')
                 candidateList.push({
                     type: 'turn',
                     stunAddress: event.candidate.relatedAddress,
@@ -239,12 +243,30 @@ function connectWebSocket(user) {
         }
     }
 
+    peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE State:', peerConnection.iceConnectionState)
+    }
     // Create an offer and send it to the other peer
     async function startCall() {
         createDataChannel()
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
-        signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
+
+        // Wait for ICE gathering to complete before sending the offer
+        peerConnection.onicegatheringstatechange = () => {
+            if (peerConnection.iceGatheringState === 'complete') {
+                signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
+            }
+        }
+        setTimeout(async () => {
+            const stats = await peerConnection.getStats()
+            stats.forEach((report) => {
+                if (report.type === 'candidate-pair' && report.nominated) {
+                    console.log('Active Candidate Pair:', report)
+                }
+            })
+        }, 3000)
+        // signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
     }
 
     window.api.on('hand-shake-users', (text: string) => {
