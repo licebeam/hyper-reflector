@@ -42,7 +42,6 @@ export default function OfflinePage() {
                     onChange={(e) => setOpponentPort(e.target.value)}
                     placeholder="port"
                 />
-                <input />
                 <button
                     onClick={() => {
                         console.log('yo hey what the hell is goin on', player)

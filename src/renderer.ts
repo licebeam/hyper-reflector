@@ -167,7 +167,7 @@ function connectWebSocket(user) {
                 console.log("STUN ICE Candidate:", event.candidate);
                 connectPort = event.candidate.port
                 connectIp = event.candidate.address
-                candidateList.push({type: 'stun', ip: event.candidate.address, port: event.candidate.port})
+                candidateList.push({type: 'stun', stunAddress: event.candidate.relatedAddress, port: event.candidate.port, address: event.candidate.address})
             }
             // if the below is true it means we've successfully udp tunnelled to the candidate on the turn server
             if (event.candidate.type === "relay") {
@@ -177,7 +177,7 @@ function connectWebSocket(user) {
                 connectPort = event.candidate.port
                 connectIp = event.candidate.address
                 console.log("UDP tunneled through TURN server!");
-                candidateList.push({type: 'turn', ip: event.candidate.address, port: event.candidate.port})
+                candidateList.push({type: 'turn', stunAddress: event.candidate.relatedAddress, port: event.candidate.port, address: event.candidate.address})
             }
         }
     };
