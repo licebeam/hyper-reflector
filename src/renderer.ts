@@ -38,7 +38,7 @@ const googleStuns = [
 const peerConnection = new RTCPeerConnection({
     iceServers: [
         {
-            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+            urls: ['stun:stun.l.google.com:19302'],
         },
         {
             urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
@@ -46,6 +46,7 @@ const peerConnection = new RTCPeerConnection({
             credential: 'turn',
         },
     ],
+    iceTransportPolicy: 'all',
 })
 
 let dataChannel // Will store the game data channel
