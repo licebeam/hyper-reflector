@@ -6,12 +6,6 @@ import './front-end/app'
 let connectPort = 0;
 let connectIp = '0.0.0.0';
 
-// document.getElementById("sendTextBtn").addEventListener("click", () => {
-//     var text = document.getElementById("inputText").value; // typescript error, works fine
-//     window.api.sendText(text);
-//     startCall()
-// });
-
 // document.getElementById("testBtn").addEventListener("click", () => {
 //     window.api.sendCommand("game_name");
 //     sendGameData('some number etc')
@@ -208,6 +202,13 @@ function connectWebSocket(user) {
         await peerConnection.setLocalDescription(offer);
         signalServerSocket.send(JSON.stringify({ type: "offer", offer }));
     }
+
+    document.getElementById("startCallBtn").addEventListener("click", () => {
+        // var text = document.getElementById("inputText").value; // typescript error, works fine
+        // window.api.sendText(text);
+        startCall()
+    });
+    
 
     // Send Game Data
     function sendGameData(data) {
