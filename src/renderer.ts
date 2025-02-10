@@ -19,12 +19,26 @@ let connectIp = '0.0.0.0'
 let signalServerSocket: WebSocket = null // WebSocket reference
 
 let candidateList = []
-// handle connection to remote turn server
 
+// handle connection to remote turn server
+const googleStuns = [
+    'stun:stun.l.google.com:19302',
+    'stun:stun.l.google.com:5349',
+    'stun:stun1.l.google.com:3478',
+    'stun:stun1.l.google.com:5349',
+    'stun:stun2.l.google.com:19302',
+    'stun:stun2.l.google.com:5349',
+    'stun:stun3.l.google.com:3478',
+    'stun:stun3.l.google.com:5349',
+    'stun:stun4.l.google.com:19302',
+    'stun:stun4.l.google.com:5349',
+]
+// temp
+// `stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`
 const peerConnection = new RTCPeerConnection({
     iceServers: [
         {
-            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+            urls: [...googleStuns],
         },
         {
             urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
