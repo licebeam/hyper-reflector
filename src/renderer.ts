@@ -176,7 +176,7 @@ function connectWebSocket(user) {
         // sends a message over to another user
         console.log('this should get sent to websockets')
         if(text.length){
-            signalServerSocket.send(JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.email }))
+            signalServerSocket.send(JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.name }))
         }
     });
 
