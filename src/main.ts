@@ -47,7 +47,7 @@ const createWindow = () => {
         },
         autoHideMenuBar: true,
     })
-    
+
     let config: Config
     try {
         config = getConfig()
@@ -173,15 +173,15 @@ const createWindow = () => {
         api.externalApiDoSomething(auth)
     })
 
-    ipcMain.on('startP1', (event, data) => {
-        mainWindow.webContents.send('message-from-main', 'starting 1p mode')
+    ipcMain.on('startOnlineMatch', (event, data) => {
+        mainWindow.webContents.send('message-from-main', 'starting match')
         startPlayingOnline({
             config,
             localPort: 7000,
             remoteIp: data.ip || '127.0.0.1',
             remotePort: data.port || 7001,
-            player: 0,
-            delay: 0,
+            player: data.player,
+            delay: data.delay,
         })
     })
 
@@ -245,19 +245,19 @@ const createWindow = () => {
     }
 
     // Open the DevTools.
-    // mainWindow.webContents.openDevTools()
+    mainWindow.webContents.openDevTools()
 
     // handle cleanup on closing window
     mainWindow.on('close', async (event) => {
         console.log('closing app as', userUID)
-        event.preventDefault();
+        event.preventDefault()
         if (userUID) {
             // remove user from websockets and log them out of firebase on close
             await api.removeLoggedInUser(auth)
             mainWindow?.webContents.send('closing-app', { uid: userUID })
         }
         setTimeout(() => {
-            mainWindow?.destroy(); // force window to close when we finish
+            mainWindow?.destroy() // force window to close when we finish
         }, 500)
     })
 }

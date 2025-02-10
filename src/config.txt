@@ -1,1 +1,1 @@
-emuPath=/Users/mbp182/Desktop/emulator/fbneo
+emuPath=C:\Users\dusti\Documents\Fightcade\emulator\fbneo

@@ -35,15 +35,19 @@ export default function OfflinePage() {
                     onChange={(e) => setOpponentIp(e.target.value)}
                     placeholder="opponent public ip"
                 />
-                <button onClick={() => {
-                    if(player === 0){
+                <button
+                    onClick={() => {
+                        console.log('yo hey what the hell is goin on', player)
                         console.log('serving match')
-                        window.api.serveMatch(opponentIp, 7000);
-                    }
-                    if(player === 1){
-                        window.api.connectMatch(opponentIp, 7000);
-                    }
-                }}>Connect</button>
+                        window.api.serveMatch(opponentIp, 3478, player, 0)
+                    }}
+                >
+                    Connect
+                </button>
+
+                <button id="startCallBtn">
+                    Handshake
+                </button>
                 <br></br>
                 <button onClick={() => console.log('go to offline page')}>
                     Direct Connections

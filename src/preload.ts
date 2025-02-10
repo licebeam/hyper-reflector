@@ -4,7 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('api', {
     // server and online
-    loginUser: (loginObject: { email: string, name: string; pass: string }) =>
+    loginUser: (loginObject: { email: string; name: string; pass: string }) =>
         ipcRenderer.send('login-user', loginObject),
     logOut: () => ipcRenderer.send('log-out'),
     getLoggedInUser: (uid: string) => ipcRenderer.send('check-logged-in', uid),
@@ -17,8 +17,8 @@ contextBridge.exposeInMainWorld('api', {
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     sendText: (text: string) => ipcRenderer.send('send-text', text),
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),
-    serveMatch: (ip: string, port: number) => ipcRenderer.send('startP1', { ip, port }),
-    connectMatch: (ip: string, port: number) => ipcRenderer.send('startP2', { ip, port }),
+    serveMatch: (ip: string, port: number, player: number, delay: number) =>
+        ipcRenderer.send('startOnlineMatch', { ip, port, player, delay }),
     startSoloTraining: () => ipcRenderer.send('start-solo-mode'),
     // ipc call stuff
     on: (channel, callback) => {
