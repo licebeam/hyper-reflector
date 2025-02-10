@@ -123,14 +123,29 @@ function connectWebSocket(user) {
             await peerConnection.setLocalDescription(answer);
             signalServerSocket.send(JSON.stringify({ type: "answer", answer }));
             console.log('hey we got offer')
+
+            setTimeout(async () => {
+                const stats = await peerConnection.getStats();
+                stats.forEach((report) => {
+                    if (report.type === "local-candidate") {
+                        console.log("Local Candidate:", report);
+                    }
+                    if (report.type === "remote-candidate") {
+                        console.log("Remote Candidate:", report);
+                    }
+                });
+            }, 3000);
+
         } else if (data.type === "answer") {
             console.log('hey we got answer')
             console.log(JSON.stringify(candidateList));
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+
         } else if (data.type === "ice-candidate") {
             console.log('hey we got candidate')
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
         }
+
     };
 
     //allow users to chat
