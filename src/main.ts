@@ -47,7 +47,7 @@ const createWindow = () => {
         },
         autoHideMenuBar: true,
     })
-
+    
     let config: Config
     try {
         config = getConfig()
