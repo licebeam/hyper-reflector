@@ -240,8 +240,12 @@ function connectWebSocket(user) {
     }
 
     peerConnection.oniceconnectionstatechange = () => {
-        console.log('ICE State:', peerConnection.iceConnectionState)
-    }
+        console.log("ICE Connection State:", peerConnection.iceConnectionState);
+    
+        if (peerConnection.iceConnectionState === "connected") {
+            console.log("ICE is fully connected! Now we can send data.");
+        }
+    };
 
     // Create an offer and send it to the other peer
     async function startCall() {
@@ -250,11 +254,11 @@ function connectWebSocket(user) {
         await peerConnection.setLocalDescription(offer)
 
         // Wait for ICE gathering to complete before sending the offer
-        peerConnection.onicegatheringstatechange = () => {
-            if (peerConnection.iceGatheringState === 'complete') {
-                signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
-            }
-        }
+        // peerConnection.onicegatheringstatechange = () => {
+        //     if (peerConnection.iceGatheringState === 'complete') {
+        //         signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
+        //     }
+        // }
         setTimeout(async () => {
             const stats = await peerConnection.getStats()
             stats.forEach((report) => {
@@ -263,7 +267,7 @@ function connectWebSocket(user) {
                 }
             })
         }, 3000)
-        // signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
+        signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
     }
 
     window.api.on('hand-shake-users', (text: string) => {
