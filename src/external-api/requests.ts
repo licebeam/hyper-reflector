@@ -58,7 +58,7 @@ async function addLoggedInUser(auth) {
 async function getLoggedInUser(userEmail: string) {
     try {
         console.log('user emai for request', userEmail)
-        const response = await fetch(`http://127.0.0.1:${keys.API_PORT}/get-logged-in`, {
+        const response = await fetch(`http://${SERVER}:${keys.API_PORT}/get-logged-in`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
