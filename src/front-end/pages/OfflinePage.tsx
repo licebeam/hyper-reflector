@@ -3,6 +3,7 @@ import Layout from '../layout/Layout'
 
 export default function OfflinePage() {
     const [player, setPlayer] = useState(0)
+    const [opponentPort, setOpponentPort] = useState(0)
     const [opponentIp, setOpponentIp] = useState('')
 
     // document.getElementById("api-serve-btn").addEventListener("click", () => {
@@ -35,19 +36,29 @@ export default function OfflinePage() {
                     onChange={(e) => setOpponentIp(e.target.value)}
                     placeholder="opponent public ip"
                 />
+                <input
+                    type="number"
+                    value={opponentPort}
+                    onChange={(e) => setOpponentPort(e.target.value)}
+                    placeholder="port"
+                />
+                <input />
                 <button
                     onClick={() => {
                         console.log('yo hey what the hell is goin on', player)
                         console.log('serving match')
-                        window.api.serveMatch(opponentIp, 3478, player, 0)
+                        window.api.serveMatch(opponentIp, opponentPort, player, 0)
                     }}
                 >
                     Connect
                 </button>
 
-                <button id="startCallBtn" onClick={() => {
-                    window.api.handShake();
-                }}>
+                <button
+                    id="startCallBtn"
+                    onClick={() => {
+                        window.api.handShake()
+                    }}
+                >
                     Handshake
                 </button>
                 <br></br>
