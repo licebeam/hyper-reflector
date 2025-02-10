@@ -23,6 +23,7 @@ const path = require('path')
 
 const isDev = !app.isPackaged
 
+let userUID: string | null = null
 let filePathBase = process.resourcesPath
 //handle dev mode toggle for file paths.
 if (isDev) {
@@ -34,7 +35,7 @@ if (started) {
     app.quit()
 }
 
-let mainWindow: BrowserWindow | null;
+let mainWindow: BrowserWindow | null
 
 const createWindow = () => {
     // Create the browser window.
@@ -137,6 +138,7 @@ const createWindow = () => {
                 email: user.userEmail,
                 uid: user.uid,
             })
+            userUID = user.uid
             console.log('user is: ', user)
         }
     })
@@ -230,10 +232,10 @@ const createWindow = () => {
         mainWindow.webContents.send('user-name-changed', complete)
     })
 
-    ipcMain.on('createAccount', async (event, name, email) => {
-        const complete = await api.createAccount(auth, name, email)
-        // mainWindow.webContents.send('user-account-created', complete)
-    })
+    // ipcMain.on('createAccount', async (event, name, email) => {
+    //     const complete = await api.createAccount(auth, name, email)
+    //     // mainWindow.webContents.send('user-account-created', complete)
+    // })
 
     // and load the index.html of the app.
     if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -244,6 +246,18 @@ const createWindow = () => {
 
     // Open the DevTools.
     mainWindow.webContents.openDevTools()
+
+    // handle cleanup on closing window
+    mainWindow.on('close', (event) => {
+        console.log('closing app as', userUID)
+        event.preventDefault();
+        if (userUID) {
+            mainWindow?.webContents.send('closing-app', { uid: userUID })
+        }
+        setTimeout(() => {
+            mainWindow?.destroy(); // force window to close when we finish
+        }, 500)
+    })
 }
 
 // Listen for a request and respond to it
@@ -267,9 +281,6 @@ app.on('ready', createWindow)
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('before-quit', () => {
-    mainWindow?.webContents.send('closing-app');
-})
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit()

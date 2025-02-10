@@ -117,11 +117,11 @@ window.api.on('logged-out', (user) => {
     }
 });
 
-window.api.on('closing-app', () => {
+window.api.on('closing-app', async (user) => {
     // kill the socket connection
     if (signalServerSocket) {
-        signalServerSocket.send(JSON.stringify({ type: "user-disconnect", user }));
-        signalServerSocket.send(JSON.stringify({ type: "join", user }));
+        console.log('we are killing the socket user')
+        await signalServerSocket.send(JSON.stringify({ type: "user-disconnect", user }));
         signalServerSocket.close();
         signalServerSocket = null;
     }

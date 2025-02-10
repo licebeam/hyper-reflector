@@ -20,7 +20,7 @@ export const useMessageStore = create((set) => ({
     pushUser: (user) => set((state) => ({ userList: [...state.userList, user] })),
     removeUser: (user) =>
         set((state) => ({
-            userList: [...state.userList.filter((u) => u === user)],
+            userList: [...state.userList.filter((u) => u !== user)],
         })),
     clearUserList: () => set((state) => ({ userList: [] })),
 }))
