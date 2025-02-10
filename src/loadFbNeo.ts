@@ -52,6 +52,7 @@ export function startPlayingOnline({
   player: number;
   delay: number;
 }) {
+  console.log(localPort, remoteIp, remotePort)
   const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${config.emulator.luaPath}`;
   console.log({ directCommand });
 
