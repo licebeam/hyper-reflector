@@ -38,7 +38,7 @@ const googleStuns = [
 const peerConnection = new RTCPeerConnection({
     iceServers: [
         {
-            urls: [...googleStuns],
+            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`, ...googleStuns],
         },
         {
             urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
@@ -131,11 +131,11 @@ function connectWebSocket(user) {
         if (data.type === 'user-message') {
             window.api.sendRoomMessage(data)
         }
-        if (data.type === "offer") {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            signalServerSocket.send(JSON.stringify({ type: "answer", answer }));
+        if (data.type === 'offer') {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
+            const answer = await peerConnection.createAnswer()
+            await peerConnection.setLocalDescription(answer)
+            signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
             console.log('hey we got offer')
             setTimeout(async () => {
                 const stats = await peerConnection.getStats()
@@ -152,12 +152,12 @@ function connectWebSocket(user) {
                     console.warn('ICE is not connected yet! Waiting...')
                 }
             }, 3000)
-        } else if (data.type === "answer") {
+        } else if (data.type === 'answer') {
             console.log('hey we got answer')
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        } else if (data.type === "ice-candidate") {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
+        } else if (data.type === 'ice-candidate') {
             console.log('hey we got candidate')
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
         }
     }
 
