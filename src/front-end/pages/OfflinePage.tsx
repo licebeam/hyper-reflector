@@ -5,6 +5,7 @@ export default function OfflinePage() {
     const [player, setPlayer] = useState(0)
     const [opponentPort, setOpponentPort] = useState(0)
     const [opponentIp, setOpponentIp] = useState('')
+    const [myPort, setMyPort] = useState(0)
 
     // document.getElementById("api-serve-btn").addEventListener("click", () => {
     //     var port = document.getElementById("externalPort").value; // typescript error, works fine
@@ -42,11 +43,18 @@ export default function OfflinePage() {
                     onChange={(e) => setOpponentPort(e.target.value)}
                     placeholder="port"
                 />
+                <br> user port </br>
+                <input
+                    type="number"
+                    value={myPort}
+                    onChange={(e) => setMyPort(e.target.value)}
+                    placeholder="my port"
+                />
                 <button
                     onClick={() => {
                         console.log('yo hey what the hell is goin on', player)
                         console.log('serving match')
-                        window.api.serveMatch(opponentIp, opponentPort, player, 0)
+                        window.api.serveMatch(opponentIp, opponentPort, player, 0, myPort)
                     }}
                 >
                     Connect

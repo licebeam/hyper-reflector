@@ -18,8 +18,8 @@ contextBridge.exposeInMainWorld('api', {
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     sendText: (text: string) => ipcRenderer.send('send-text', text),
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),
-    serveMatch: (ip: string, port: number, player: number, delay: number) =>
-        ipcRenderer.send('startOnlineMatch', { ip, port, player, delay }),
+    serveMatch: (ip: string, port: number, player: number, delay: number, myPort: mumber) =>
+        ipcRenderer.send('startOnlineMatch', { ip, port, player, delay, myPort }),
     startSoloTraining: () => ipcRenderer.send('start-solo-mode'),
     // ipc call stuff
     on: (channel, callback) => {

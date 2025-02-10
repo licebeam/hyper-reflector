@@ -240,12 +240,20 @@ function connectWebSocket(user) {
     }
 
     peerConnection.oniceconnectionstatechange = () => {
-        console.log("ICE Connection State:", peerConnection.iceConnectionState);
-    
-        if (peerConnection.iceConnectionState === "connected") {
-            console.log("ICE is fully connected! Now we can send data.");
+        console.log('ICE Connection State:', peerConnection.iceConnectionState)
+
+        if (peerConnection.iceConnectionState === 'connected') {
+            console.log('ICE is fully connected! Now we can send data.')
         }
-    };
+    }
+
+    peerConnection.onicegatheringstatechange = () => {
+        console.log('ICE Gathering State:', peerConnection.iceGatheringState)
+    }
+
+    peerConnection.onconnectionstatechange = () => {
+        console.log('Connection State:', peerConnection.connectionState)
+    }
 
     // Create an offer and send it to the other peer
     async function startCall() {

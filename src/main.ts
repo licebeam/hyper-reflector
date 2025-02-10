@@ -161,7 +161,6 @@ const createWindow = () => {
     ipcMain.on('setEmulatorPath', () => {
         setEmulatorPath()
     })
-    
 
     // receives text from front end sends it to emulator
     ipcMain.on('send-text', (event, text: string) => {
@@ -182,7 +181,7 @@ const createWindow = () => {
         mainWindow.webContents.send('message-from-main', 'starting match')
         startPlayingOnline({
             config,
-            localPort: 7000,
+            localPort: data.myPort || 7000,
             remoteIp: data.ip || '127.0.0.1',
             remotePort: data.port || 7001,
             player: data.player,
