@@ -38,7 +38,7 @@ const googleStuns = [
 const peerConnection = new RTCPeerConnection({
     iceServers: [
         {
-            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`, ...googleStuns],
+            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
         },
         {
             urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
