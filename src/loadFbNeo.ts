@@ -25,6 +25,8 @@ function fightcadeCmd(config: Config) {
   const { fightcadePath } = config.emulator;
   console.log({ platform: process.platform });
   switch(process.platform) {
+    case "darwin":
+      return `wine "${fightcadePath}"`
     case "linux":
       return `wine "${fightcadePath}"`
     default:

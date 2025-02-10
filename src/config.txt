@@ -1,1 +1,1 @@
-emuPath=undefined
+emuPath=/Users/mbp182/Desktop/emulator/fbneo
