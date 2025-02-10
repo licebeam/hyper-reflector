@@ -1,6 +1,6 @@
 import keys from '../private/keys'
 
-const SERVER = keys.COTURN_IP;
+const SERVER = keys.COTURN_IP
 // const SERVER = '127.0.0.1' -- used for testing the backend locally
 
 function checkCurrentAuthState(auth) {
@@ -55,25 +55,25 @@ async function addLoggedInUser(auth) {
     }
 }
 
-async function getLoggedInUser(email) {
+async function getLoggedInUser(userEmail: string) {
     try {
-        const response = fetch(`http://${SERVER}:${keys.API_PORT}/get-logged-in`, {
+        console.log('user emai for request', userEmail)
+        const response = await fetch(`http://127.0.0.1:${keys.API_PORT}/get-logged-in`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                userEmail: email,
+                userEmail: userEmail,
             }),
         })
 
         if (!response.ok) {
             return false
         }
-        return true
-        // const data = await response.json();
-        // console.log(data);
-        // return data
+
+        const data = await response.json()
+        return data
     } catch (error) {
         console.log(error)
         console.error(error.message)

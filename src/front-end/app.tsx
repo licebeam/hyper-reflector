@@ -1,4 +1,4 @@
-import { createRoot } from 'react-dom/client';
+import { createRoot } from 'react-dom/client'
 import {
     Outlet,
     RouterProvider,
@@ -7,12 +7,12 @@ import {
     createRootRoute,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import StartPage from './pages/StartPage';
-import LobbyPage from './pages/LobbyPage';
-import OfflinePage from './pages/OfflinePage';
-import NewsPage from './pages/NewsPage';
-import PlayerProfilePage from './pages/PlayerProfilePage';
-import SettingsPage from './pages/SettingsPage';
+import StartPage from './pages/StartPage'
+import LobbyPage from './pages/LobbyPage'
+import OfflinePage from './pages/OfflinePage'
+import NewsPage from './pages/NewsPage'
+import PlayerProfilePage from './pages/PlayerProfilePage'
+import SettingsPage from './pages/SettingsPage'
 
 const rootRoute = createRootRoute({
     component: () => (
@@ -75,9 +75,11 @@ const profileRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/player',
     component: function Settings() {
-        return <div className="p-2">
-            <PlayerProfilePage />
-        </div>
+        return (
+            <div className="p-2">
+                <PlayerProfilePage />
+            </div>
+        )
     },
 })
 
@@ -85,11 +87,22 @@ const settingsRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/settings',
     component: function Settings() {
-        return <div className="p-2"><SettingsPage /></div>
+        return (
+            <div className="p-2">
+                <SettingsPage />
+            </div>
+        )
     },
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, newsRoute, offlineRoute, chatRoute, profileRoute, settingsRoute])
+const routeTree = rootRoute.addChildren([
+    indexRoute,
+    newsRoute,
+    offlineRoute,
+    chatRoute,
+    profileRoute,
+    settingsRoute,
+])
 
 const router = createRouter({ routeTree })
 
@@ -99,5 +112,5 @@ declare module '@tanstack/react-router' {
     }
 }
 
-const root = createRoot(document.body);
-root.render(<RouterProvider router={router} />);
+const root = createRoot(document.body)
+root.render(<RouterProvider router={router} />)

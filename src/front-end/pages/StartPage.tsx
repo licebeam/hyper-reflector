@@ -10,7 +10,7 @@ export default function StartPage() {
             <div>
                 <Link to="/offline" className="[&.active]:font-bold">
                     Play Offline
-                </Link>{' '}
+                </Link>
             </div>
         </Layout>
     )

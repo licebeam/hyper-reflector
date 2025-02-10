@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('api', {
     loginUser: (loginObject: { email: string, name: string; pass: string }) =>
         ipcRenderer.send('login-user', loginObject),
     logOut: () => ipcRenderer.send('log-out'),
-    getLoggedInUser: (email: string) => ipcRenderer.send('check-logged-in', email),
+    getLoggedInUser: (uid: string) => ipcRenderer.send('check-logged-in', uid),
     sendMessage: (text: string) => ipcRenderer.send('sendMessage', text),
     sendRoomMessage: (text: string) => ipcRenderer.send('roomMessage', text),
     addUserToRoom: (user: any) => ipcRenderer.send('addUserToRoom', user),

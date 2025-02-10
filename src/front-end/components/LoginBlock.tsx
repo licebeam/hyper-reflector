@@ -26,7 +26,6 @@ export default function LoginBlock() {
     }
 
     const handleLogIn = (loginInfo) => {
-        console.log('login success, whats the info:', loginInfo)
         setUserState(loginInfo)
         addUser(loginInfo)
         successLogin()
@@ -35,7 +34,6 @@ export default function LoginBlock() {
     }
 
     const handleLoginFail = (event) => {
-        console.log('Received:', event)
         clearUserList()
         failedLogin()
         navigate({ to: '/' })
@@ -59,49 +57,54 @@ export default function LoginBlock() {
     }, [])
 
     return (
-        <div style={{ display: 'flex' }}>
-            {!isLoggedIn && (
-                <>
-                    <div>
-                        <p>User Email</p>
-                        <Input
-                            onChange={(e) =>
-                                setLogin({
-                                    name: login.name,
-                                    email: e.target.value,
-                                    pass: login.pass,
-                                })
-                            }
-                            type="text"
-                            value={login.email}
-                        />
-                    </div>
-                    <div>
-                        <p>Password</p>
-                        <Input
-                            onChange={(e) =>
-                                setLogin({
-                                    name: login.name,
-                                    email: login.email,
-                                    pass: e.target.value,
-                                })
-                            }
-                            type="password"
-                            value={login.pass}
-                        />
-                    </div>
-                    <button
-                        id="login-btn"
-                        onClick={() => {
-                            console.log(window.api.getLoggedInUser(login.email)) // its and email
-                            window.api.loginUser(login)
-                        }}
-                    >
-                        Log In
-                    </button>
-                    {isLoggedIn}
-                </>
-            )}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <p>
+                Currently account creation is not available, please ask an admin to make an account
+                for you.
+            </p>
+            <div style={{ display: 'flex' }}>
+                {!isLoggedIn && (
+                    <>
+                        <div>
+                            <p>User Email</p>
+                            <Input
+                                onChange={(e) =>
+                                    setLogin({
+                                        name: login.name,
+                                        email: e.target.value,
+                                        pass: login.pass,
+                                    })
+                                }
+                                type="text"
+                                value={login.email}
+                            />
+                        </div>
+                        <div>
+                            <p>Password</p>
+                            <Input
+                                onChange={(e) =>
+                                    setLogin({
+                                        name: login.name,
+                                        email: login.email,
+                                        pass: e.target.value,
+                                    })
+                                }
+                                type="password"
+                                value={login.pass}
+                            />
+                        </div>
+                        <button
+                            id="login-btn"
+                            onClick={() => {
+                                window.api.loginUser(login)
+                            }}
+                        >
+                            Log In
+                        </button>
+                        {isLoggedIn}
+                    </>
+                )}
+            </div>
         </div>
     )
 }

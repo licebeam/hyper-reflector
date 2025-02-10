@@ -1,8 +1,5 @@
 import * as React from 'react'
-import {
-    Link,
-    useNavigate,
-} from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useLoginStore, useMessageStore } from '../state/store'
 
 export default function Layout({ children }) {
@@ -17,45 +14,43 @@ export default function Layout({ children }) {
     React.useEffect(() => {
         window.api.on('logged-out', (event) => {
             clearUserList()
-            clearMessageState();
+            clearMessageState()
             setUserState({ email: '' })
             loggedOut()
             navigate({ to: '/' })
             // handle do some funky stateful call for logging in redirect etc
-        });
-    }, []);
+        })
+    }, [])
 
     return (
         <div>
             <div>
-                <div className="p-2 flex gap-2">
+                <div>
                     <Link to="/news" className="[&.active]:font-bold">
                         News
                     </Link>
-                    {isLoggedIn &&
+                    {isLoggedIn && (
                         <>
                             <Link to="/chat" className="[&.active]:font-bold">
                                 Chat
                             </Link>
                             <Link to="/player" className="[&.active]:font-bold">
-                                Profle
-                            </Link>
-                            <Link to="/settings" className="[&.active]:font-bold">
-                                Settings
+                                Profile
                             </Link>
                         </>
-                    }
+                    )}
                     <Link to="/offline" className="[&.active]:font-bold">
                         Offline
                     </Link>
-                    {!isLoggedIn &&
+                    <Link to="/settings" className="[&.active]:font-bold">
+                        Settings
+                    </Link>
+                    {!isLoggedIn && (
                         <Link to="/" className="[&.active]:font-bold">
                             Login
                         </Link>
-                    }
-                    {isLoggedIn &&
-                        <button onClick={() => window.api.logOut()}>Log Out</button>
-                    }
+                    )}
+                    {isLoggedIn && <button onClick={() => window.api.logOut()}>Log Out</button>}
                 </div>
                 <hr />
             </div>

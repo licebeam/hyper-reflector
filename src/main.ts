@@ -124,8 +124,8 @@ const createWindow = () => {
 
     // handle ipc calls
     ipcMain.on('login-user', async (event, login) => {
-        const isLoggedIn = await api.getLoggedInUser(login.email)
-        if (isLoggedIn) return
+        const loginObject = await api.getLoggedInUser(login.email)
+        if (loginObject.loggedIn) return
         await handleLogin(login.email, login.pass)
         await api.addLoggedInUser(auth)
         //test first time log
@@ -149,8 +149,8 @@ const createWindow = () => {
         handleLogOut()
     })
 
-    ipcMain.on('check-logged-in', async (event, email) => {
-        const isLoggedIn = await api.getLoggedInUser(email)
+    ipcMain.on('check-logged-in', async (event, uid) => {
+        const isLoggedIn = await api.getLoggedInUser(uid)
         return isLoggedIn
     })
 
@@ -245,13 +245,15 @@ const createWindow = () => {
     }
 
     // Open the DevTools.
-    mainWindow.webContents.openDevTools()
+    // mainWindow.webContents.openDevTools()
 
     // handle cleanup on closing window
-    mainWindow.on('close', (event) => {
+    mainWindow.on('close', async (event) => {
         console.log('closing app as', userUID)
         event.preventDefault();
         if (userUID) {
+            // remove user from websockets and log them out of firebase on close
+            await api.removeLoggedInUser(auth)
             mainWindow?.webContents.send('closing-app', { uid: userUID })
         }
         setTimeout(() => {
