@@ -38,7 +38,7 @@ const googleStuns = [
 const peerConnection = new RTCPeerConnection({
     iceServers: [
         {
-            urls: ['stun:stun.l.google.com:19302'],
+            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
         },
         {
             urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
@@ -152,9 +152,25 @@ function connectWebSocket(user) {
                 if (peerConnection.iceConnectionState !== 'connected') {
                     console.warn('ICE is not connected yet! Waiting...')
                 }
-            }, 3000)
+            }, 6000)
         } else if (data.type === 'answer') {
             console.log('hey we got answer')
+            setTimeout(async () => {
+                console.log('from answer------------')
+                const stats = await peerConnection.getStats()
+                stats.forEach((report) => {
+                    if (report.type === 'host' || report.candidateType === 'host') return
+                    if (report.type === 'local-candidate') {
+                        console.log('Local Candidate:', report)
+                    }
+                    if (report.type === 'remote-candidate') {
+                        console.log('Remote Candidate:', report)
+                    }
+                })
+                if (peerConnection.iceConnectionState !== 'connected') {
+                    console.warn('ICE is not connected yet! Waiting...')
+                }
+            }, 6000)
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         } else if (data.type === 'ice-candidate') {
             console.log('hey we got candidate')
@@ -190,37 +206,77 @@ function connectWebSocket(user) {
 
     // send new ice candidates from the coturn server
     peerConnection.onicecandidate = (event) => {
+        //port filtere
         if (event.candidate) {
-            signalServerSocket.send(
-                JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
-            )
-            if (event.candidate.type === 'srflx') {
-                // if we only require the stun server then we can break out of here.
-                console.log('STUN ICE Candidate:', event.candidate)
-                connectPort = event.candidate.port
-                connectIp = event.candidate.address
-                candidateList.push({
-                    type: 'stun',
-                    stunAddress: event.candidate.relatedAddress,
-                    port: event.candidate.port,
-                    address: event.candidate.address,
-                })
-            }
-            // if the below is true it means we've successfully udp tunnelled to the candidate on the turn server
-            if (event.candidate.type === 'relay') {
-                // we should be able use the below information on relayed players to connect via fbneo
-                console.log('TURN ICE Candidate:', event.candidate)
-                console.log(event.candidate.address, event.candidate.port)
-                connectPort = event.candidate.port
-                connectIp = event.candidate.address
-                candidateList.push({
-                    type: 'turn',
-                    stunAddress: event.candidate.relatedAddress,
-                    port: event.candidate.port,
-                    address: event.candidate.address,
-                })
+            const { port } = event.candidate
+
+            // Only allow candidates using port 7000 or 7001
+            if (port === 7000 || port === 7001) {
+                signalServerSocket.send(
+                    JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
+                )
+                if (event.candidate.type === 'srflx') {
+                    // if we only require the stun server then we can break out of here.
+                    console.log('STUN ICE Candidate:', event.candidate)
+                    connectPort = event.candidate.port
+                    connectIp = event.candidate.address
+                    candidateList.push({
+                        type: 'stun',
+                        stunAddress: event.candidate.relatedAddress,
+                        port: event.candidate.port,
+                        address: event.candidate.address,
+                    })
+                }
+                // if the below is true it means we've successfully udp tunnelled to the candidate on the turn server
+                if (event.candidate.type === 'relay') {
+                    // we should be able use the below information on relayed players to connect via fbneo
+                    console.log('TURN ICE Candidate:', event.candidate)
+                    console.log(event.candidate.address, event.candidate.port)
+                    connectPort = event.candidate.port
+                    connectIp = event.candidate.address
+                    candidateList.push({
+                        type: 'turn',
+                        stunAddress: event.candidate.relatedAddress,
+                        port: event.candidate.port,
+                        address: event.candidate.address,
+                    })
+                }
+                console.log('Accepted ICE Candidate:', event.candidate)
+            } else {
+                console.warn('Rejected ICE Candidate (wrong port):', event.candidate)
             }
         }
+        // if (event.candidate) {
+        //     signalServerSocket.send(
+        //         JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
+        //     )
+        //     if (event.candidate.type === 'srflx') {
+        //         // if we only require the stun server then we can break out of here.
+        //         console.log('STUN ICE Candidate:', event.candidate)
+        //         connectPort = event.candidate.port
+        //         connectIp = event.candidate.address
+        //         candidateList.push({
+        //             type: 'stun',
+        //             stunAddress: event.candidate.relatedAddress,
+        //             port: event.candidate.port,
+        //             address: event.candidate.address,
+        //         })
+        //     }
+        //     // if the below is true it means we've successfully udp tunnelled to the candidate on the turn server
+        //     if (event.candidate.type === 'relay') {
+        //         // we should be able use the below information on relayed players to connect via fbneo
+        //         console.log('TURN ICE Candidate:', event.candidate)
+        //         console.log(event.candidate.address, event.candidate.port)
+        //         connectPort = event.candidate.port
+        //         connectIp = event.candidate.address
+        //         candidateList.push({
+        //             type: 'turn',
+        //             stunAddress: event.candidate.relatedAddress,
+        //             port: event.candidate.port,
+        //             address: event.candidate.address,
+        //         })
+        //     }
+        // }
     }
 
     async function convertBlob(event: any) {
