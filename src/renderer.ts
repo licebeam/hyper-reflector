@@ -136,7 +136,7 @@ function connectWebSocket(user) {
             const answer = await peerConnection.createAnswer()
             await peerConnection.setLocalDescription(answer)
             signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
-            console.log('offered')
+            console.log('hey we got offer')
 
             setTimeout(async () => {
                 const stats = await peerConnection.getStats()
@@ -153,16 +153,16 @@ function connectWebSocket(user) {
                     console.warn('ICE is not connected yet! Waiting...')
                 }
             }, 3000)
-        } 
+        }
         if (data.type === 'answer') {
-            console.log('answered')
+            console.log('hey we got answer')
             console.log(JSON.stringify(candidateList))
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         }
         if (data.type === 'ice-candidate') {
-            console.log('ice candidate:', data.candidate);
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-        }}
+            console.log('candidate:', data.candidate)
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
+        }
     }
 
     //allow users to chat
