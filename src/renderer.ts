@@ -18,6 +18,7 @@ let connectIp = '0.0.0.0';
 
 let signalServerSocket: WebSocket = null; // WebSocket reference
 
+let candidateList = [];
 // handle connection to remote turn server
 
 const peerConnection = new RTCPeerConnection({
@@ -124,6 +125,7 @@ function connectWebSocket(user) {
             console.log('hey we got offer')
         } else if (data.type === "answer") {
             console.log('hey we got answer')
+            console.log(JSON.stringify(candidateList));
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
         } else if (data.type === "ice-candidate") {
             console.log('hey we got candidate')
@@ -133,6 +135,7 @@ function connectWebSocket(user) {
 
     //allow users to chat
     window.api.on('user-message', (text: string) => {
+        console.log(JSON.stringify(candidateList));
         // sends a message over to another user
         console.log('this should get sent to websockets')
         if(text.length){
@@ -164,6 +167,7 @@ function connectWebSocket(user) {
                 console.log("STUN ICE Candidate:", event.candidate);
                 connectPort = event.candidate.port
                 connectIp = event.candidate.address
+                candidateList.push({type: 'stun', ip: event.candidate.address, port: event.candidate.port})
             }
             // if the below is true it means we've successfully udp tunnelled to the candidate on the turn server
             if (event.candidate.type === "relay") {
@@ -173,6 +177,7 @@ function connectWebSocket(user) {
                 connectPort = event.candidate.port
                 connectIp = event.candidate.address
                 console.log("UDP tunneled through TURN server!");
+                candidateList.push({type: 'turn', ip: event.candidate.address, port: event.candidate.port})
             }
         }
     };
