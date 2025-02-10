@@ -12,10 +12,16 @@ export default function UsersChat() {
     const removeUser = useMessageStore((state) => state.removeUser)
     const clearUserList = useMessageStore((state) => state.clearUserList)
 
+    function uniq(a) {
+        var seen = {};
+        return a.filter(function(item) {
+            return seen.hasOwnProperty(item) ? false : (seen[item] = true);
+        });
+    }
     // user has joined lobby
     const handleUserJoinGroup = (users) => {
         clearUserList();
-        console.log(users)
+        console.log('setting list to : ', users)
         // sets the list of users from the websocket server
         setUsersList(users)
     }
@@ -57,7 +63,7 @@ export default function UsersChat() {
     }, []);
 
     useEffect(()=> {
-        console.log('users updated',userList)
+        console.log('users updated', userList)
     }, [userList])
 
 

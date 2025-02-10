@@ -34,6 +34,8 @@ if (started) {
     app.quit()
 }
 
+let mainWindow: BrowserWindow | null;
+
 const createWindow = () => {
     // Create the browser window.
     const mainWindow = new BrowserWindow({
@@ -265,6 +267,9 @@ app.on('ready', createWindow)
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
+app.on('before-quit', () => {
+    mainWindow?.webContents.send('closing-app');
+})
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit()
