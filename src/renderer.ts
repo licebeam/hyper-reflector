@@ -131,13 +131,12 @@ function connectWebSocket(user) {
         if (data.type === 'user-message') {
             window.api.sendRoomMessage(data)
         }
-        if (data.type === 'offer') {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
-            const answer = await peerConnection.createAnswer()
-            await peerConnection.setLocalDescription(answer)
-            signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
+        if (data.type === "offer") {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            signalServerSocket.send(JSON.stringify({ type: "answer", answer }));
             console.log('hey we got offer')
-
             setTimeout(async () => {
                 const stats = await peerConnection.getStats()
                 stats.forEach((report) => {
@@ -153,15 +152,12 @@ function connectWebSocket(user) {
                     console.warn('ICE is not connected yet! Waiting...')
                 }
             }, 3000)
-        }
-        if (data.type === 'answer') {
+        } else if (data.type === "answer") {
             console.log('hey we got answer')
-            console.log(JSON.stringify(candidateList))
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
-        }
-        if (data.type === 'ice-candidate') {
-            console.log('candidate:', data.candidate)
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        } else if (data.type === "ice-candidate") {
+            console.log('hey we got candidate')
+            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
         }
     }
 
@@ -246,6 +242,7 @@ function connectWebSocket(user) {
     peerConnection.oniceconnectionstatechange = () => {
         console.log('ICE State:', peerConnection.iceConnectionState)
     }
+
     // Create an offer and send it to the other peer
     async function startCall() {
         createDataChannel()
