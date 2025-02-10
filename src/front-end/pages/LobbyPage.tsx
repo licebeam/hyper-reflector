@@ -6,7 +6,7 @@ import UsersChat from '../components/UsersChat'
 export default function LobbyPage() {
     return (
         <Layout>
-            <div style={{display: 'flex'}}>
+            <div style={{ display: 'flex' }}>
                 <div>
                     <ChatWindow />
                     <ChatBar />

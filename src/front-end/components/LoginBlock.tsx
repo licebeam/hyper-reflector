@@ -1,12 +1,10 @@
 import * as React from 'react'
 import styled from 'styled-components'
-import {
-    useNavigate,
-} from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { useLoginStore, useMessageStore } from '../state/store'
 
 const Input = styled('input')(() => ({
-    width: '100px'
+    width: '100px',
 }))
 
 export default function LoginBlock() {
@@ -24,7 +22,7 @@ export default function LoginBlock() {
     }
 
     const handleLogIn = (loginInfo) => {
-        console.log('login success, whats the info:', loginInfo);
+        console.log('login success, whats the info:', loginInfo)
         setUserState(loginInfo)
         addUser(loginInfo)
         successLogin()
@@ -33,7 +31,7 @@ export default function LoginBlock() {
     }
 
     const handleLoginFail = (event) => {
-        console.log('Received:', event);
+        console.log('Received:', event)
         clearUserList()
         failedLogin()
         navigate({ to: '/' })
@@ -41,38 +39,53 @@ export default function LoginBlock() {
 
     React.useEffect(() => {
         // Listen for updates from Electron
-        window.api.on('logging-in', handleIsLoggingIn);
+        window.api.on('logging-in', handleIsLoggingIn)
 
-        window.api.removeExtraListeners('login-success', handleLogIn);
-        window.api.on('login-success', handleLogIn);
-        
-        window.api.removeExtraListeners('login-failed', handleLoginFail);
-        window.api.on('login-failed', handleLoginFail);
+        window.api.removeExtraListeners('login-success', handleLogIn)
+        window.api.on('login-success', handleLogIn)
 
-        return (() => {
-            window.api.removeListener('logging-in', handleIsLoggingIn);
-            window.api.removeListener('login-success', handleLogIn);
-            window.api.removeListener('login-failed', handleLoginFail);
-        })
-    }, []);
+        window.api.removeExtraListeners('login-failed', handleLoginFail)
+        window.api.on('login-failed', handleLoginFail)
+
+        return () => {
+            window.api.removeListener('logging-in', handleIsLoggingIn)
+            window.api.removeListener('login-success', handleLogIn)
+            window.api.removeListener('login-failed', handleLoginFail)
+        }
+    }, [])
 
     return (
         <div style={{ display: 'flex' }}>
-            {!isLoggedIn && <>
-                <div>
-                    <p>User Name</p>
-                    <Input onChange={(e) => setLogin({ name: e.target.value, pass: login.pass })} type='text' value={login.name} />
-                </div>
-                <div>
-                    <p>User Name</p>
-                    <Input onChange={(e) => setLogin({ name: login.name, pass: e.target.value })} type='password' value={login.pass} />
-                </div>
-                <button id='login-btn' onClick={() => {
-                    window.api.loginUser(login);
-                }}>Log In</button>
-                {isLoggedIn}
-            </>
-            }
+            {!isLoggedIn && (
+                <>
+                    <div>
+                        <p>User Name</p>
+                        <Input
+                            onChange={(e) => setLogin({ name: e.target.value, pass: login.pass })}
+                            type="text"
+                            value={login.name}
+                        />
+                    </div>
+                    <div>
+                        <p>User Name</p>
+                        <Input
+                            onChange={(e) => setLogin({ name: login.name, pass: e.target.value })}
+                            type="password"
+                            value={login.pass}
+                        />
+                    </div>
+                    <button
+                        id="login-btn"
+                        onClick={() => {
+                            console.log(window.api.getLoggedInUser(login.name)) // its and email
+                            window.api.loginUser(login)
+                        }}
+                    >
+                        Log In
+                    </button>
+                    {isLoggedIn}
+                </>
+            )}
         </div>
     )
 }

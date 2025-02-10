@@ -104,6 +104,7 @@ const createWindow = () => {
                         email: user.email,
                         uid: user.uid,
                     })
+                    return true
                 })
                 .catch((error) => {
                     const errorCode = error.code
@@ -131,14 +132,22 @@ const createWindow = () => {
     }
 
     // handle ipc calls
-    ipcMain.on('login-user', (event, login) => {
-        console.log('should login user', login)
-        handleLogin(login.name, login.pass)
+    ipcMain.on('login-user', async (event, login) => {
+        const isLoggedIn = await api.getLoggedInUser(login.name)
+        if (isLoggedIn) return
+        await handleLogin(login.name, login.pass)
+        await api.addLoggedInUser(auth)
     })
 
-    ipcMain.on('log-out', (event, login) => {
+    ipcMain.on('log-out', async (event, login) => {
         console.log('should log out user', login)
+        await api.removeLoggedInUser(auth)
         handleLogOut()
+    })
+
+    ipcMain.on('check-logged-in', async (event, email) => {
+        const isLoggedIn = await api.getLoggedInUser(email)
+        return isLoggedIn
     })
 
     ipcMain.on('setEmulatorPath', () => {
