@@ -203,12 +203,12 @@ function connectWebSocket(user) {
         signalServerSocket.send(JSON.stringify({ type: "offer", offer }));
     }
 
-    document.getElementById("startCallBtn").addEventListener("click", () => {
-        // var text = document.getElementById("inputText").value; // typescript error, works fine
-        // window.api.sendText(text);
+    window.api.on('hand-shake-users', (text: string) => {
         startCall()
+        // if(text.length){
+        //     signalServerSocket.send(JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.name }))
+        // }
     });
-    
 
     // Send Game Data
     function sendGameData(data) {
