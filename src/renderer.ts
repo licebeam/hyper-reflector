@@ -17,20 +17,6 @@ let connectIp = '0.0.0.0';
 //     sendGameData('some number etc')
 // });
 
-// document.getElementById("api-serve-btn").addEventListener("click", () => {
-//     var port = document.getElementById("externalPort").value; // typescript error, works fine
-//     var ip = document.getElementById("externalIp").value; // typescript error, works fine
-//     console.log('starting match with: ', connectIp, ":", connectPort)
-//     window.api.serveMatch(connectIp, connectPort);
-// });
-
-// document.getElementById("api-connect-btn").addEventListener("click", () => {
-//     var port = document.getElementById("externalPort").value; // typescript error, works fine
-//     var ip = document.getElementById("externalIp").value; // typescript error, works fine
-//     console.log('starting match with: ', connectIp, ":", connectPort)
-//     window.api.connectMatch(connectIp, connectPort);
-// });
-
 // document.getElementById("start-solo-btn").addEventListener("click", () => {
 //     console.log('starting solo training')
 //     window.api.startSoloTraining();
