@@ -45,7 +45,9 @@ export default function OfflinePage() {
                     Connect
                 </button>
 
-                <button id="startCallBtn">
+                <button id="startCallBtn" onClick={() => {
+                    window.api.handShake();
+                }}>
                     Handshake
                 </button>
                 <br></br>

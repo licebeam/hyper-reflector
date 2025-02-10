@@ -154,9 +154,14 @@ const createWindow = () => {
         return isLoggedIn
     })
 
+    ipcMain.on('hand-shake-users', (event, uid) => {
+        mainWindow.webContents.send('hand-shake-users')
+    })
+
     ipcMain.on('setEmulatorPath', () => {
         setEmulatorPath()
     })
+    
 
     // receives text from front end sends it to emulator
     ipcMain.on('send-text', (event, text: string) => {
