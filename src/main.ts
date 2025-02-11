@@ -155,8 +155,8 @@ const createWindow = () => {
     })
 
     // Web RTC stuff
-    ipcMain.on('hand-shake-users', (event, uid) => {
-        mainWindow.webContents.send('hand-shake-users')
+    ipcMain.on('hand-shake-users', (event, type) => {
+        mainWindow.webContents.send('hand-shake-users', type)
     })
 
     ipcMain.on('send-data-channel', (event, data) => {

@@ -63,10 +63,18 @@ export default function OfflinePage() {
                 <button
                     id="startCallBtn"
                     onClick={() => {
-                        window.api.handShake()
+                        window.api.handShake('call')
                     }}
                 >
-                    Handshake
+                    Call
+                </button>
+                <button
+                    id="startCallBtn"
+                    onClick={() => {
+                        window.api.handShake('answer')
+                    }}
+                >
+                    Answer
                 </button>
                 <button
                     id="sendDataBtn"
