@@ -138,8 +138,7 @@ function connectWebSocket(user) {
         }
         if (data.type === 'offer') {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
-            const answer = await peerConnection.createAnswer()
-            await peerConnection.setLocalDescription(answer)
+
             console.log('we sent and offer')
             setTimeout(async () => {
                 const stats = await peerConnection.getStats()
@@ -327,16 +326,17 @@ function connectWebSocket(user) {
 
     // answer call
     async function answerCall() {
+        const answer = await peerConnection.createAnswer()
+        await peerConnection.setLocalDescription(answer)
         signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
     }
 
     window.api.on('hand-shake-users', (type: string) => {
-        if(type === 'call'){
+        if (type === 'call') {
             startCall()
         } else {
             answerCall()
         }
-
     })
 
     window.api.on('send-data-channel', (data: string) => {
