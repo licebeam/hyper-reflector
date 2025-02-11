@@ -308,7 +308,6 @@ function connectWebSocket(user) {
 
     // Create an offer and send it to the other peer
     async function startCall() {
-        signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
         createDataChannel()
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
