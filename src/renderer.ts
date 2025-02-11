@@ -20,6 +20,10 @@ let signalServerSocket: WebSocket = null // WebSocket reference
 
 let candidateList = []
 
+/// NOTES
+//there seems to be something going on with port forwarding, if I forward the pc's and have them target the ip it seems to work, opening the game up and starting character select
+// the opposite pc isn't able to do so because the ports aren't correctly forewarded or something
+
 // handle connection to remote turn server
 const googleStuns = [
     'stun:stun.l.google.com:19302',
@@ -46,7 +50,7 @@ const peerConnection = new RTCPeerConnection({
             credential: 'turn',
         },
     ],
-    iceTransportPolicy: 'all',
+    // iceTransportPolicy: 'all',
 })
 
 let dataChannel // Will store the game data channel
@@ -211,40 +215,40 @@ function connectWebSocket(user) {
             const { port } = event.candidate
 
             // Only allow candidates using port 7000 or 7001
-            if (port === 7000 || port === 7001) {
-                signalServerSocket.send(
-                    JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
-                )
-                if (event.candidate.type === 'srflx') {
-                    // if we only require the stun server then we can break out of here.
-                    console.log('STUN ICE Candidate:', event.candidate)
-                    connectPort = event.candidate.port
-                    connectIp = event.candidate.address
-                    candidateList.push({
-                        type: 'stun',
-                        stunAddress: event.candidate.relatedAddress,
-                        port: event.candidate.port,
-                        address: event.candidate.address,
-                    })
-                }
-                // if the below is true it means we've successfully udp tunnelled to the candidate on the turn server
-                if (event.candidate.type === 'relay') {
-                    // we should be able use the below information on relayed players to connect via fbneo
-                    console.log('TURN ICE Candidate:', event.candidate)
-                    console.log(event.candidate.address, event.candidate.port)
-                    connectPort = event.candidate.port
-                    connectIp = event.candidate.address
-                    candidateList.push({
-                        type: 'turn',
-                        stunAddress: event.candidate.relatedAddress,
-                        port: event.candidate.port,
-                        address: event.candidate.address,
-                    })
-                }
-                console.log('Accepted ICE Candidate:', event.candidate)
-            } else {
-                console.warn('Rejected ICE Candidate (wrong port):', event.candidate)
+            // if (port === 7000 || port === 7001) {
+            signalServerSocket.send(
+                JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
+            )
+            if (event.candidate.type === 'srflx') {
+                // if we only require the stun server then we can break out of here.
+                console.log('STUN ICE Candidate:', event.candidate)
+                connectPort = event.candidate.port
+                connectIp = event.candidate.address
+                candidateList.push({
+                    type: 'stun',
+                    stunAddress: event.candidate.relatedAddress,
+                    port: event.candidate.port,
+                    address: event.candidate.address,
+                })
             }
+            // if the below is true it means we've successfully udp tunnelled to the candidate on the turn server
+            if (event.candidate.type === 'relay') {
+                // we should be able use the below information on relayed players to connect via fbneo
+                console.log('TURN ICE Candidate:', event.candidate)
+                console.log(event.candidate.address, event.candidate.port)
+                connectPort = event.candidate.port
+                connectIp = event.candidate.address
+                candidateList.push({
+                    type: 'turn',
+                    stunAddress: event.candidate.relatedAddress,
+                    port: event.candidate.port,
+                    address: event.candidate.address,
+                })
+            }
+            console.log('Accepted ICE Candidate:', event.candidate)
+            // } else {
+            //     console.warn('Rejected ICE Candidate (wrong port):', event.candidate)
+            // }
         }
         // if (event.candidate) {
         //     signalServerSocket.send(
@@ -342,11 +346,10 @@ function connectWebSocket(user) {
         // }
     })
 
-    // Send Game Data
-    function sendGameData(data) {
+    window.api.on('send-data-channel', (data: string) => {
         console.log('sending data')
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(JSON.stringify(data))
         }
-    }
+    })
 }

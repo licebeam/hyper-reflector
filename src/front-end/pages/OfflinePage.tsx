@@ -68,6 +68,14 @@ export default function OfflinePage() {
                 >
                     Handshake
                 </button>
+                <button
+                    id="sendDataBtn"
+                    onClick={() => {
+                        window.api.sendDataChannel()
+                    }}
+                >
+                    send to data channel
+                </button>
                 <br></br>
                 <button onClick={() => console.log('go to offline page')}>
                     Direct Connections
