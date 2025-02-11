@@ -140,8 +140,7 @@ function connectWebSocket(user) {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
             const answer = await peerConnection.createAnswer()
             await peerConnection.setLocalDescription(answer)
-            signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
-            console.log('hey we got offer')
+            console.log('we sent and offer')
             setTimeout(async () => {
                 const stats = await peerConnection.getStats()
                 stats.forEach((report) => {
@@ -158,7 +157,7 @@ function connectWebSocket(user) {
                 }
             }, 6000)
         } else if (data.type === 'answer') {
-            console.log('hey we got answer')
+            console.log('we send an answer')
             setTimeout(async () => {
                 console.log('from answer------------')
                 const stats = await peerConnection.getStats()
@@ -210,12 +209,7 @@ function connectWebSocket(user) {
 
     // send new ice candidates from the coturn server
     peerConnection.onicecandidate = (event) => {
-        //port filtere
         if (event.candidate) {
-            const { port } = event.candidate
-
-            // Only allow candidates using port 7000 or 7001
-            // if (port === 7000 || port === 7001) {
             signalServerSocket.send(
                 JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
             )
@@ -246,9 +240,6 @@ function connectWebSocket(user) {
                 })
             }
             console.log('Accepted ICE Candidate:', event.candidate)
-            // } else {
-            //     console.warn('Rejected ICE Candidate (wrong port):', event.candidate)
-            // }
         }
         // if (event.candidate) {
         //     signalServerSocket.send(
@@ -318,16 +309,11 @@ function connectWebSocket(user) {
 
     // Create an offer and send it to the other peer
     async function startCall() {
+        signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
         createDataChannel()
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
 
-        // Wait for ICE gathering to complete before sending the offer
-        // peerConnection.onicegatheringstatechange = () => {
-        //     if (peerConnection.iceGatheringState === 'complete') {
-        //         signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
-        //     }
-        // }
         setTimeout(async () => {
             const stats = await peerConnection.getStats()
             stats.forEach((report) => {
@@ -339,11 +325,18 @@ function connectWebSocket(user) {
         signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
     }
 
-    window.api.on('hand-shake-users', (text: string) => {
-        startCall()
-        // if(text.length){
-        //     signalServerSocket.send(JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.name }))
-        // }
+    // answer call
+    async function answerCall() {
+        signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
+    }
+
+    window.api.on('hand-shake-users', (type: string) => {
+        if(type === 'call'){
+            startCall()
+        } else {
+            answerCall()
+        }
+
     })
 
     window.api.on('send-data-channel', (data: string) => {
