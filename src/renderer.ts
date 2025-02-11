@@ -30,7 +30,8 @@ const googleStuns = [
 const peerConnection = new RTCPeerConnection({
     iceServers: [
         {
-            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+            urls: 'stun:stun.l.google.com:19302' ,
+            // urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
         },
         {
             urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
@@ -38,7 +39,7 @@ const peerConnection = new RTCPeerConnection({
             credential: 'turn',
         },
     ],
-    // iceTransportPolicy: 'all',
+    iceTransportPolicy: 'all',
 })
 
 let dataChannel // Will store the game data channel
@@ -227,6 +228,8 @@ function connectWebSocket(user) {
                 })
             }
             console.log('Accepted ICE Candidate:', event.candidate)
+        } else {
+            console.log("candidate gathering finished ----")
         }
     }
 
@@ -264,26 +267,69 @@ function connectWebSocket(user) {
     }
 
     // Create an offer and send it to the other peer
+    // async function startCall() {
+    //     createDataChannel()
+    //     const offer = await peerConnection.createOffer()
+    //     await peerConnection.setLocalDescription(offer)
+
+    //     setTimeout(async () => {
+    //         const stats = await peerConnection.getStats()
+    //         stats.forEach((report) => {
+    //             if (report.type === 'candidate-pair' && report.nominated) {
+    //                 console.log('Active Candidate Pair:', report)
+    //             }
+    //         })
+    //     }, 3000)
+    //     signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
+    // }
+
     async function startCall() {
         createDataChannel()
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
-
-        setTimeout(async () => {
-            const stats = await peerConnection.getStats()
-            stats.forEach((report) => {
-                if (report.type === 'candidate-pair' && report.nominated) {
-                    console.log('Active Candidate Pair:', report)
+    
+        // Wait for ICE gathering to complete
+        await new Promise((resolve) => {
+            if (peerConnection.iceGatheringState === 'complete') {
+                resolve(null)
+            } else {
+                peerConnection.onicegatheringstatechange = () => {
+                    if (peerConnection.iceGatheringState === 'complete') {
+                        resolve(null)
+                    }
                 }
-            })
-        }, 3000)
+            }
+        })
+    
+        console.log('Finished gathering ICE candidates, sending offer...')
         signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
     }
 
     // answer call
+    // async function answerCall() {
+    //     const answer = await peerConnection.createAnswer()
+    //     await peerConnection.setLocalDescription(answer)
+    //     signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
+    // }
+
     async function answerCall() {
         const answer = await peerConnection.createAnswer()
         await peerConnection.setLocalDescription(answer)
+    
+        // Wait for ICE gathering to complete before sending the answer
+        await new Promise((resolve) => {
+            if (peerConnection.iceGatheringState === 'complete') {
+                resolve(null)
+            } else {
+                peerConnection.onicegatheringstatechange = () => {
+                    if (peerConnection.iceGatheringState === 'complete') {
+                        resolve(null)
+                    }
+                }
+            }
+        })
+    
+        console.log('Finished gathering ICE candidates, sending answer...')
         signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
     }
 
