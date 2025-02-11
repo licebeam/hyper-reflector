@@ -154,10 +154,16 @@ const createWindow = () => {
         return isLoggedIn
     })
 
+    // Web RTC stuff
     ipcMain.on('hand-shake-users', (event, uid) => {
         mainWindow.webContents.send('hand-shake-users')
     })
 
+    ipcMain.on('send-data-channel', (event, data) => {
+        mainWindow.webContents.send('send-data-channel', data)
+    })
+
+    //
     ipcMain.on('setEmulatorPath', () => {
         setEmulatorPath()
     })
