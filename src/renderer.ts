@@ -5,19 +5,7 @@ import './front-end/app'
 
 let connectPort = 0
 let connectIp = '0.0.0.0'
-
-// document.getElementById("testBtn").addEventListener("click", () => {
-//     window.api.sendCommand("game_name");
-//     sendGameData('some number etc')
-// });
-
-// document.getElementById("start-solo-btn").addEventListener("click", () => {
-//     console.log('starting solo training')
-//     window.api.startSoloTraining();
-// });
-
 let signalServerSocket: WebSocket = null // WebSocket reference
-
 let candidateList = []
 
 /// NOTES
@@ -240,37 +228,6 @@ function connectWebSocket(user) {
             }
             console.log('Accepted ICE Candidate:', event.candidate)
         }
-        // if (event.candidate) {
-        //     signalServerSocket.send(
-        //         JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
-        //     )
-        //     if (event.candidate.type === 'srflx') {
-        //         // if we only require the stun server then we can break out of here.
-        //         console.log('STUN ICE Candidate:', event.candidate)
-        //         connectPort = event.candidate.port
-        //         connectIp = event.candidate.address
-        //         candidateList.push({
-        //             type: 'stun',
-        //             stunAddress: event.candidate.relatedAddress,
-        //             port: event.candidate.port,
-        //             address: event.candidate.address,
-        //         })
-        //     }
-        //     // if the below is true it means we've successfully udp tunnelled to the candidate on the turn server
-        //     if (event.candidate.type === 'relay') {
-        //         // we should be able use the below information on relayed players to connect via fbneo
-        //         console.log('TURN ICE Candidate:', event.candidate)
-        //         console.log(event.candidate.address, event.candidate.port)
-        //         connectPort = event.candidate.port
-        //         connectIp = event.candidate.address
-        //         candidateList.push({
-        //             type: 'turn',
-        //             stunAddress: event.candidate.relatedAddress,
-        //             port: event.candidate.port,
-        //             address: event.candidate.address,
-        //         })
-        //     }
-        // }
     }
 
     async function convertBlob(event: any) {
