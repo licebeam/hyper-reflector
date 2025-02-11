@@ -127,8 +127,7 @@ function connectWebSocket(user) {
         }
         if (data.type === 'offer') {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
-
-            console.log('we sent and offer')
+            console.log('offer recieved')
             setTimeout(async () => {
                 const stats = await peerConnection.getStats()
                 stats.forEach((report) => {
@@ -145,7 +144,8 @@ function connectWebSocket(user) {
                 }
             }, 6000)
         } else if (data.type === 'answer') {
-            console.log('we send an answer')
+            console.log('answer recieved')
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
             setTimeout(async () => {
                 console.log('from answer------------')
                 const stats = await peerConnection.getStats()
@@ -162,7 +162,6 @@ function connectWebSocket(user) {
                     console.warn('ICE is not connected yet! Waiting...')
                 }
             }, 6000)
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         } else if (data.type === 'ice-candidate') {
             console.log('hey we got candidate')
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
