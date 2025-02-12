@@ -5,6 +5,7 @@ import {
     createRouter,
     createRoute,
     createRootRoute,
+    createMemoryHistory,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import StartPage from './pages/StartPage'
@@ -104,13 +105,19 @@ const routeTree = rootRoute.addChildren([
     settingsRoute,
 ])
 
-const router = createRouter({ routeTree })
+// this allows electron to hash the routing
+const memoryHistory = createMemoryHistory({
+    initialEntries: ['/'], // Pass your initial url
+})
+
+const router = createRouter({ routeTree, history: memoryHistory })
 
 declare module '@tanstack/react-router' {
     interface Register {
         router: typeof router
     }
 }
-
+console.log(window.location.href)
 const root = createRoot(document.body)
 root.render(<RouterProvider router={router} />)
+// root.render(<div>Test</div>)
