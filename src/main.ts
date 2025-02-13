@@ -125,13 +125,13 @@ const createWindow = () => {
     // handle ipc calls
     ipcMain.on('login-user', async (event, login) => {
         // this line seems to fail on mac??
-        const loginObject = await api.getLoggedInUser(login.email).catch(err => console.log(err))
+        const loginObject = await api.getLoggedInUser(login.email).catch(err => console.log('error checkig if user was loggin in', err))
         console.log(loginObject)
         if (loginObject && loginObject.loggedIn) return
-        await handleLogin(login.email, login.pass)
-        await api.addLoggedInUser(auth)
+        await handleLogin(login.email, login.pass).catch(err => console.log('failed to log in'))
+        await api.addLoggedInUser(auth).catch(err => console.log('failed to add user to logged in users list'))
         //test first time log
-        await api.createAccount(auth, login.name, login.email)
+        await api.createAccount(auth, login.name, login.email).catch(err => console.log('failed to create new account'))
         const user = await api.getUserByAuth(auth)
         if (user) {
             // send our user object to the front end
