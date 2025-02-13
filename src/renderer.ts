@@ -141,7 +141,11 @@ function connectWebSocket(user) {
 
     // create data channel
     function createDataChannel() {
-        dataChannel = peerConnection.createDataChannel('game')
+        const dataChannel = peerConnection.createDataChannel('game', {
+            negotiated: true, // Ensure both peers agree on the channel
+            id: 0,
+            protocol: 'udp', // This is important for compatibility with the emulator
+        })
         dataChannel.onopen = () => console.log('Data Channel Open!')
         dataChannel.onmessage = (event) => console.log('Received:', event.data)
     }
@@ -220,6 +224,17 @@ function connectWebSocket(user) {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         } else if (data.type === 'ice-candidate') {
             peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
+            const candidate = data.candidate.candidate
+            if (candidate.includes('srflx')) {
+                console.log(`🌍 ${'external user'} STUN Candidate:`, candidate)
+
+                // Extract IP and Port
+                let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
+                if (matches) {
+                    let [ip, port] = matches[0].split(' ')
+                    console.log(`🔍 ${'external user'} IP: ${ip}, Port: ${port}`)
+                }
+            }
         }
     }
 
@@ -239,4 +254,5 @@ function connectWebSocket(user) {
             dataChannel.send(JSON.stringify(data))
         }
     })
+
 }

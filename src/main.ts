@@ -125,13 +125,19 @@ const createWindow = () => {
     // handle ipc calls
     ipcMain.on('login-user', async (event, login) => {
         // this line seems to fail on mac??
-        const loginObject = await api.getLoggedInUser(login.email).catch(err => console.log('error checkig if user was loggin in', err))
+        const loginObject = await api
+            .getLoggedInUser(login.email)
+            .catch((err) => console.log('error checkig if user was loggin in', err))
         console.log(loginObject)
         if (loginObject && loginObject.loggedIn) return
-        await handleLogin(login.email, login.pass).catch(err => console.log('failed to log in'))
-        await api.addLoggedInUser(auth).catch(err => console.log('failed to add user to logged in users list'))
+        await handleLogin(login.email, login.pass).catch((err) => console.log('failed to log in'))
+        await api
+            .addLoggedInUser(auth)
+            .catch((err) => console.log('failed to add user to logged in users list'))
         //test first time log
-        await api.createAccount(auth, login.name, login.email).catch(err => console.log('failed to create new account'))
+        await api
+            .createAccount(auth, login.name, login.email)
+            .catch((err) => console.log('failed to create new account'))
         const user = await api.getUserByAuth(auth)
         if (user) {
             // send our user object to the front end
@@ -309,7 +315,53 @@ app.on('activate', () => {
     }
 })
 
-app.whenReady().then(() => {})
+app.whenReady().then(() => {
+    //UDP STUFF
+    const dgram = require('dgram')
+    const axios = require('axios')
+
+    const client = dgram.createSocket('udp4')
+
+    const SERVER_IP = '127.0.0.1' // Change to public server IP
+    const UDP_SERVER_PORT = 7000
+    const EXPRESS_API = 'http://127.0.0.1:7010'
+
+    const CLIENT_ID = Math.random().toString(36).substring(7)
+
+    client.on('message', (msg, rinfo) => {
+        console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${msg}`)
+
+        const [peerIp, peerPort] = msg.toString().split(':')
+
+        // Punch a hole to the peer
+        setInterval(() => {
+            console.log(`Punching hole to ${peerIp}:${peerPort}`)
+            client.send('punch', peerPort, peerIp)
+        }, 1000)
+    })
+
+    client.on('listening', () => {
+        const address = client.address()
+        console.log(`Client listening on ${address.address}:${address.port}`)
+
+        // Register with the Express API
+        axios
+            .post(`${EXPRESS_API}/register`, {
+                id: CLIENT_ID,
+                ip: address.address,
+                port: address.port,
+            })
+            .then((response) => {
+                console.log('Server Response:', response.data)
+            })
+            .catch((err) => console.error(err))
+
+        // Send initial UDP message to register
+        client.send(CLIENT_ID, UDP_SERVER_PORT, SERVER_IP)
+    })
+
+    client.bind(0) // Binds to a random port
+})
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
