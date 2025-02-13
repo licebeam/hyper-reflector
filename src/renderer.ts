@@ -321,17 +321,17 @@ function connectWebSocket(user) {
         await peerConnection.setLocalDescription(offer)
 
         // Wait for ICE gathering to complete
-        // await new Promise((resolve) => {
-        //     if (peerConnection.iceGatheringState === 'complete') {
-        //         resolve(null)
-        //     } else {
-        //         peerConnection.onicegatheringstatechange = () => {
-        //             if (peerConnection.iceGatheringState === 'complete') {
-        //                 resolve(null)
-        //             }
-        //         }
-        //     }
-        // })
+        await new Promise((resolve) => {
+            if (peerConnection.iceGatheringState === 'complete') {
+                resolve(null)
+            } else {
+                peerConnection.onicegatheringstatechange = () => {
+                    if (peerConnection.iceGatheringState === 'complete') {
+                        resolve(null)
+                    }
+                }
+            }
+        })
 
         console.log('Finished gathering ICE candidates, sending offer...')
         signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
