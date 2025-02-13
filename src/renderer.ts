@@ -39,11 +39,30 @@ const peerConnection = new RTCPeerConnection({
     ],
 })
 
+function setupLogging(peer, userLabel, event) {
+    if (event.candidate) {
+        let candidate = event.candidate.candidate
+        if (candidate.includes('srflx')) {
+            console.log(`🌍 ${userLabel} STUN Candidate:`, candidate)
+
+            // Extract IP and Port
+            let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
+            if (matches) {
+                let [ip, port] = matches[0].split(' ')
+                console.log(`🔍 ${userLabel} IP: ${ip}, Port: ${port}`)
+            }
+        }
+    }
+}
+
+let userName
+
 let dataChannel // Will store the game data channel
 
 window.api.on('login-success', (user) => {
     if (user) {
         console.log('User logged in:', user.email)
+        userName = user.email
         connectWebSocket(user)
     } else {
         console.log("User not logged in. WebSocket won't connect.")
@@ -135,7 +154,7 @@ function connectWebSocket(user) {
     // send new ice candidates from the coturn server
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            console.log('New ICE Candidate:', event.candidate.candidate)
+            setupLogging(peerConnection, userName, event)
         } else {
             console.log('ICE Candidate gathering complete!')
         }
