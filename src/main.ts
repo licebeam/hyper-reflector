@@ -330,17 +330,35 @@ app.whenReady().then(() => {
     const CLIENT_ID = Math.random().toString(36).substring(7)
 
     client.on('message', (msg, rinfo) => {
-        const message = msg.toString("utf8").trim(); 
-        console.log(rinfo);
+        // Convert to string and trim any extra whitespace or binary junk
+        const message = msg.toString('utf8').trim()
+
+        // Log any unexpected data to see what is coming in
+        if (!message || !message.includes(':')) {
+            console.log(
+                `Received invalid or empty message from ${rinfo.address}:${rinfo.port} - ${message}`
+            )
+            return
+        }
+
         console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${message}`)
 
-        // const [peerIp, peerPort] = msg.toString().split(':')
-        const peerIp = '127.0.0.1' // my external IP
-        const peerPort = rinfo.port
+        // Ensure the message is a valid IP:Port format
+        const [peerIp, peerPort] = message.split(':')
 
-        // Punch a hole to the peer
-        console.log(`Punching hole to ${peerIp}:${peerPort}`)
-        client.send('punch', peerPort, peerIp)
+        // Validate IP and port
+        if (!peerIp || !peerPort || isNaN(peerPort)) {
+            console.error('Invalid peer data received:', message)
+            return
+        }
+
+        console.log(`Valid peer info received: ${peerIp}:${peerPort}`)
+
+        // Start hole punching
+        setInterval(() => {
+            console.log(`Punching hole to ${peerIp}:${peerPort}`)
+            client.send('punch', peerPort, peerIp)
+        }, 1000)
     })
 
     client.on('listening', () => {
