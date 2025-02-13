@@ -3,6 +3,7 @@ import started from 'electron-squirrel-startup'
 import { sendCommand, readCommand, readStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
 import { getConfig, type Config } from './config'
+import keys from './private/keys'
 // external api
 import api from './external-api/requests'
 
@@ -322,22 +323,24 @@ app.whenReady().then(() => {
 
     const client = dgram.createSocket('udp4')
 
-    const SERVER_IP = '127.0.0.1' // Change to public server IP
+    const SERVER_IP = keys.COTURN_IP // Change to public server IP
     const UDP_SERVER_PORT = 7000
-    const EXPRESS_API = 'http://127.0.0.1:7010'
+    const EXPRESS_API = `http://${keys.COTURN_IP}:7010`
 
     const CLIENT_ID = Math.random().toString(36).substring(7)
 
     client.on('message', (msg, rinfo) => {
-        console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${msg}`)
+        const message = msg.toString("utf8").trim(); 
+        console.log(rinfo);
+        console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${message}`)
 
-        const [peerIp, peerPort] = msg.toString().split(':')
+        // const [peerIp, peerPort] = msg.toString().split(':')
+        const peerIp = '127.0.0.1' // my external IP
+        const peerPort = rinfo.port
 
         // Punch a hole to the peer
-        setInterval(() => {
-            console.log(`Punching hole to ${peerIp}:${peerPort}`)
-            client.send('punch', peerPort, peerIp)
-        }, 1000)
+        console.log(`Punching hole to ${peerIp}:${peerPort}`)
+        client.send('punch', peerPort, peerIp)
     })
 
     client.on('listening', () => {
