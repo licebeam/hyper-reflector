@@ -30,7 +30,7 @@ const googleStuns = [
 const peerConnection = new RTCPeerConnection({
     iceServers: [
         {
-            urls: 'stun:stun.l.google.com:19302' ,
+            urls: 'stun:stun.l.google.com:19302',
             // urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
         },
         {
@@ -106,6 +106,11 @@ function connectWebSocket(user) {
         console.error('WebSocket Error:', error)
     }
 
+    // ice state holders
+    let hostList = []
+    let list = []
+    let remoteList = []
+
     signalServerSocket.onmessage = async (message) => {
         const data = await convertBlob(message).then((res) => res)
         if (data.type === 'connected-users') {
@@ -126,42 +131,58 @@ function connectWebSocket(user) {
             window.api.sendRoomMessage(data)
         }
         if (data.type === 'offer') {
+            hostList = []
+            list = []
+            remoteList = []
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
             console.log('offer recieved')
             setTimeout(async () => {
                 const stats = await peerConnection.getStats()
                 stats.forEach((report) => {
-                    if (report.type === 'host' || report.candidateType === 'host') return
+                    if (report.type === 'host') {
+                        return hostList.push(report)
+                    }
                     if (report.type === 'local-candidate') {
-                        console.log('Local Candidate:', report)
+                        return list.push(report)
                     }
                     if (report.type === 'remote-candidate') {
-                        console.log('Remote Candidate:', report)
+                        return remoteList.push(report)
                     }
                 })
+                console.log('host candidates', hostList)
+                console.log('local candidates', list)
+                console.log('Remote candidates', hostList)
                 if (peerConnection.iceConnectionState !== 'connected') {
                     console.warn('ICE is not connected yet! Waiting...')
                 }
-            }, 6000)
+            }, 500)
         } else if (data.type === 'answer') {
+            hostList = []
+            list = []
+            remoteList = []
             console.log('answer recieved')
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
             setTimeout(async () => {
                 console.log('from answer------------')
                 const stats = await peerConnection.getStats()
                 stats.forEach((report) => {
-                    if (report.type === 'host' || report.candidateType === 'host') return
+                    if (report.type === 'host') {
+                        return hostList.push(report)
+                    }
                     if (report.type === 'local-candidate') {
-                        console.log('Local Candidate:', report)
+                        return list.push(report)
                     }
                     if (report.type === 'remote-candidate') {
-                        console.log('Remote Candidate:', report)
+                        return remoteList.push(report)
                     }
                 })
+                console.log('host candidates', hostList)
+                console.log('local candidates', list)
+                console.log('Remote candidates', hostList)
                 if (peerConnection.iceConnectionState !== 'connected') {
                     console.warn('ICE is not connected yet! Waiting...')
                 }
-            }, 6000)
+            }, 500)
         } else if (data.type === 'ice-candidate') {
             console.log('hey we got candidate')
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
@@ -200,6 +221,18 @@ function connectWebSocket(user) {
             signalServerSocket.send(
                 JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
             )
+            if (event.candidate.type === "host") {
+                // if we only require the stun server then we can break out of here.
+                console.log('Local ICE Candidate:', event.candidate)
+                connectPort = event.candidate.port
+                connectIp = event.candidate.address
+                candidateList.push({
+                    type: 'local',
+                    stunAddress: event.candidate.relatedAddress,
+                    port: event.candidate.port,
+                    address: event.candidate.address,
+                })
+            }
             if (event.candidate.type === 'srflx') {
                 // if we only require the stun server then we can break out of here.
                 console.log('STUN ICE Candidate:', event.candidate)
@@ -226,9 +259,9 @@ function connectWebSocket(user) {
                     address: event.candidate.address,
                 })
             }
-            console.log('Accepted ICE Candidate:', event.candidate)
+            // console.log('Accepted ICE Candidate:', event.candidate)
         } else {
-            console.log("candidate gathering finished ----")
+            console.log('candidate gathering finished ----')
         }
     }
 
@@ -286,20 +319,20 @@ function connectWebSocket(user) {
         createDataChannel()
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
-    
+
         // Wait for ICE gathering to complete
-        await new Promise((resolve) => {
-            if (peerConnection.iceGatheringState === 'complete') {
-                resolve(null)
-            } else {
-                peerConnection.onicegatheringstatechange = () => {
-                    if (peerConnection.iceGatheringState === 'complete') {
-                        resolve(null)
-                    }
-                }
-            }
-        })
-    
+        // await new Promise((resolve) => {
+        //     if (peerConnection.iceGatheringState === 'complete') {
+        //         resolve(null)
+        //     } else {
+        //         peerConnection.onicegatheringstatechange = () => {
+        //             if (peerConnection.iceGatheringState === 'complete') {
+        //                 resolve(null)
+        //             }
+        //         }
+        //     }
+        // })
+
         console.log('Finished gathering ICE candidates, sending offer...')
         signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
     }
@@ -314,7 +347,7 @@ function connectWebSocket(user) {
     async function answerCall() {
         const answer = await peerConnection.createAnswer()
         await peerConnection.setLocalDescription(answer)
-    
+
         // Wait for ICE gathering to complete before sending the answer
         await new Promise((resolve) => {
             if (peerConnection.iceGatheringState === 'complete') {
@@ -327,7 +360,7 @@ function connectWebSocket(user) {
                 }
             }
         })
-    
+
         console.log('Finished gathering ICE candidates, sending answer...')
         signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
     }
@@ -342,6 +375,10 @@ function connectWebSocket(user) {
 
     window.api.on('send-data-channel', (data: string) => {
         console.log('sending data')
+        console.log('host candidates', hostList)
+        console.log('local candidates', list)
+        console.log('Remote candidates', hostList)
+        console.log('potential candidates', candidateList)
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(JSON.stringify(data))
         }
