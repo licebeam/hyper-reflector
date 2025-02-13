@@ -132,7 +132,7 @@ function connectWebSocket(user) {
             let answer = await peerConnection.createAnswer()
             await peerConnection.setLocalDescription(answer)
             console.log('Answer (send this to User A):', answer.sdp)
-            signalServerSocket.send(JSON.stringify({ type: 'asnwer', answer }))
+            signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
 
             hostList = []
             list = []
@@ -151,9 +151,9 @@ function connectWebSocket(user) {
                         return remoteList.push(report)
                     }
                 })
-                console.log('host candidates', hostList)
-                console.log('local candidates', list)
-                console.log('Remote candidates', hostList)
+                // console.log('host candidates', hostList)
+                // console.log('local candidates', list)
+                // console.log('Remote candidates', hostList)
                 if (peerConnection.iceConnectionState !== 'connected') {
                     console.warn('ICE is not connected yet! Waiting...')
                 }
@@ -178,9 +178,9 @@ function connectWebSocket(user) {
                         return remoteList.push(report)
                     }
                 })
-                console.log('host candidates', hostList)
-                console.log('local candidates', list)
-                console.log('Remote candidates', hostList)
+                // console.log('host candidates', hostList)
+                // console.log('local candidates', list)
+                // console.log('Remote candidates', hostList)
                 if (peerConnection.iceConnectionState !== 'connected') {
                     console.warn('ICE is not connected yet! Waiting...')
                 }
@@ -275,15 +275,15 @@ function connectWebSocket(user) {
     }
 
     window.api.on('send-data-channel', (data: string) => {
-        console.log(getIdentityAssertion(peerConnection))
-        console.log(peerConnection.signalingState)
-        console.log(peerConnection.connectionState)
-        console.log(peerConnection.currentLocalDescription)
-        console.log('sending data', peerConnection)
-        console.log('host candidates', hostList)
-        console.log('local candidates', list)
-        console.log('Remote candidates', hostList)
-        console.log('potential candidates', candidateList)
+        // console.log(getIdentityAssertion(peerConnection))
+        // console.log(peerConnection.signalingState)
+        // console.log(peerConnection.connectionState)
+        // console.log(peerConnection.currentLocalDescription)
+        // console.log('sending data', peerConnection)
+        // console.log('host candidates', hostList)
+        // console.log('local candidates', list)
+        // console.log('Remote candidates', hostList)
+        // console.log('potential candidates', candidateList)
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(JSON.stringify(data))
         }
