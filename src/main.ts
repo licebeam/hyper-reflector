@@ -331,24 +331,24 @@ app.whenReady().then(() => {
 
     client.on('message', (msg, rinfo) => {
         // Convert to string and trim any extra whitespace or binary junk
-        const message = msg.toString('utf8').trim()
+        const incomingMessage = msg.toString('utf8').trim()
 
         // Log any unexpected data to see what is coming in
-        if (!message || !message.includes(':')) {
+        if (!incomingMessage || !incomingMessage.includes(':')) {
             console.log(
-                `Received invalid or empty message from ${rinfo.address}:${rinfo.port} - ${message}`
+                `Received invalid or empty message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`
             )
             return
         }
 
-        console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${message}`)
+        console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`)
 
         // Ensure the message is a valid IP:Port format
-        const [peerIp, peerPort] = message.split(':')
+        const [peerIp, peerPort] = incomingMessage.split(':')
 
         // Validate IP and port
         if (!peerIp || !peerPort || isNaN(peerPort)) {
-            console.error('Invalid peer data received:', message)
+            console.error('Invalid peer data received:', incomingMessage)
             return
         }
 
@@ -359,6 +359,23 @@ app.whenReady().then(() => {
             console.log(`Punching hole to ${peerIp}:${peerPort}`)
             client.send('punch', peerPort, peerIp)
         }, 1000)
+
+        if (peerIp) {
+            const sendClient = dgram.createSocket('udp4')
+            console.log('Sending packet to', peerIp)
+
+            const testMessage = Buffer.from('test message')
+            sendClient.send(testMessage, 0, testMessage.length, peerPort, peerIp, (err) => {
+                if (err) {
+                    console.error('Error sending test message:', err)
+                } else {
+                    console.log('Test message sent!')
+                }
+
+                // Close the sendClient socket after sending
+                sendClient.close()
+            })
+        }
     })
 
     client.on('listening', () => {
