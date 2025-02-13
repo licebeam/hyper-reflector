@@ -42,6 +42,9 @@ const peerConnection = new RTCPeerConnection({
 function setupLogging(peer, userLabel, event) {
     if (event.candidate) {
         let candidate = event.candidate.candidate
+        // Send the candidate to the remote peer via signaling
+        signalServerSocket.send(JSON.stringify({ type: 'ice-candidate', candidate }))
+
         if (candidate.includes('srflx')) {
             console.log(`🌍 ${userLabel} STUN Candidate:`, candidate)
 
@@ -214,7 +217,6 @@ function connectWebSocket(user) {
         } else if (data.type === 'answer') {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         } else if (data.type === 'ice-candidate') {
-            console.log('ice-candidate recieved')
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
         }
     }
