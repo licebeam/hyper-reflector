@@ -103,10 +103,69 @@ function connectWebSocket(user) {
         console.error('WebSocket Error:', error)
     }
 
-    // ice state holders
-    let hostList = []
-    let list = []
-    let remoteList = []
+    //allow users to chat
+    window.api.on('user-message', (text: string) => {
+        console.log(JSON.stringify(candidateList))
+        // sends a message over to another user
+        console.log('this should get sent to websockets')
+        if (text.length) {
+            signalServerSocket.send(
+                JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.name })
+            )
+        }
+    })
+
+    // create data channel
+    function createDataChannel() {
+        dataChannel = peerConnection.createDataChannel('game')
+        dataChannel.onopen = () => console.log('Data Channel Open!')
+        dataChannel.onmessage = (event) => console.log('Received:', event.data)
+    }
+
+    // automatically create the data channel
+    createDataChannel()
+
+    // handle recieve data from channel
+    peerConnection.ondatachannel = (event) => {
+        dataChannel = event.channel
+        dataChannel.onopen = () => console.log('Data Channel Open!')
+        dataChannel.onmessage = (event) => console.log('Received:', event.data)
+    }
+
+    // send new ice candidates from the coturn server
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            console.log('New ICE Candidate:', event.candidate.candidate)
+        } else {
+            console.log('ICE Candidate gathering complete!')
+        }
+    }
+
+    peerConnection.oniceconnectionstatechange = () => {
+        console.log('ICE Connection State:', peerConnection.iceConnectionState)
+        if (peerConnection.iceConnectionState === 'connected') {
+            console.log('Connected! Ready to send data.')
+        } else if (peerConnection.iceConnectionState === 'failed') {
+            console.log('ICE connection failed. Check STUN/TURN settings.')
+        }
+    }
+
+    async function convertBlob(event: any) {
+        try {
+            // check if event is not JSON but is blob
+            if (event.data instanceof Blob) {
+                const text = await event.data.text()
+                const data = JSON.parse(text)
+                console.log(data)
+                return data
+            } else {
+                const data = JSON.parse(event.data)
+                return data
+            }
+        } catch (error) {
+            console.error('could not convert data:', event.data, error)
+        }
+    }
 
     signalServerSocket.onmessage = async (message) => {
         const data = await convertBlob(message).then((res) => res)
@@ -133,127 +192,15 @@ function connectWebSocket(user) {
             await peerConnection.setLocalDescription(answer)
             console.log('Answer (send this to User A):', answer.sdp)
             signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
-
-            hostList = []
-            list = []
-            remoteList = []
-            console.log('offer recieved')
-            setTimeout(async () => {
-                const stats = await peerConnection.getStats()
-                stats.forEach((report) => {
-                    if (report.type === 'host') {
-                        return hostList.push(report)
-                    }
-                    if (report.type === 'local-candidate') {
-                        return list.push(report)
-                    }
-                    if (report.type === 'remote-candidate') {
-                        return remoteList.push(report)
-                    }
-                })
-                // console.log('host candidates', hostList)
-                // console.log('local candidates', list)
-                // console.log('Remote candidates', hostList)
-                if (peerConnection.iceConnectionState !== 'connected') {
-                    console.warn('ICE is not connected yet! Waiting...')
-                }
-            }, 500)
         } else if (data.type === 'answer') {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
-            hostList = []
-            list = []
-            remoteList = []
-            console.log('answer recieved')
-            setTimeout(async () => {
-                console.log('from answer------------')
-                const stats = await peerConnection.getStats()
-                stats.forEach((report) => {
-                    if (report.type === 'host') {
-                        return hostList.push(report)
-                    }
-                    if (report.type === 'local-candidate') {
-                        return list.push(report)
-                    }
-                    if (report.type === 'remote-candidate') {
-                        return remoteList.push(report)
-                    }
-                })
-                // console.log('host candidates', hostList)
-                // console.log('local candidates', list)
-                // console.log('Remote candidates', hostList)
-                if (peerConnection.iceConnectionState !== 'connected') {
-                    console.warn('ICE is not connected yet! Waiting...')
-                }
-            }, 500)
         } else if (data.type === 'ice-candidate') {
-            console.log('hey we got candidate')
+            console.log('ice-candidate recieved')
             await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
         }
     }
 
-    //allow users to chat
-    window.api.on('user-message', (text: string) => {
-        console.log(JSON.stringify(candidateList))
-        // sends a message over to another user
-        console.log('this should get sent to websockets')
-        if (text.length) {
-            signalServerSocket.send(
-                JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.name })
-            )
-        }
-    })
-
-    // create data channel
-    function createDataChannel() {
-        dataChannel = peerConnection.createDataChannel('game')
-        dataChannel.onopen = () => console.log('Data Channel Open!')
-        dataChannel.onmessage = (event) => console.log('Received:', event.data)
-    }
-
-    // handle recieve data from channel
-    peerConnection.ondatachannel = (event) => {
-        dataChannel = event.channel
-        dataChannel.onopen = () => console.log('Data Channel Open!')
-        dataChannel.onmessage = (event) => console.log('Received:', event.data)
-    }
-
-    // send new ice candidates from the coturn server
-    peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-            console.log('New ICE Candidate:', event.candidate.candidate)
-        } else {
-            console.log('ICE Candidate gathering complete!')
-        }
-    }
-
-    async function convertBlob(event: any) {
-        try {
-            // check if event is not JSON but is blob
-            if (event.data instanceof Blob) {
-                const text = await event.data.text()
-                const data = JSON.parse(text)
-                console.log(data)
-                return data
-            } else {
-                const data = JSON.parse(event.data)
-                return data
-            }
-        } catch (error) {
-            console.error('could not convert data:', event.data, error)
-        }
-    }
-
-    peerConnection.oniceconnectionstatechange = () => {
-        console.log('ICE Connection State:', peerConnection.iceConnectionState)
-        if (peerConnection.iceConnectionState === 'connected') {
-            console.log('Connected! Ready to send data.')
-        } else if (peerConnection.iceConnectionState === 'failed') {
-            console.log('ICE connection failed. Check STUN/TURN settings.')
-        }
-    }
-
     async function startCall() {
-        createDataChannel()
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
         console.log('Offer Created:', offer.sdp)
@@ -264,26 +211,7 @@ function connectWebSocket(user) {
         startCall()
     })
 
-    async function getIdentityAssertion(pc) {
-        try {
-            const identity = await pc.peerIdentity
-            return identity
-        } catch (err) {
-            console.log('Error identifying remote peer: ', err)
-            return null
-        }
-    }
-
     window.api.on('send-data-channel', (data: string) => {
-        // console.log(getIdentityAssertion(peerConnection))
-        // console.log(peerConnection.signalingState)
-        // console.log(peerConnection.connectionState)
-        // console.log(peerConnection.currentLocalDescription)
-        // console.log('sending data', peerConnection)
-        // console.log('host candidates', hostList)
-        // console.log('local candidates', list)
-        // console.log('Remote candidates', hostList)
-        // console.log('potential candidates', candidateList)
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(JSON.stringify(data))
         }
