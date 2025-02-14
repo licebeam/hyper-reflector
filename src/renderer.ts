@@ -23,6 +23,7 @@ const googleStuns = [
     'stun:stun4.l.google.com:19302',
     'stun:stun4.l.google.com:5349',
 ]
+
 // temp
 // `stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`
 const peerConnection = new RTCPeerConnection({
@@ -42,11 +43,26 @@ const peerConnection = new RTCPeerConnection({
 
 function setupLogging(peer, userLabel, event) {
     if (event.candidate) {
+        console.log(`📤 Sending ICE Candidate from ${userLabel}:`, event.candidate)
         let candidate = event.candidate.candidate
         // Send the candidate to the remote peer via signaling
-        signalServerSocket.send(
-            JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
-        )
+        if (signalServerSocket.readyState === WebSocket.OPEN) {
+            signalServerSocket.send(
+                JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
+            )
+        } else {
+            console.warn(`⚠️ WebSocket not ready, queuing ICE Candidate for later...`)
+            candidateList.push(event.candidate) // Store the candidate to send later
+        }
+
+        if (event.candidate.candidate.includes('relay')) {
+            // Extract IP and Port
+            let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
+            if (matches) {
+                let [ip, port] = matches[0].split(' ')
+                console.log(`🔄 TURN Candidate:: ${ip}, Port: ${port}`)
+            }
+        }
 
         if (candidate.includes('srflx')) {
             console.log(`🌍 ${userLabel} STUN Candidate:`, candidate)
@@ -62,7 +78,6 @@ function setupLogging(peer, userLabel, event) {
 }
 
 let userName
-
 let dataChannel // Will store the game data channel
 
 window.api.on('login-success', (user) => {
@@ -114,6 +129,13 @@ function connectWebSocket(user) {
         signalServerSocket.send(JSON.stringify({ type: 'join', user }))
         console.log('WebSocket connected', user.uid)
         signalServerSocket.send(JSON.stringify({ type: 'user-connect', user }))
+        while (candidateList.length > 0) {
+            let queuedCandidate = candidateList.shift()
+            signalServerSocket.send(
+                JSON.stringify({ type: 'ice-candidate', candidate: queuedCandidate })
+            )
+            console.log(`📤 Sent queued ICE candidate`)
+        }
     }
 
     signalServerSocket.onclose = async (user) => {
@@ -218,13 +240,21 @@ function connectWebSocket(user) {
             await peerConnection.setLocalDescription(answer)
             console.log('Answer Being Sent ----', answer.sdp)
             signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
-        } else if (data.type === 'answer') {
+        }
+        if (data.type === 'answer') {
             console.log('Answer Recieved:', { offer: data.answer.sdp })
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
-        } else if (data.type === 'ice-candidate') {
-            peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
+        }
+        if (data.type === 'ice-candidate') {
+            console.log(`📩 Received ICE candidate from external user:`, data.candidate)
+
+            peerConnection
+                .addIceCandidate(new RTCIceCandidate(data.candidate))
+                .then(() => console.log(`✅ ICE Candidate added successfully!`))
+                .catch((err) => console.error(`❌ Failed to add ICE Candidate:`, err))
+
             const candidate = data.candidate.candidate
-            console.log(`📃 ${'external candidate'} type unknown at this point:`, candidate)
+            // console.log(`📃 ${'external candidate'} type unknown at this point:`, candidate)
             if (candidate.includes('srflx')) {
                 console.log(`🌍 ${'external user'} STUN Candidate:`, candidate)
 
