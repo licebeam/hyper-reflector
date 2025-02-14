@@ -354,10 +354,10 @@ app.on('activate', () => {
 
 const dgram = require('dgram')
 let listener = null // Store the listener globally
-let expected_peer_ip = 'x.x.x.x' // Replace with STUN-discovered external IP
-let stun_port = 50000 // Default STUN port
+let expectedRemoteIP = 'x.x.x.x' // Replace with STUN-discovered external IP
+let stunPort = 50000 // Default STUN port
 let emulatorPort = null // Will update dynamically
-let external_port = 7000,
+let externalPort = 7000
 
 app.whenReady().then(() => {
     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
@@ -365,16 +365,16 @@ app.whenReady().then(() => {
 
         // Close existing listener if it exists
         if (listener) {
-            console.log(`Closing previous listener on port ${stun_port}`)
+            console.log(`Closing previous listener on port ${stunPort}`)
             listener.close()
             listener = null
         }
 
         // Update STUN variables
-        stun_port = port
-        expected_peer_ip = ip
+        stunPort = port
+        expectedRemoteIP = ip
         emulatorPort = null
-        external_port = extPort
+        externalPort = extPort
 
         // Create a new UDP listener
         listener = dgram.createSocket('udp4')
@@ -384,7 +384,7 @@ app.whenReady().then(() => {
                 `📥 Received packet from ${rinfo.address}:${rinfo.port} - Size: ${msg.length}`
             )
             // Check if message is from the expected peer
-            if (rinfo.address === expected_peer_ip) {
+            if (rinfo.address === expectedRemoteIP) {
                 if (!emulatorPort) {
                     emulatorPort = rinfo.port // Capture the emulator's real port
                     console.log(`Detected emulator port: ${emulatorPort}`)
@@ -392,9 +392,9 @@ app.whenReady().then(() => {
 
                 // Forward packets to emulator's actual port
                 console.log(
-                    `🔄 Routing packet from ${rinfo.address}:${rinfo.port} → Emulator ${stun_port}`
+                    `🔄 Routing packet from ${rinfo.address}:${rinfo.port} → Emulator ${stunPort}`
                 )
-                // forwardPacket(msg, stun_port + 1, expected_peer_ip)
+                // forwardPacket(msg, stunPort + 1, expectedRemoteIP)
             }
         })
 
@@ -404,7 +404,7 @@ app.whenReady().then(() => {
             listener = null
         })
 
-        // listener.send('message', stun_port)
+        // listener.send('message', stunPort)
 
         // Function to forward packets
         function forwardPacket(data, targetPort, targetIP) {
@@ -416,8 +416,8 @@ app.whenReady().then(() => {
         }
 
         // Bind to STUN port (initial listening point)
-        listener.bind(stun_port, () => {
-            console.log(`Listening on STUN port ${stun_port}...`)
+        listener.bind(stunPort, () => {
+            console.log(`Listening on STUN port ${stunPort}...`)
         })
 
             // Function to send a manual UDP message to the listener
@@ -438,7 +438,7 @@ app.whenReady().then(() => {
         })
     }
     setInterval(() => {
-        sendManualMessage('test', expected_peer_ip, external_port)
+        sendManualMessage('test', expectedRemoteIP, externalPort)
     }, 5000)
     })
 })
