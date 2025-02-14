@@ -316,6 +316,58 @@ app.on('activate', () => {
     }
 })
 
+// port proxy code
+import dgram from 'dgram'
+app.whenReady().then(() => {
+    // Expected external IP from STUN
+    let expect_peer_ip = 'x.x.x.x' // Replace with STUN-discovered external IP
+    let stun_port = 50000 // Example port assigned by STUN
+    let emulatorPort = null // Will update dynamically
+
+    ipcMain.on('updateStun', async (event, { port, ip }) => {
+        console.log('updating stun conditions', port, '-', ip)
+        stun_port = port
+        expect_peer_ip = ip
+    })
+    // Create UDP listener
+    const listener = dgram.createSocket('udp4')
+
+    listener.on('message', (msg, rinfo) => {
+        // Check if message is from the expected peer
+        if (rinfo.address === expect_peer_ip) {
+            if (!emulatorPort) {
+                emulatorPort = rinfo.port // Capture the emulator's real port
+                console.log(`🎯 Detected emulator port: ${emulatorPort}`)
+            }
+
+            // Forward packets to emulator's actual port
+            console.log(
+                `🔄 Routing packet from ${rinfo.address}:${rinfo.port} → Emulator ${stun_port}`
+            )
+            forwardPacket(msg, stun_port, expect_peer_ip)
+        }
+    })
+
+    listener.on('error', (err) => {
+        console.log(`❌ UDP Error: ${err.message}`)
+        listener.close()
+    })
+
+    // Function to forward packets
+    function forwardPacket(data, targetPort, targetIP) {
+        const socket = dgram.createSocket('udp4')
+        socket.send(data, targetPort, targetIP, (err) => {
+            if (err) console.log(`🚨 Forwarding Error: ${err.message}`)
+            socket.close()
+        })
+    }
+
+    // Bind to STUN port (initial listening point)
+    listener.bind(stun_port, () => {
+        console.log(`🚀 Listening on STUN port ${stun_port}...`)
+    })
+})
+
 // app.whenReady().then(() => {
 //     //UDP STUFF
 //     const dgram = require('dgram')
