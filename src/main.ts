@@ -352,176 +352,228 @@ app.on('activate', () => {
 //   }
 // });
 
-const dgram = require('dgram')
-let listener = null // Store the listener globally
-let expectedRemoteIP = 'x.x.x.x' // Replace with STUN-discovered external IP
-let stunPort = 50000 // Default STUN port
-let emulatorPort = null // Will update dynamically
-let externalPort = 7000
+// const dgram = require('dgram')
+// let listener = null // Store the listener globally
+// let expectedRemoteIP = 'x.x.x.x' // Replace with STUN-discovered external IP
+// let stunPort = 50000 // Default STUN port
+// let emulatorPort = null // Will update dynamically
+// let externalPort = 7000
 
-app.whenReady().then(() => {
-    ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
-        console.log('Updating STUN conditions:', port, '-', ip)
+// const dgram = require('dgram')
+// const server = dgram.createSocket('udp4')
 
-        // Close existing listener if it exists
-        if (listener) {
-            console.log(`Closing previous listener on port ${stunPort}`)
-            listener.close()
-            listener = null
-        }
-
-        // Update STUN variables
-        stunPort = port
-        expectedRemoteIP = ip
-        emulatorPort = null
-        externalPort = extPort
-
-        // Create a new UDP listener
-        listener = dgram.createSocket('udp4')
-
-        listener.on('message', (msg, rinfo) => {
-            console.log(
-                `📥 Received packet from ${rinfo.address}:${rinfo.port} - Size: ${msg.length}`
-            )
-            // Check if message is from the expected peer
-            if (rinfo.address === expectedRemoteIP) {
-                if (!emulatorPort) {
-                    emulatorPort = rinfo.port // Capture the emulator's real port
-                    console.log(`Detected emulator port: ${emulatorPort}`)
-                }
-
-                // Forward packets to emulator's actual port
-                console.log(
-                    `🔄 Routing packet from ${rinfo.address}:${rinfo.port} → Emulator ${stunPort}`
-                )
-                // forwardPacket(msg, stunPort + 1, expectedRemoteIP)
-            }
-        })
-
-        listener.on('error', (err) => {
-            console.log(`UDP Error: ${err.message}`)
-            listener.close()
-            listener = null
-        })
-
-        // listener.send('message', stunPort)
-
-        // Function to forward packets
-        function forwardPacket(data, targetPort, targetIP) {
-            const socket = dgram.createSocket('udp4')
-            socket.send(data, targetPort, targetIP, (err) => {
-                if (err) console.log(`Forwarding Error: ${err.message}`)
-                socket.close()
-            })
-        }
-
-        // Bind to STUN port (initial listening point)
-        listener.bind(stunPort, () => {
-            console.log(`Listening on STUN port ${stunPort}...`)
-        })
-
-            // Function to send a manual UDP message to the listener
-    function sendManualMessage(message, targetIP, targetPort) {
-        const socket = dgram.createSocket('udp4')
-
-        // Convert the message to a buffer
-        const bufferMessage = Buffer.from(message, 'utf-8')
-
-        // Send the message to the target IP and port
-        socket.send(bufferMessage, targetPort, targetIP, (err) => {
-            if (err) {
-                console.log(`Error sending message: ${err.message}`)
-            } else {
-                console.log(`Manual message sent to ${targetIP}:${targetPort}`)
-            }
-            socket.close()
-        })
-    }
-    setInterval(() => {
-        sendManualMessage('test', expectedRemoteIP, externalPort)
-    }, 5000)
-    })
-})
+// const internalPort = 9000 // Port you want your app to think it is receiving data on
+// let actualPort = 8000 // Port you're actually receiving data on
 
 // app.whenReady().then(() => {
-//     //UDP STUFF
-//     const dgram = require('dgram')
-//     const axios = require('axios')
+//     // Create a UDP socket
+//     const listener = dgram.createSocket('udp4')
 
-//     const client = dgram.createSocket('udp4')
+//     // Start listening on a range of ports
+//     const portsToMonitor = [7000, 7001, 7002] // Example port range
 
-//     const SERVER_IP = keys.COTURN_IP // Change to public server IP
-//     const UDP_SERVER_PORT = 7000
-//     const EXPRESS_API = `http://${keys.COTURN_IP}:7010`
-
-//     const CLIENT_ID = Math.random().toString(36).substring(7)
-
-//     client.on('message', (msg, rinfo) => {
-//         // Convert to string and trim any extra whitespace or binary junk
-//         const incomingMessage = msg.toString('utf8').trim()
-
-//         // Log any unexpected data to see what is coming in
-//         if (!incomingMessage || !incomingMessage.includes(':')) {
-//             console.log(
-//                 `Received invalid or empty message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`
-//             )
-//             return
-//         }
-
-//         console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`)
-
-//         // Ensure the message is a valid IP:Port format
-//         const [peerIp, peerPort] = incomingMessage.split(':')
-
-//         // Validate IP and port
-//         if (!peerIp || !peerPort || isNaN(peerPort)) {
-//             console.error('Invalid peer data received:', incomingMessage)
-//             return
-//         }
-
-//         console.log(`Valid peer info received: ${peerIp}:${peerPort}`)
-
-//         // Start hole punching
-//         setInterval(() => {
-//             console.log(`Punching hole to ${peerIp}:${peerPort}`)
-//             client.send('punch', peerPort, peerIp)
-//         }, 1000)
-
-//         if (peerIp) {
-//             const sendClient = dgram.createSocket('udp4')
-//             console.log('Sending packet to', peerIp)
-//             setInterval(() => {
-//                 const message = Buffer.from('keep-alive')
-//                 client.send(message, peerPort, peerIp, (err) => {
-//                     if (err) console.error('Error:', err)
-//                     else console.log('Keep-alive sent!')
-//                 })
-//             }, 2000)
-//         }
+//     portsToMonitor.forEach((port) => {
+//         listener.bind(port, () => {
+//             console.log(`Listening on port ${port}`)
+//         })
 //     })
 
-//     client.on('listening', () => {
-//         const address = client.address()
-//         console.log(`Client listening on ${address.address}:${address.port}`)
-
-//         // Register with the Express API
-//         axios
-//             .post(`${EXPRESS_API}/register`, {
-//                 id: CLIENT_ID,
-//                 ip: address.address,
-//                 port: address.port,
-//             })
-//             .then((response) => {
-//                 console.log('Server Response:', response.data)
-//             })
-//             .catch((err) => console.error(err))
-
-//         // Send initial UDP message to register
-//         client.send(CLIENT_ID, UDP_SERVER_PORT, SERVER_IP)
+//     listener.on('message', (msg, rinfo) => {
+//         console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${msg}`)
 //     })
 
-//     client.bind(0) // Binds to a random port
+//     listener.on('error', (err) => {
+//         console.log(`Error: ${err.message}`)
+//     })
+
+//     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
+//         console.log('Updating STUN conditions:', port, '-', ip)
+//         actualPort = port
+//         // Listener on the "actual" port
+//         server.on('message', (msg, rinfo) => {
+//             console.log(`Received message from ${rinfo.address}:${rinfo.port}`)
+
+//             // Forward the message to the "internal" port
+//             const forwardSocket = dgram.createSocket('udp4')
+//             forwardSocket.send(msg, 0, msg.length, internalPort, '127.0.0.1', (err) => {
+//                 if (err) {
+//                     console.error(`Error forwarding message: ${err.message}`)
+//                 } else {
+//                     console.log(`Forwarded message to internal port ${internalPort}`)
+//                 }
+//                 forwardSocket.close()
+//             })
+//         })
+
+//         server.bind(actualPort, () => {
+//             console.log(`Listening on actual port ${actualPort}`)
+//         })
+//     })
 // })
+
+// app.whenReady().then(() => {
+//     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
+//         console.log('Updating STUN conditions:', port, '-', ip)
+
+//         // Close existing listener if it exists
+//         if (listener) {
+//             console.log(`Closing previous listener on port ${stunPort}`)
+//             listener.close()
+//             listener = null
+//         }
+
+//         // Update STUN variables
+//         stunPort = port
+//         expectedRemoteIP = ip
+//         emulatorPort = null
+//         externalPort = extPort
+
+//         // Create a new UDP listener
+//         listener = dgram.createSocket('udp4')
+
+//         listener.on('message', (msg, rinfo) => {
+//             console.log(
+//                 `📥 Received packet from ${rinfo.address}:${rinfo.port} - Size: ${msg.length}`
+//             )
+//             // Check if message is from the expected peer
+//             if (rinfo.address === expectedRemoteIP) {
+//                 if (!emulatorPort) {
+//                     emulatorPort = rinfo.port // Capture the emulator's real port
+//                     console.log(`Detected emulator port: ${emulatorPort}`)
+//                 }
+
+//                 // Forward packets to emulator's actual port
+//                 console.log(
+//                     `🔄 Routing packet from ${rinfo.address}:${rinfo.port} → Emulator ${stunPort}`
+//                 )
+//                 // forwardPacket(msg, stunPort + 1, expectedRemoteIP)
+//             }
+//         })
+
+//         listener.on('error', (err) => {
+//             console.log(`UDP Error: ${err.message}`)
+//             listener.close()
+//             listener = null
+//         })
+
+//         // listener.send('message', stunPort)
+
+//         // Function to forward packets
+//         function forwardPacket(data, targetPort, targetIP) {
+//             const socket = dgram.createSocket('udp4')
+//             socket.send(data, targetPort, targetIP, (err) => {
+//                 if (err) console.log(`Forwarding Error: ${err.message}`)
+//                 socket.close()
+//             })
+//         }
+
+//         // Bind to STUN port (initial listening point)
+//         listener.bind(stunPort, () => {
+//             console.log(`Listening on STUN port ${stunPort}...`)
+//         })
+
+//             // Function to send a manual UDP message to the listener
+//     function sendManualMessage(message, targetIP, targetPort) {
+//         const socket = dgram.createSocket('udp4')
+
+//         // Convert the message to a buffer
+//         const bufferMessage = Buffer.from(message, 'utf-8')
+
+//         // Send the message to the target IP and port
+//         socket.send(bufferMessage, targetPort, targetIP, (err) => {
+//             if (err) {
+//                 console.log(`Error sending message: ${err.message}`)
+//             } else {
+//                 console.log(`Manual message sent to ${targetIP}:${targetPort}`)
+//             }
+//             socket.close()
+//         })
+//     }
+//     setInterval(() => {
+//         sendManualMessage('test', expectedRemoteIP, externalPort)
+//     }, 5000)
+//     })
+// })
+
+app.whenReady().then(() => {
+    //UDP STUFF
+    const dgram = require('dgram')
+    const axios = require('axios')
+
+    const client = dgram.createSocket('udp4')
+
+    const SERVER_IP = keys.COTURN_IP // Change to public server IP
+    const UDP_SERVER_PORT = 7000
+    const EXPRESS_API = `http://${keys.COTURN_IP}:7010`
+
+    const CLIENT_ID = Math.random().toString(36).substring(7)
+
+    client.on('message', (msg, rinfo) => {
+        // Convert to string and trim any extra whitespace or binary junk
+        const incomingMessage = msg.toString('utf8').trim()
+
+        // Log any unexpected data to see what is coming in
+        if (!incomingMessage || !incomingMessage.includes(':')) {
+            console.log(
+                `Received invalid or empty message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`
+            )
+            return
+        }
+
+        console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`)
+
+        // Ensure the message is a valid IP:Port format
+        const [peerIp, peerPort] = incomingMessage.split(':')
+
+        // Validate IP and port
+        if (!peerIp || !peerPort || isNaN(peerPort)) {
+            console.error('Invalid peer data received:', incomingMessage)
+            return
+        }
+
+        console.log(`Valid peer info received: ${peerIp}:${peerPort}`)
+
+        // Start hole punching
+        setInterval(() => {
+            console.log(`Punching hole to ${peerIp}:${peerPort}`)
+            client.send('punch', peerPort, peerIp)
+        }, 1000)
+
+        if (peerIp) {
+            const sendClient = dgram.createSocket('udp4')
+            console.log('Sending packet to', peerIp)
+            setInterval(() => {
+                const message = Buffer.from('keep-alive')
+                client.send(message, peerPort, peerIp, (err) => {
+                    if (err) console.error('Error:', err)
+                    else console.log('Keep-alive sent!')
+                })
+            }, 2000)
+        }
+    })
+
+    client.on('listening', () => {
+        const address = client.address()
+        console.log(`Client listening on ${address.address}:${address.port}`)
+
+        // Register with the Express API
+        axios
+            .post(`${EXPRESS_API}/register`, {
+                id: CLIENT_ID,
+                ip: address.address,
+                port: address.port,
+            })
+            .then((response) => {
+                console.log('Server Response:', response.data)
+            })
+            .catch((err) => console.error(err))
+
+        // Send initial UDP message to register
+        client.send(CLIENT_ID, UDP_SERVER_PORT, SERVER_IP)
+    })
+
+    client.bind(0) // Binds to a random port
+})
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
