@@ -357,9 +357,10 @@ let listener = null // Store the listener globally
 let expected_peer_ip = 'x.x.x.x' // Replace with STUN-discovered external IP
 let stun_port = 50000 // Default STUN port
 let emulatorPort = null // Will update dynamically
+let external_port = 7000,
 
 app.whenReady().then(() => {
-    ipcMain.on('updateStun', async (event, { port, ip }) => {
+    ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
         console.log('Updating STUN conditions:', port, '-', ip)
 
         // Close existing listener if it exists
@@ -373,6 +374,7 @@ app.whenReady().then(() => {
         stun_port = port
         expected_peer_ip = ip
         emulatorPort = null
+        external_port = extPort
 
         // Create a new UDP listener
         listener = dgram.createSocket('udp4')
@@ -436,7 +438,7 @@ app.whenReady().then(() => {
         })
     }
     setInterval(() => {
-        sendManualMessage('test', expected_peer_ip, stun_port)
+        sendManualMessage('test', expected_peer_ip, external_port)
     }, 5000)
     })
 })
