@@ -364,12 +364,12 @@ app.whenReady().then(() => {
             const sendClient = dgram.createSocket('udp4')
             console.log('Sending packet to', peerIp)
             setInterval(() => {
-                const message = Buffer.from('keep-alive');
+                const message = Buffer.from('keep-alive')
                 client.send(message, peerPort, peerIp, (err) => {
-                    if (err) console.error('Error:', err);
-                    else console.log('Keep-alive sent!');
-                });
-            }, 2000);
+                    if (err) console.error('Error:', err)
+                    else console.log('Keep-alive sent!')
+                })
+            }, 2000)
         }
     })
 
@@ -380,7 +380,7 @@ app.whenReady().then(() => {
         // Register with the Express API
         axios
             .post(`${EXPRESS_API}/register`, {
-                id: CLIENT_ID,3133
+                id: CLIENT_ID,
                 ip: address.address,
                 port: address.port,
             })
