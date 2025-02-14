@@ -392,7 +392,7 @@ app.whenReady().then(() => {
                 console.log(
                     `🔄 Routing packet from ${rinfo.address}:${rinfo.port} → Emulator ${stun_port}`
                 )
-                forwardPacket(msg, stun_port + 1, expected_peer_ip)
+                // forwardPacket(msg, stun_port + 1, expected_peer_ip)
             }
         })
 
@@ -437,7 +437,7 @@ app.whenReady().then(() => {
     }
     setInterval(() => {
         sendManualMessage('test', expected_peer_ip, stun_port)
-    }, 2000)
+    }, 5000)
     })
 })
 
