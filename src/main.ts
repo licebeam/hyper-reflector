@@ -317,6 +317,41 @@ app.on('activate', () => {
 })
 
 // port proxy code
+
+// const udpProxy = require('node-udp-proxy');
+
+// const proxy = udpProxy({
+//   from: 'localhost:12345',  // The port the client is sending to
+//   to: 'localhost:6789'      // The actual port the server is listening on
+// });
+
+// proxy.start();
+
+// const pcap = require('pcap');
+
+// // Set up a pcap session to capture UDP packets
+// const session = pcap.createSession('', 'udp');
+
+// const targetIp = '192.168.1.100';  // Replace with the target IP
+// const targetPort = 12345;          // Replace with the target port
+
+// session.on('packet', (rawPacket) => {
+//   const packet = pcap.decode.packet(rawPacket);
+
+//   if (packet.payload && packet.payload.payload) {
+//     const udpPayload = packet.payload.payload;
+
+//     // Check if the packet is UDP and comes from the desired IP and port
+//     if (udpPayload.dport === targetPort || udpPayload.sport === targetPort) {
+//       const sourceIp = packet.payload.payload.saddr;
+//       if (sourceIp === targetIp) {
+//         console.log(`Intercepted UDP packet from ${sourceIp}:${udpPayload.sport}`);
+//         console.log('Data:', udpPayload.data.toString());
+//       }
+//     }
+//   }
+// });
+
 const dgram = require('dgram')
 let listener = null // Store the listener globally
 let expected_peer_ip = 'x.x.x.x' // Replace with STUN-discovered external IP
@@ -357,7 +392,7 @@ app.whenReady().then(() => {
                 console.log(
                     `🔄 Routing packet from ${rinfo.address}:${rinfo.port} → Emulator ${stun_port}`
                 )
-                forwardPacket(msg, stun_port, expected_peer_ip)
+                forwardPacket(msg, stun_port + 1, expected_peer_ip)
             }
         })
 
@@ -366,6 +401,8 @@ app.whenReady().then(() => {
             listener.close()
             listener = null
         })
+
+        // listener.send('message', stun_port)
 
         // Function to forward packets
         function forwardPacket(data, targetPort, targetIP) {
@@ -380,6 +417,27 @@ app.whenReady().then(() => {
         listener.bind(stun_port, () => {
             console.log(`Listening on STUN port ${stun_port}...`)
         })
+
+            // Function to send a manual UDP message to the listener
+    function sendManualMessage(message, targetIP, targetPort) {
+        const socket = dgram.createSocket('udp4')
+
+        // Convert the message to a buffer
+        const bufferMessage = Buffer.from(message, 'utf-8')
+
+        // Send the message to the target IP and port
+        socket.send(bufferMessage, targetPort, targetIP, (err) => {
+            if (err) {
+                console.log(`Error sending message: ${err.message}`)
+            } else {
+                console.log(`Manual message sent to ${targetIP}:${targetPort}`)
+            }
+            socket.close()
+        })
+    }
+    setInterval(() => {
+        sendManualMessage('test', expected_peer_ip, stun_port)
+    }, 2000)
     })
 })
 
