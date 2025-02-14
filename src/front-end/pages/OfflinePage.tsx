@@ -79,7 +79,7 @@ export default function OfflinePage() {
                 <button
                     id="sendDataBtn"
                     onClick={() => {
-                        window.api.sendDataChannel()
+                        window.api.sendDataChannel('Hello from another user')
                     }}
                 >
                     send to data channel

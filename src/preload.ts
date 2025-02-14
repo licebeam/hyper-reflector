@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('api', {
     removeUserFromRoom: (user: any) => ipcRenderer.send('removeUserFromRoom', user),
     addUserGroupToRoom: (users: [any]) => ipcRenderer.send('addUserGroupToRoom', users),
     handShake: (type: string) => ipcRenderer.send('hand-shake-users', type),
-    sendDataChannel: () => ipcRenderer.send('send-data-channel'),
+    sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
     // sends text to the emulator using the fbneo_commands.txt
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     sendText: (text: string) => ipcRenderer.send('send-text', text),

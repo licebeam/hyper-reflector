@@ -28,8 +28,8 @@ const googleStuns = [
 const peerConnection = new RTCPeerConnection({
     iceServers: [
         {
-            urls: 'stun:stun.l.google.com:19302',
-            // urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+            // urls: 'stun:stun.l.google.com:19302',
+            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
         },
         {
             urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
@@ -37,6 +37,7 @@ const peerConnection = new RTCPeerConnection({
             credential: 'turn',
         },
     ],
+    iceTransportPolicy: 'all',
 })
 
 function setupLogging(peer, userLabel, event) {
@@ -152,8 +153,8 @@ function connectWebSocket(user) {
     // handle recieve data from channel
     peerConnection.ondatachannel = (event) => {
         dataChannel = event.channel
-        dataChannel.onopen = () => console.log('Data Channel Open!')
-        dataChannel.onmessage = (event) => console.log('Received:', event.data)
+        dataChannel.onopen = () => console.log('Data Channel Open Peer Connection!')
+        dataChannel.onmessage = (event) => console.log('Received peer:', event.data)
     }
 
     // send new ice candidates from the coturn server
