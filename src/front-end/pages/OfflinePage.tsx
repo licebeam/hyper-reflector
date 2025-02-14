@@ -84,6 +84,15 @@ export default function OfflinePage() {
                 >
                     send to data channel
                 </button>
+
+                <button
+                    id="updateStunBtn"
+                    onClick={() => {
+                        window.api.updateStun({ ip: opponentIp, port: opponentPort })
+                    }}
+                >
+                    send to data channel
+                </button>
                 <br></br>
                 <button onClick={() => console.log('go to offline page')}>
                     Direct Connections
