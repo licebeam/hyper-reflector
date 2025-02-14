@@ -88,7 +88,11 @@ export default function OfflinePage() {
                 <button
                     id="updateStunBtn"
                     onClick={() => {
-                        window.api.updateStun({ ip: opponentIp, port: myPort })
+                        window.api.updateStun({
+                            ip: opponentIp,
+                            port: myPort,
+                            extPort: opponentPort,
+                        })
                     }}
                 >
                     send to data channel
