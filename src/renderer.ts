@@ -141,11 +141,7 @@ function connectWebSocket(user) {
 
     // create data channel
     function createDataChannel() {
-        const dataChannel = peerConnection.createDataChannel('game', {
-            negotiated: true, // Ensure both peers agree on the channel
-            id: 0,
-            protocol: 'udp', // This is important for compatibility with the emulator
-        })
+        const dataChannel = peerConnection.createDataChannel('game')
         dataChannel.onopen = () => console.log('Data Channel Open!')
         dataChannel.onmessage = (event) => console.log('Received:', event.data)
     }
