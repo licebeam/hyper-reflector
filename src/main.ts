@@ -316,85 +316,85 @@ app.on('activate', () => {
     }
 })
 
-// app.whenReady().then(() => {
-//     //UDP STUFF
-//     const dgram = require('dgram')
-//     const axios = require('axios')
+app.whenReady().then(() => {
+    //UDP STUFF
+    const dgram = require('dgram')
+    const axios = require('axios')
 
-//     const client = dgram.createSocket('udp4')
+    const client = dgram.createSocket('udp4')
 
-//     const SERVER_IP = keys.COTURN_IP // Change to public server IP
-//     const UDP_SERVER_PORT = 7000
-//     const EXPRESS_API = `http://${keys.COTURN_IP}:7010`
+    const SERVER_IP = keys.COTURN_IP // Change to public server IP
+    const UDP_SERVER_PORT = 7000
+    const EXPRESS_API = `http://${keys.COTURN_IP}:7010`
 
-//     const CLIENT_ID = Math.random().toString(36).substring(7)
+    const CLIENT_ID = Math.random().toString(36).substring(7)
 
-//     client.on('message', (msg, rinfo) => {
-//         // Convert to string and trim any extra whitespace or binary junk
-//         const incomingMessage = msg.toString('utf8').trim()
+    client.on('message', (msg, rinfo) => {
+        // Convert to string and trim any extra whitespace or binary junk
+        const incomingMessage = msg.toString('utf8').trim()
 
-//         // Log any unexpected data to see what is coming in
-//         if (!incomingMessage || !incomingMessage.includes(':')) {
-//             console.log(
-//                 `Received invalid or empty message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`
-//             )
-//             return
-//         }
+        // Log any unexpected data to see what is coming in
+        if (!incomingMessage || !incomingMessage.includes(':')) {
+            console.log(
+                `Received invalid or empty message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`
+            )
+            return
+        }
 
-//         console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`)
+        console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${incomingMessage}`)
 
-//         // Ensure the message is a valid IP:Port format
-//         const [peerIp, peerPort] = incomingMessage.split(':')
+        // Ensure the message is a valid IP:Port format
+        const [peerIp, peerPort] = incomingMessage.split(':')
 
-//         // Validate IP and port
-//         if (!peerIp || !peerPort || isNaN(peerPort)) {
-//             console.error('Invalid peer data received:', incomingMessage)
-//             return
-//         }
+        // Validate IP and port
+        if (!peerIp || !peerPort || isNaN(peerPort)) {
+            console.error('Invalid peer data received:', incomingMessage)
+            return
+        }
 
-//         console.log(`Valid peer info received: ${peerIp}:${peerPort}`)
+        console.log(`Valid peer info received: ${peerIp}:${peerPort}`)
 
-//         // Start hole punching
-//         setInterval(() => {
-//             console.log(`Punching hole to ${peerIp}:${peerPort}`)
-//             client.send('punch', peerPort, peerIp)
-//         }, 1000)
+        // Start hole punching
+        setInterval(() => {
+            console.log(`Punching hole to ${peerIp}:${peerPort}`)
+            client.send('punch', peerPort, peerIp)
+        }, 1000)
 
-//         if (peerIp) {
-//             const sendClient = dgram.createSocket('udp4')
-//             console.log('Sending packet to', peerIp)
-//             setInterval(() => {
-//                 const message = Buffer.from('keep-alive');
-//                 client.send(message, peerPort, peerIp, (err) => {
-//                     if (err) console.error('Error:', err);
-//                     else console.log('Keep-alive sent!');
-//                 });
-//             }, 2000);
-//         }
-//     })
+        if (peerIp) {
+            const sendClient = dgram.createSocket('udp4')
+            console.log('Sending packet to', peerIp)
+            setInterval(() => {
+                const message = Buffer.from('keep-alive');
+                client.send(message, peerPort, peerIp, (err) => {
+                    if (err) console.error('Error:', err);
+                    else console.log('Keep-alive sent!');
+                });
+            }, 2000);
+        }
+    })
 
-//     client.on('listening', () => {
-//         const address = client.address()
-//         console.log(`Client listening on ${address.address}:${address.port}`)
+    client.on('listening', () => {
+        const address = client.address()
+        console.log(`Client listening on ${address.address}:${address.port}`)
 
-//         // Register with the Express API
-//         axios
-//             .post(`${EXPRESS_API}/register`, {
-//                 id: CLIENT_ID,3133
-//                 ip: address.address,
-//                 port: address.port,
-//             })
-//             .then((response) => {
-//                 console.log('Server Response:', response.data)
-//             })
-//             .catch((err) => console.error(err))
+        // Register with the Express API
+        axios
+            .post(`${EXPRESS_API}/register`, {
+                id: CLIENT_ID,3133
+                ip: address.address,
+                port: address.port,
+            })
+            .then((response) => {
+                console.log('Server Response:', response.data)
+            })
+            .catch((err) => console.error(err))
 
-//         // Send initial UDP message to register
-//         client.send(CLIENT_ID, UDP_SERVER_PORT, SERVER_IP)
-//     })
+        // Send initial UDP message to register
+        client.send(CLIENT_ID, UDP_SERVER_PORT, SERVER_IP)
+    })
 
-//     client.bind(0) // Binds to a random port
-// })
+    client.bind(0) // Binds to a random port
+})
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
