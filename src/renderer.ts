@@ -215,16 +215,19 @@ function connectWebSocket(user) {
             window.api.sendRoomMessage(data)
         }
         if (data.type === 'offer') {
+            console.log('Offer Recieved:', { offer: data.offer.sdp })
             peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
             let answer = await peerConnection.createAnswer()
             await peerConnection.setLocalDescription(answer)
-            console.log('Answer (send this to User A):', answer.sdp)
+            console.log('Answer Being Sent ----', answer.sdp)
             signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
         } else if (data.type === 'answer') {
+            console.log('Answer Recieved:', { offer: data.answer.sdp })
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         } else if (data.type === 'ice-candidate') {
             peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
             const candidate = data.candidate.candidate
+            console.log(`📃 ${'external candidate'} type unknown at this point:`, candidate)
             if (candidate.includes('srflx')) {
                 console.log(`🌍 ${'external user'} STUN Candidate:`, candidate)
 
@@ -241,7 +244,7 @@ function connectWebSocket(user) {
     async function startCall() {
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
-        console.log('Offer Created:', offer.sdp)
+        console.log('Offer Created:', { offer: offer.sdp })
         signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
     }
 
@@ -254,5 +257,4 @@ function connectWebSocket(user) {
             dataChannel.send(JSON.stringify(data))
         }
     })
-
 }
