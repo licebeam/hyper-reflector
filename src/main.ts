@@ -456,11 +456,10 @@ app.whenReady().then(() => {
         });
 
         listener.on('message', (msg, rinfo) => {
-            console.log(`Received packet from ${rinfo.address}:${rinfo.port}`);
-
             if (rinfo.address === expected_peer_ip) {
+                console.log(`Received packet from ${rinfo.address}:${rinfo.port}`);
                 // Forward packet to local emulator on port 7000
-                forwardPacket(msg, emulatorPort, '127.0.0.1');
+                forwardPacket(msg, emulatorPort + 1, '127.0.0.1');
             }
         });
 
