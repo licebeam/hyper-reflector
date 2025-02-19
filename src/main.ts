@@ -439,7 +439,7 @@ app.whenReady().then(() => {
             sendKeepAlive()
 
             // Send keep-alive packets every 5 seconds
-            setInterval(sendKeepAlive, 5000)
+            // setInterval(sendKeepAlive, 5000)
         }
 
         // Call this BEFORE launching the emulator
