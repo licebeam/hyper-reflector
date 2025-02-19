@@ -359,57 +359,103 @@ app.on('activate', () => {
 // let emulatorPort = null // Will update dynamically
 // let externalPort = 7000
 
+// Define the range of ports you want to listen to
+// const startPort = 54000;
+// const endPort = 60000; // Adjust this range as needed
+// const dgram = require('dgram')
+// // Create a function to bind to each port in the range
+// function bindToPortRange(startPort, endPort) {
+//     for (let port = startPort; port <= endPort; port++) {
+//         const listener = dgram.createSocket('udp4');
+
+//         listener.on('message', (msg, rinfo) => {
+//             console.log(`📥 Received packet on port ${port} from ${rinfo.address}:${rinfo.port} - Size: ${msg.length}`);
+//         });
+
+//         listener.on('error', (err) => {
+//             console.log(`UDP Error on port ${port}: ${err.message}`);
+//             listener.close();
+//         });
+
+//         // Bind to the port
+//         listener.bind(port, () => {
+//             console.log(`Listening on port ${port}...`);
+//         });
+//     }
+// }
+
+// Call the function to bind to a range of ports
+// bindToPortRange(startPort, endPort);
+
 // const dgram = require('dgram')
 // const server = dgram.createSocket('udp4')
 
 // const internalPort = 9000 // Port you want your app to think it is receiving data on
 // let actualPort = 8000 // Port you're actually receiving data on
+const dgram = require('dgram')
+app.whenReady().then(() => {
+    const server = dgram.createSocket('udp4')
 
-// app.whenReady().then(() => {
-//     // Create a UDP socket
-//     const listener = dgram.createSocket('udp4')
+    server.on('message', (msg, rinfo) => {
+        console.log('got a message from the dll', msg.toString())
+    })
 
-//     // Start listening on a range of ports
-//     const portsToMonitor = [7000, 7001, 7002] // Example port range
+    server.bind(5000, () => {
+        console.log('listening for messages from dll on port 5000')
+    })
+})
 
-//     portsToMonitor.forEach((port) => {
-//         listener.bind(port, () => {
-//             console.log(`Listening on port ${port}`)
-//         })
-//     })
+let expected_peer_ip = 'x.x.x.x' // Replace with STUN-discovered external IP
+let stun_port = 50000 // STUN assigned port
+let emulatorPort = null // This will be detected dynamically
+const listener = dgram.createSocket('udp4')
 
-//     listener.on('message', (msg, rinfo) => {
-//         console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${msg}`)
-//     })
+app.whenReady().then(() => {
+    ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
+        console.log('starting listener')
+        stun_port = port
+        expected_peer_ip = ip
+        console.log('port is: ', stun_port)
 
-//     listener.on('error', (err) => {
-//         console.log(`Error: ${err.message}`)
-//     })
+        function openNatPath(targetIP, targetPort) {
+            const socket = dgram.createSocket("udp4");
+            const msg = Buffer.from('ping')
+            socket.send(msg, targetPort, targetIP, (err) => {
+                if (err) console.error(`Error sending NAT punch: ${err.message}`)
+                else console.log(`🌍 NAT punch sent to ${targetIP}:${targetPort}`)
+            })
+        }
 
-//     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
-//         console.log('Updating STUN conditions:', port, '-', ip)
-//         actualPort = port
-//         // Listener on the "actual" port
-//         server.on('message', (msg, rinfo) => {
-//             console.log(`Received message from ${rinfo.address}:${rinfo.port}`)
+        // Call this BEFORE launching the emulator
+        openNatPath(expected_peer_ip, extPort)
 
-//             // Forward the message to the "internal" port
-//             const forwardSocket = dgram.createSocket('udp4')
-//             forwardSocket.send(msg, 0, msg.length, internalPort, '127.0.0.1', (err) => {
-//                 if (err) {
-//                     console.error(`Error forwarding message: ${err.message}`)
-//                 } else {
-//                     console.log(`Forwarded message to internal port ${internalPort}`)
-//                 }
-//                 forwardSocket.close()
-//             })
-//         })
+        // Start listening on the STUN port to capture the emulator's actual port
+        listener.bind(stun_port, () => {
+            console.log(`Listening on STUN port ${stun_port}...`)
+        })
 
-//         server.bind(actualPort, () => {
-//             console.log(`Listening on actual port ${actualPort}`)
-//         })
-//     })
-// })
+        listener.on('message', (msg, rinfo) => {
+            // If we receive a packet from the expected peer, capture the real port
+            if (rinfo.address === expected_peer_ip) {
+                if (!emulatorPort) {
+                    emulatorPort = rinfo.port // Capture the emulator’s real port
+                    console.log(`🎯 Detected emulator port: ${emulatorPort}`)
+                }
+
+                // Forward incoming packets to the actual emulator port
+                forwardPacket(msg, emulatorPort, expected_peer_ip)
+            }
+        })
+
+        function forwardPacket(data, targetPort, targetIP) {
+            const socket = dgram.createSocket('udp4')
+            socket.send(data, targetPort, targetIP, (err) => {
+                if (err) console.log(`Forwarding Error: ${err.message}`)
+                socket.close()
+            })
+        }
+    })
+})
 
 // app.whenReady().then(() => {
 //     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {

@@ -95,7 +95,7 @@ export default function OfflinePage() {
                         })
                     }}
                 >
-                    send to data channel
+                    SET STUN PORT and IP
                 </button>
                 <br></br>
                 <button onClick={() => console.log('go to offline page')}>
