@@ -441,10 +441,10 @@ app.whenReady().then(() => {
             sendKeepAlive();
 
             // Send keep-alive packets every 5 seconds
-            const keepAliveInterval = setInterval(sendKeepAlive, 5000);
+            // const keepAliveInterval = setInterval(sendKeepAlive, 5000);
 
             // Clean up socket when app closes
-            socket.on('close', () => clearInterval(keepAliveInterval));
+            // socket.on('close', () => clearInterval(keepAliveInterval));
         }
 
         // Punch NAT hole to the external STUN-mapped port
