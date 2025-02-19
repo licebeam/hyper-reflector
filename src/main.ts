@@ -408,7 +408,6 @@ app.whenReady().then(() => {
 let expected_peer_ip = 'x.x.x.x' // Replace with STUN-discovered external IP
 let stun_port = 50000 // STUN assigned port
 let emulatorPort = null // This will be detected dynamically
-const listener = dgram.createSocket('udp4')
 
 app.whenReady().then(() => {
     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
@@ -417,13 +416,29 @@ app.whenReady().then(() => {
         expected_peer_ip = ip
         console.log('port is: ', stun_port)
 
+        if (listener) {
+            console.log('closing old listener')
+            listener.close()
+        }
+
+        const listener = dgram.createSocket('udp4')
+
         function openNatPath(targetIP, targetPort) {
-            const socket = dgram.createSocket("udp4");
+            const socket = dgram.createSocket('udp4')
             const msg = Buffer.from('ping')
-            socket.send(msg, targetPort, targetIP, (err) => {
-                if (err) console.error(`Error sending NAT punch: ${err.message}`)
-                else console.log(`🌍 NAT punch sent to ${targetIP}:${targetPort}`)
-            })
+
+            function sendKeepAlive() {
+                socket.send(msg, targetPort, targetIP, (err) => {
+                    if (err) console.error(`Error sending NAT punch: ${err.message}`)
+                    else console.log(`🌍 NAT punch sent to ${targetIP}:${targetPort}`)
+                })
+            }
+
+            // Send first punch
+            sendKeepAlive()
+
+            // Send keep-alive packets every 5 seconds
+            setInterval(sendKeepAlive, 5000)
         }
 
         // Call this BEFORE launching the emulator
@@ -439,6 +454,8 @@ app.whenReady().then(() => {
             if (rinfo.address === expected_peer_ip) {
                 if (!emulatorPort) {
                     emulatorPort = rinfo.port // Capture the emulator’s real port
+                    console.log(`🎯 Detected emulator port: ${emulatorPort}`)
+                } else if (emulatorPort) {
                     console.log(`🎯 Detected emulator port: ${emulatorPort}`)
                 }
 
