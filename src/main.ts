@@ -408,6 +408,7 @@ app.whenReady().then(() => {
 let expected_peer_ip = 'x.x.x.x' // Replace with STUN-discovered external IP
 let stun_port = 50000 // STUN assigned port
 let emulatorPort = null // This will be detected dynamically
+let listener = dgram.createSocket('udp4')
 
 app.whenReady().then(() => {
     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
@@ -421,7 +422,7 @@ app.whenReady().then(() => {
             listener.close()
         }
 
-        const listener = dgram.createSocket('udp4')
+        listener = dgram.createSocket('udp4')
 
         function openNatPath(targetIP, targetPort) {
             const socket = dgram.createSocket('udp4')
