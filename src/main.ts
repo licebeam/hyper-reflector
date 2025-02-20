@@ -449,10 +449,10 @@ app.whenReady().then(() => {
             })
 
             // Send keep-alive packets every 5 seconds
-            //const keepAliveInterval = setInterval(sendKeepAlive, 5000)
+            const keepAliveInterval = setInterval(sendKeepAlive, 5000)
 
             // Clean up socket when app closes
-            //socket.on('close', () => clearInterval(keepAliveInterval))
+            socket.on('close', () => clearInterval(keepAliveInterval))
         }
 
         // Punch NAT hole to the external STUN-mapped port
@@ -466,6 +466,12 @@ app.whenReady().then(() => {
         listener.on('message', (msg, rinfo) => {
             console.log(rinfo)
             if (rinfo.address === expected_peer_ip) {
+                // prevent keep alive from being forwarded to the emulator - it crashes
+                const messageContent = msg.toString()
+                if (messageContent === 'ping') {
+                    console.log(`Ignoring keep-alive message from ${rinfo.address}:${rinfo.port}`)
+                    return
+                }
                 console.log(`Received packet from ${rinfo.address}:${rinfo.port}`)
                 // Forward packet to local emulator on port + 1
                 forwardPacket(msg, emulatorPort + 1, '127.0.0.1')
