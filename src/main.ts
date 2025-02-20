@@ -405,78 +405,86 @@ app.whenReady().then(() => {
     })
 })
 
-let listener = null;
-let expected_peer_ip = 'x.x.x.x';  // The external IP of the other player (from STUN)
-let stun_port = 50000;             // The external port this PC is using (from STUN)
-let emulatorPort = 7000;           // The fixed local port for the emulator
+let listener = null
+let expected_peer_ip = 'x.x.x.x' // The external IP of the other player (from STUN)
+let stun_port = 50000 // The external port this PC is using (from STUN)
+let emulatorPort = 7000 // The fixed local port for the emulator
 
 app.whenReady().then(() => {
     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
-        console.log('Starting listener...');
-        stun_port = port;
-        expected_peer_ip = ip;
-        console.log(`STUN Port: ${stun_port}, Expected Peer: ${expected_peer_ip}`);
+        console.log('Starting listener...')
+        stun_port = port
+        expected_peer_ip = ip
+        console.log(`STUN Port: ${stun_port}, Expected Peer: ${expected_peer_ip}`)
 
         // Ensure we don't create multiple listeners
         if (listener) {
-            console.log('Closing existing listener...');
-            listener.close();
+            console.log('Closing existing listener...')
+            listener.close()
         }
 
         // Create a fresh listener
-        listener = dgram.createSocket('udp4');
+        listener = dgram.createSocket('udp4')
 
         function openNatPath(targetIP, targetPort) {
-            const socket = dgram.createSocket("udp4");
-            const msg = Buffer.from('ping');
+            const socket = dgram.createSocket('udp4')
+            const msg = Buffer.from('ping')
 
             function sendKeepAlive() {
                 socket.send(msg, targetPort, targetIP, (err) => {
-                    if (err) console.error(`Error sending NAT punch: ${err.message}`);
-                    else console.log(`🌍 NAT punch sent to ${targetIP}:${targetPort}`);
-                });
+                    if (err) console.error(`Error sending NAT punch: ${err.message}`)
+                    else console.log(`🌍 NAT punch sent to ${targetIP}:${targetPort}`)
+                })
             }
 
             // Send first punch
-            sendKeepAlive();
+            sendKeepAlive()
+
+            // Listen for responses and immediately reply to complete the hole punch
+            socket.on('message', (msg, rinfo) => {
+                console.log(`🔄 Received from ${rinfo.address}:${rinfo.port}`)
+
+                // Reply immediately (force NAT to open the path)
+                socket.send(msg, rinfo.port, rinfo.address)
+            })
 
             // Send keep-alive packets every 5 seconds
-            const keepAliveInterval = setInterval(sendKeepAlive, 5000);
+            const keepAliveInterval = setInterval(sendKeepAlive, 5000)
 
             // Clean up socket when app closes
-            socket.on('close', () => clearInterval(keepAliveInterval));
+            socket.on('close', () => clearInterval(keepAliveInterval))
         }
 
         // Punch NAT hole to the external STUN-mapped port
-        openNatPath(expected_peer_ip, extPort);
+        openNatPath(expected_peer_ip, extPort)
 
         // Start listening on the STUN port for incoming packets
         listener.bind(stun_port, () => {
-            console.log(`Listening on STUN port ${stun_port}...`);
-        });
+            console.log(`Listening on STUN port ${stun_port}...`)
+        })
 
         listener.on('message', (msg, rinfo) => {
             if (rinfo.address === expected_peer_ip) {
-                console.log(`Received packet from ${rinfo.address}:${rinfo.port}`);
+                console.log(`Received packet from ${rinfo.address}:${rinfo.port}`)
                 // Forward packet to local emulator on port 7000
-                forwardPacket(msg, emulatorPort + 1, '127.0.0.1');
+                forwardPacket(msg, emulatorPort + 1, '127.0.0.1')
             }
-        });
+        })
 
         function forwardPacket(data, targetPort, targetIP) {
-            const socket = dgram.createSocket('udp4');
+            const socket = dgram.createSocket('udp4')
             socket.send(data, targetPort, targetIP, (err) => {
-                if (err) console.log(`Forwarding Error: ${err.message}`);
-                socket.close();
-            });
+                if (err) console.log(`Forwarding Error: ${err.message}`)
+                socket.close()
+            })
         }
 
         listener.on('error', (err) => {
-            console.error(`❌ UDP Listener Error: ${err.message}`);
-            listener.close();
-        });
-    });
-});
+            console.error(`❌ UDP Listener Error: ${err.message}`)
+            listener.close()
+        })
+    })
+})
 
 // let expected_peer_ip = 'x.x.x.x' // Replace with STUN-discovered external IP
 // let stun_port = 50000 // STUN assigned port

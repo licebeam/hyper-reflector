@@ -29,8 +29,8 @@ const googleStuns = [
 const peerConnection = new RTCPeerConnection({
     iceServers: [
         {
-            // urls: 'stun:stun.l.google.com:19302',
-            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+            urls: 'stun:stun.l.google.com:19302',
+            // urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
         },
         {
             urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
@@ -43,7 +43,7 @@ const peerConnection = new RTCPeerConnection({
 
 function setupLogging(peer, userLabel, event) {
     if (event.candidate) {
-        console.log(`📤 Sending ICE Candidate from ${userLabel}:`, event.candidate)
+        // console.log(`📤 Sending ICE Candidate from ${userLabel}:`, event.candidate)
         let candidate = event.candidate.candidate
         // Send the candidate to the remote peer via signaling
         if (signalServerSocket.readyState === WebSocket.OPEN) {
@@ -127,14 +127,14 @@ function connectWebSocket(user) {
     signalServerSocket = new WebSocket(`ws://${keys.COTURN_IP}:3000`)
     signalServerSocket.onopen = () => {
         signalServerSocket.send(JSON.stringify({ type: 'join', user }))
-        console.log('WebSocket connected', user.uid)
+        // console.log('WebSocket connected', user.uid)
         signalServerSocket.send(JSON.stringify({ type: 'user-connect', user }))
         while (candidateList.length > 0) {
             let queuedCandidate = candidateList.shift()
             signalServerSocket.send(
                 JSON.stringify({ type: 'ice-candidate', candidate: queuedCandidate })
             )
-            console.log(`📤 Sent queued ICE candidate`)
+            // console.log(`📤 Sent queued ICE candidate`)
         }
     }
 
@@ -142,7 +142,7 @@ function connectWebSocket(user) {
         if (signalServerSocket) {
             await signalServerSocket.send(JSON.stringify({ type: 'user-disconnect', user }))
         }
-        console.log('WebSocket disconnected')
+        // console.log('WebSocket disconnected')
         signalServerSocket = null
     }
 
@@ -154,7 +154,6 @@ function connectWebSocket(user) {
     window.api.on('user-message', (text: string) => {
         console.log(JSON.stringify(candidateList))
         // sends a message over to another user
-        console.log('this should get sent to websockets')
         if (text.length) {
             signalServerSocket.send(
                 JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.name })
@@ -189,11 +188,11 @@ function connectWebSocket(user) {
     }
 
     peerConnection.oniceconnectionstatechange = () => {
-        console.log('ICE Connection State:', peerConnection.iceConnectionState)
+       // console.log('ICE Connection State:', peerConnection.iceConnectionState)
         if (peerConnection.iceConnectionState === 'connected') {
-            console.log('Connected! Ready to send data.')
+           console.log('Connected! Ready to send data.')
         } else if (peerConnection.iceConnectionState === 'failed') {
-            console.log('ICE connection failed. Check STUN/TURN settings.')
+            // console.log('ICE connection failed. Check STUN/TURN settings.')
         }
     }
 
@@ -203,7 +202,7 @@ function connectWebSocket(user) {
             if (event.data instanceof Blob) {
                 const text = await event.data.text()
                 const data = JSON.parse(text)
-                console.log(data)
+                // console.log(data)
                 return data
             } else {
                 const data = JSON.parse(event.data)
@@ -218,7 +217,7 @@ function connectWebSocket(user) {
         const data = await convertBlob(message).then((res) => res)
         if (data.type === 'connected-users') {
             if (data.users.length) {
-                console.log('connected users = ', data.users)
+                // console.log('connected users = ', data.users)
                 window.api.addUserGroupToRoom(data.users)
             }
         }
@@ -234,19 +233,19 @@ function connectWebSocket(user) {
             window.api.sendRoomMessage(data)
         }
         if (data.type === 'offer') {
-            console.log('Offer Recieved:', { offer: data.offer.sdp })
+            // console.log('Offer Recieved:', { offer: data.offer.sdp })
             peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
             let answer = await peerConnection.createAnswer()
             await peerConnection.setLocalDescription(answer)
-            console.log('Answer Being Sent ----', answer.sdp)
+            // console.log('Answer Being Sent ----', answer.sdp)
             signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
         }
         if (data.type === 'answer') {
-            console.log('Answer Recieved:', { offer: data.answer.sdp })
+            // console.log('Answer Recieved:', { offer: data.answer.sdp })
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         }
         if (data.type === 'ice-candidate') {
-            console.log(`📩 Received ICE candidate from external user:`, data.candidate)
+            // console.log(`📩 Received ICE candidate from external user:`, data.candidate)
 
             peerConnection
                 .addIceCandidate(new RTCIceCandidate(data.candidate))
@@ -256,7 +255,7 @@ function connectWebSocket(user) {
             const candidate = data.candidate.candidate
             // console.log(`📃 ${'external candidate'} type unknown at this point:`, candidate)
             if (candidate.includes('srflx')) {
-                console.log(`🌍 ${'external user'} STUN Candidate:`, candidate)
+                // console.log(`🌍 ${'external user'} STUN Candidate:`, candidate)
 
                 // Extract IP and Port
                 let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
@@ -271,7 +270,7 @@ function connectWebSocket(user) {
     async function startCall() {
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
-        console.log('Offer Created:', { offer: offer.sdp })
+        // console.log('Offer Created:', { offer: offer.sdp })
         signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
     }
 

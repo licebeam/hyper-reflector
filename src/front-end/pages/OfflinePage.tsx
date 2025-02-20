@@ -7,20 +7,6 @@ export default function OfflinePage() {
     const [opponentIp, setOpponentIp] = useState('')
     const [myPort, setMyPort] = useState(0)
 
-    // document.getElementById("api-serve-btn").addEventListener("click", () => {
-    //     var port = document.getElementById("externalPort").value; // typescript error, works fine
-    //     var ip = document.getElementById("externalIp").value; // typescript error, works fine
-    //     console.log('starting match with: ', connectIp, ":", connectPort)
-    //     window.api.serveMatch(connectIp, connectPort);
-    // });
-
-    // document.getElementById("api-connect-btn").addEventListener("click", () => {
-    //     var port = document.getElementById("externalPort").value; // typescript error, works fine
-    //     var ip = document.getElementById("externalIp").value; // typescript error, works fine
-    //     console.log('starting match with: ', connectIp, ":", connectPort)
-    //     window.api.connectMatch(connectIp, connectPort);
-    // });
-
     return (
         <Layout>
             <div>
@@ -32,28 +18,26 @@ export default function OfflinePage() {
                     placeholder="player -- either 0 or 1"
                 />
                 <input
-                    type="strong"
+                    type="text"
                     value={opponentIp}
                     onChange={(e) => setOpponentIp(e.target.value)}
                     placeholder="opponent public ip"
                 />
                 <input
-                    type="number"
+                    type="text"
                     value={opponentPort}
                     onChange={(e) => setOpponentPort(e.target.value)}
                     placeholder="port"
                 />
                 <p> user port </p>
                 <input
-                    type="number"
+                    type="text"
                     value={myPort}
                     onChange={(e) => setMyPort(e.target.value)}
                     placeholder="my port"
                 />
                 <button
                     onClick={() => {
-                        console.log('yo hey what the hell is goin on', player)
-                        console.log('serving match')
                         window.api.serveMatch(opponentIp, opponentPort, player, 0, myPort)
                     }}
                 >
@@ -82,7 +66,7 @@ export default function OfflinePage() {
                         window.api.sendDataChannel('Hello from another user')
                     }}
                 >
-                    send to data channel
+                    Send Message Data Channel
                 </button>
 
                 <button
@@ -95,12 +79,12 @@ export default function OfflinePage() {
                         })
                     }}
                 >
-                    SET STUN PORT and IP
+                    Start NAT Punch
                 </button>
                 <br></br>
-                <button onClick={() => console.log('go to offline page')}>
+                {/* <button onClick={() => console.log('go to offline page')}>
                     Direct Connections
-                </button>
+                </button> */}
                 <button onClick={() => window.api.startSoloTraining()}>Training Modes</button>
             </div>
         </Layout>
