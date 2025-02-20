@@ -188,9 +188,9 @@ function connectWebSocket(user) {
     }
 
     peerConnection.oniceconnectionstatechange = () => {
-       // console.log('ICE Connection State:', peerConnection.iceConnectionState)
+        // console.log('ICE Connection State:', peerConnection.iceConnectionState)
         if (peerConnection.iceConnectionState === 'connected') {
-           console.log('Connected! Ready to send data.')
+            console.log('Connected! Ready to send data.')
         } else if (peerConnection.iceConnectionState === 'failed') {
             // console.log('ICE connection failed. Check STUN/TURN settings.')
         }
@@ -253,9 +253,8 @@ function connectWebSocket(user) {
                 .catch((err) => console.error(`❌ Failed to add ICE Candidate:`, err))
 
             const candidate = data.candidate.candidate
-            // console.log(`📃 ${'external candidate'} type unknown at this point:`, candidate)
             if (candidate.includes('srflx')) {
-                // console.log(`🌍 ${'external user'} STUN Candidate:`, candidate)
+                console.log(`🌍 ${'external user'} STUN Candidate:`, candidate)
 
                 // Extract IP and Port
                 let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
@@ -278,7 +277,15 @@ function connectWebSocket(user) {
         startCall()
     })
 
-    window.api.on('send-data-channel', (data: string) => {
+    window.api.on('send-data-channel', async (data: string) => {
+        console.log(
+            ' PEER STATS ',
+            (await peerConnection.getStats()).forEach((r) => {
+                if (r.candidateType === 'srflx') {
+                    console.log(r)
+                }
+            })
+        )
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(JSON.stringify(data))
         }
