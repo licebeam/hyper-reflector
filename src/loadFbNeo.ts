@@ -52,7 +52,9 @@ export function startPlayingOnline({
     player: number
     delay: number
 }) {
-    console.log(localPort, remoteIp, remotePort + 1)
+    console.log(localPort, remoteIp, remotePort)
+    console.log('emulator target', remotePort + 1)
+
     // we add +1 to local port because when we hole punch nat, the emulator assigns a socket to the next port
     const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort + 1},${player},${delay},0 ${config.emulator.luaPath}`
     console.log({ directCommand })
