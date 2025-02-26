@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Notification, protocol } from 'electron'
 import started from 'electron-squirrel-startup'
 import { sendCommand, readCommand, readStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
@@ -392,6 +392,9 @@ app.on('activate', () => {
 
 // const internalPort = 9000 // Port you want your app to think it is receiving data on
 // let actualPort = 8000 // Port you're actually receiving data on
+// upnp stuff
+var natUpnp = require('nat-upnp')
+
 const dgram = require('dgram')
 app.whenReady().then(() => {
     const server = dgram.createSocket('udp4')
@@ -410,8 +413,53 @@ let expected_peer_ip = 'x.x.x.x' // The external IP of the other player (from ST
 let stun_port = 50000 // The external port this PC is using (from STUN)
 let emulatorPort = 7000 // The fixed local port for the emulator
 
+// intriguing...
+// results from mappings:  [
+//     {
+//       public: { host: '', port: 6004 },
+//       private: { host: '192.168.11.2', port: 6004 },
+//       protocol: 'udp',
+//       enabled: true,
+//       description: 'Fightcade-6004-udp',
+//       ttl: 0,
+//       local: true
+//     },
+var client = natUpnp.createClient()
+
 app.whenReady().then(() => {
     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
+        client.portMapping(
+            {
+                public: 7000,
+                private: 7000,
+                ttl: 0,
+                protocol: 'TCP',
+            },
+            function (err) {
+                // Will be called once finished
+                console.log('upnp error', err)
+            }
+        )
+
+        // client.portUnmapping({
+        //     public: 12345,
+        // })
+
+        client.getMappings(function (err, results) {
+            console.log(err)
+            console.log('results from mappings: ', results)
+        })
+
+        // client.getMappings({ local: true }, function (err, results) {
+        //     console.log(err)
+        //     console.log('results from mappings LOCAL: ', results)
+        // })
+
+        client.externalIp(function (err, ip) {
+            console.log('err', err)
+            console.log('externalized IP', ip)
+        })
+
         console.log('Starting listener...')
         stun_port = port
         expected_peer_ip = ip
@@ -491,6 +539,12 @@ app.whenReady().then(() => {
             listener.close()
         })
     })
+})
+
+process.on('SIGINT', () => {
+    client.portUnmapping({ public: 7000, protocol: protocol })
+    console.log(`UPnP Port Mapping removed: ${7000}`)
+    process.exit()
 })
 
 // let expected_peer_ip = 'x.x.x.x' // Replace with STUN-discovered external IP
