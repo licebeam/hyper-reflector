@@ -44,7 +44,7 @@
     "dgram": "^1.0.1",
     "electron-squirrel-startup": "^1.0.1",
     "firebase": "^11.2.0",
-    "nat-upnp": "^1.1.1",
+    "nat-upnp": "github:kaden-sharpin/node-nat-upnp",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "styled-components": "^6.1.15",

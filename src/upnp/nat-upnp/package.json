@@ -1,0 +1,24 @@
+{
+  "name": "nat-upnp",
+  "version": "1.1.1",
+  "main": "lib/nat-upnp",
+  "author": "Fedor Indutny <fedor@indutny.com>",
+  "homepage": "https://github.com/indutny/node-nat-upnp",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/indutny/node-nat-upnp.git"
+  },
+  "devDependencies": {
+    "jscs": "^1.11.2",
+    "mocha": "^3.2.0"
+  },
+  "scripts": {
+    "test": "jscs lib/*.js test/*.js && mocha --timeout 60000 --reporter spec test/*-test.js"
+  },
+  "dependencies": {
+    "xml2js": "~0.1.14",
+    "request": "^2.79.0",
+    "async": "^2.1.5",
+    "ip": "^1.1.4"
+  }
+}

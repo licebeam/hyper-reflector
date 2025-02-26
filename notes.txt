@@ -9,3 +9,6 @@ Things I want to add - Small
 
 Things I'm trying to do - to help
 1: refactor grouflons training mode so we can just use it as a middleware to collect stats.
+
+
+upnp functionality is provided in TS here: https://github.com/indutny/node-nat-upnp/pull/44
