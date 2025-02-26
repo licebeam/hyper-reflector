@@ -59,3 +59,7 @@ contextBridge.exposeInMainWorld('api', {
 ipcRenderer.on('stats-from-main', (event, message) => {
     console.log('Stats to update the UI with:', message)
 })
+
+ipcRenderer.on('send-log', (event, message) => {
+    console.log('-main- ', message)
+})
