@@ -4,9 +4,9 @@ import nat from '../nat-upnp'
 // import xml2js from 'xml2js'
 // import { Buffer } from 'buffer'
 // var request = require('request')
-var url = require('url')
+// var url = require('url')
 // var xml2js = require('xml2js')
-var Buffer = require('buffer').Buffer
+// var Buffer = require('buffer').Buffer
 
 let device = {}
 
