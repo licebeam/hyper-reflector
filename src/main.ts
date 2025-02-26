@@ -6,11 +6,10 @@ import { getConfig, type Config } from './config'
 import keys from './private/keys'
 // external api
 import api from './external-api/requests'
-// import upnp from './upnp/nat-upnp'
-// var client = upnp.createClient()
-const portForUPNP = 8000
-import natUpnp from 'nat-upnp'
-const client = new natUpnp.Client()
+import upnp from './upnp/nat-upnp'
+// var upnp = require('nat-upnp');
+const portForUPNP = 7000
+// import natUpnp from 'nat-upnp'
 
 // - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from 'firebase/app'
@@ -347,75 +346,12 @@ let stun_port = 50000 // The external port this PC is using (from STUN)
 let emulatorPort = 7000 // The fixed local port for the emulator
 
 app.whenReady().then(async () => {
+    // UPNP is working! but we need to fix the upnp library so that we can make a build.
     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
-        // client.portUnmapping({ public: portForUPNP }, (err) => {
-        //     if (!err) return
-        //     console.log('failed to remove ports', err)
-        // })
-        // client.portMapping(
-        //     {
-        //         public: portForUPNP,
-        //         private: portForUPNP + 1,
-        //         ttl: 10,
-        //         protocol: "UDP"
-        //     },
-        //     function (err) {
-        //         if (err) {
-        //             console.error(`Failed to set up UPnP: ${err.message}`)
-        //         } else {
-        //             console.log(`UPnP Port Mapping created: ${portForUPNP} , ${portForUPNP + 1}}`)
-        //         }
-        //     }
-        // )
+        var client = upnp.createClient()
+        // const client = new natUpnp.Client()
 
-        // client.getMappings(function (err, results) {
-        //     console.log(results)
-        //     if (err) {
-        //         console.log('failed to get mapping')
-        //     }
-        // })
-
-        // // client.getMappings({ local: true }, function (err, results) { console.log(results)})
-
-        // client.externalIp(function (err, ip) {
-        //     console.log(ip)
-        //     if (err) {
-        //         console.log('failed to get external ip')
-        //     }
-        // })
-        //// -- old version above--------------------------------
-
-        // UPNP ---
-        sendLog('Should load the upnp client')
-        console.log(natUpnp)
-
-        await client
-            .removeMapping({ public: portForUPNP })
-            .then()
-            .catch((err) => {
-                if (!err) return
-                console.log('error closing port mapping', err)
-            })
-
-        await client
-            .createMapping({
-                public: { port: portForUPNP, host: await client.getPublicIp() },
-                private: portForUPNP,
-                ttl: 10,
-                protocol: 'UDP',
-            })
-            .then((res) => console.log(res))
-            .catch((err) => console.log(err))
-
-        const pubIp = await client.getPublicIp()
-        console.log(pubIp)
-
-        const maps = await client.getMappings()
-        console.log(maps)
-        sendLog(JSON.stringify(maps))
-
-
-        // Get messages from open upnp port. ---
+        //listener
         const server = dgram.createSocket('udp4')
 
         server.on('message', (msg, rinfo) => {
@@ -425,6 +361,70 @@ app.whenReady().then(async () => {
         server.bind(portForUPNP, () => {
             console.log(`Listening on port ${portForUPNP}...`)
         })
+        // listener --
+
+        client.portMapping(
+            {
+                public: portForUPNP,
+                private: portForUPNP,
+                ttl: 0,
+                protocol: "UDP"
+            },
+            function (err) {
+                if (err) {
+                    console.error(`Failed to set up UPnP: ${err.message}`)
+                } else {
+                    console.log(`UPnP Port Mapping created: ${portForUPNP} , ${portForUPNP}}`)
+                }
+            }
+        )
+
+        client.getMappings(function (err, results) {
+            console.log(results)
+            if (err) {
+                console.log('failed to get mapping')
+            }
+        })
+
+        client.getMappings({ local: true }, function (err, results) { console.log(results)})
+
+        client.externalIp(function (err, ip) {
+            console.log(ip)
+            if (err) {
+                console.log('failed to get external ip')
+            }
+        })
+        //// -- old version above--------------------------------
+
+        // UPNP ---
+        // sendLog('Should load the upnp client')
+        // console.log(natUpnp)
+
+        // await client
+        //     .removeMapping({ public: portForUPNP })
+        //     .then()
+        //     .catch((err) => {
+        //         if (!err) return
+        //         console.log('error closing port mapping', err)
+        //     })
+
+        // await client
+        //     .createMapping({
+        //         public: portForUPNP,
+        //         private: portForUPNP,
+        //         ttl: 0,
+        //         protocol: 'UDP',
+        //     })
+        //     .then((res) => console.log(res))
+        //     .catch((err) => console.log(err))
+
+        // const pubIp = await client.getPublicIp()
+        // console.log(pubIp)
+
+        // const maps = await client.getMappings()
+        // console.log(maps)
+        // sendLog(JSON.stringify(maps))
+
         // UPNP END ---
 
         // console.log('Starting listener...')
