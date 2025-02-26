@@ -1,5 +1,5 @@
 import nat from '../nat-upnp'
-import async from 'async';
+// import async from 'async';
 // var async = require('async')
 
 let client = {}

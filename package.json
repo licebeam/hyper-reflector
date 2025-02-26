@@ -48,7 +48,11 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "styled-components": "^6.1.15",
-    "zustand": "^5.0.3"
+    "zustand": "^5.0.3",
+    "xml2js": "~0.1.14",
+    "request": "^2.79.0",
+    "async": "^2.1.5",
+    "ip": "^1.1.4"
   },
   "build": {
     "extraResources": [
