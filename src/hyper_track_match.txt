@@ -1,0 +1,13 @@
+
+ p1-meter-gained:2
+ p1-total-meter-gained:2
+ p1-meter-gained:4
+ p1-total-meter-gained:4
+ p1-meter-gained:6
+ p1-total-meter-gained:6
+ p1-meter-gained:8
+ p1-total-meter-gained:8
+ p1-meter-gained:10
+ p1-total-meter-gained:10
+ p1-meter-gained:12
+ p1-total-meter-gained:12
