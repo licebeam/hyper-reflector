@@ -43,7 +43,6 @@ const peerConnection = new RTCPeerConnection({
 
 function setupLogging(peer, userLabel, event) {
     if (event.candidate) {
-        // console.log(`📤 Sending ICE Candidate from ${userLabel}:`, event.candidate)
         let candidate = event.candidate.candidate
         // Send the candidate to the remote peer via signaling
         if (signalServerSocket.readyState === WebSocket.OPEN) {
@@ -51,27 +50,27 @@ function setupLogging(peer, userLabel, event) {
                 JSON.stringify({ type: 'ice-candidate', candidate: event.candidate })
             )
         } else {
-            console.warn(`⚠️ WebSocket not ready, queuing ICE Candidate for later...`)
+            console.warn(`sockets not ready, saving candidates`)
             candidateList.push(event.candidate) // Store the candidate to send later
         }
 
-        if (event.candidate.candidate.includes('relay')) {
-            // Extract IP and Port
-            let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
-            if (matches) {
-                let [ip, port] = matches[0].split(' ')
-                console.log(`🔄 TURN Candidate:: ${ip}, Port: ${port}`)
-            }
-        }
+        // if (event.candidate.candidate.includes('relay')) {
+        //     // Extract IP and Port
+        //     let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
+        //     if (matches) {
+        //         let [ip, port] = matches[0].split(' ')
+        //         console.log(`TURN Candidate:: ${ip}, Port: ${port}`)
+        //     }
+        // }
 
         if (candidate.includes('srflx')) {
-            console.log(`🌍 ${userLabel} STUN Candidate:`, candidate)
+            console.log(`${userLabel} STUN Candidate:`, candidate)
 
             // Extract IP and Port
             let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
             if (matches) {
                 let [ip, port] = matches[0].split(' ')
-                console.log(`🔍 ${userLabel} IP: ${ip}, Port: ${port}`)
+                console.log(`${userLabel} IP: ${ip}, Port: ${port}`)
             }
         }
     }
@@ -127,14 +126,12 @@ function connectWebSocket(user) {
     signalServerSocket = new WebSocket(`ws://${keys.COTURN_IP}:3000`)
     signalServerSocket.onopen = () => {
         signalServerSocket.send(JSON.stringify({ type: 'join', user }))
-        // console.log('WebSocket connected', user.uid)
         signalServerSocket.send(JSON.stringify({ type: 'user-connect', user }))
         while (candidateList.length > 0) {
             let queuedCandidate = candidateList.shift()
             signalServerSocket.send(
                 JSON.stringify({ type: 'ice-candidate', candidate: queuedCandidate })
             )
-            // console.log(`📤 Sent queued ICE candidate`)
         }
     }
 
@@ -142,7 +139,6 @@ function connectWebSocket(user) {
         if (signalServerSocket) {
             await signalServerSocket.send(JSON.stringify({ type: 'user-disconnect', user }))
         }
-        // console.log('WebSocket disconnected')
         signalServerSocket = null
     }
 
@@ -164,7 +160,7 @@ function connectWebSocket(user) {
     // create data channel
     function createDataChannel() {
         const dataChannel = peerConnection.createDataChannel('game')
-        dataChannel.onopen = () => console.log('Data Channel Open!')
+        dataChannel.onopen = () => console.log('data chanel open')
         dataChannel.onmessage = (event) => console.log('Received:', event.data)
     }
 
@@ -174,7 +170,7 @@ function connectWebSocket(user) {
     // handle recieve data from channel
     peerConnection.ondatachannel = (event) => {
         dataChannel = event.channel
-        dataChannel.onopen = () => console.log('Data Channel Open Peer Connection!')
+        dataChannel.onopen = () => console.log('data channel open')
         dataChannel.onmessage = (event) => console.log('Received peer:', event.data)
     }
 
@@ -188,11 +184,10 @@ function connectWebSocket(user) {
     }
 
     peerConnection.oniceconnectionstatechange = () => {
-        // console.log('ICE Connection State:', peerConnection.iceConnectionState)
         if (peerConnection.iceConnectionState === 'connected') {
             console.log('Connected! Ready to send data.')
         } else if (peerConnection.iceConnectionState === 'failed') {
-            // console.log('ICE connection failed. Check STUN/TURN settings.')
+            console.log('ICE connection failed. Check STUN/TURN settings.')
         }
     }
 
@@ -233,34 +228,30 @@ function connectWebSocket(user) {
             window.api.sendRoomMessage(data)
         }
         if (data.type === 'offer') {
-            // console.log('Offer Recieved:', { offer: data.offer.sdp })
             peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
             let answer = await peerConnection.createAnswer()
             await peerConnection.setLocalDescription(answer)
-            // console.log('Answer Being Sent ----', answer.sdp)
             signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
         }
         if (data.type === 'answer') {
-            // console.log('Answer Recieved:', { offer: data.answer.sdp })
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         }
         if (data.type === 'ice-candidate') {
-            // console.log(`📩 Received ICE candidate from external user:`, data.candidate)
-
             peerConnection
                 .addIceCandidate(new RTCIceCandidate(data.candidate))
-                .then(() => console.log(`✅ ICE Candidate added successfully!`))
-                .catch((err) => console.error(`❌ Failed to add ICE Candidate:`, err))
+                .then(() => console.log(`ICE Candidate added successfully!`))
+                .catch((err) => console.error(`Failed to add ICE Candidate:`, err))
 
             const candidate = data.candidate.candidate
             if (candidate.includes('srflx')) {
-                console.log(`🌍 ${'external user'} STUN Candidate:`, candidate)
+                console.log(`${'external user'} STUN Candidate:`, candidate)
 
                 // Extract IP and Port
                 let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
                 if (matches) {
                     let [ip, port] = matches[0].split(' ')
-                    console.log(`🔍 ${'external user'} IP: ${ip}, Port: ${port}`)
+                    console.log(`${'external user'} IP: ${ip}, Port: ${port}`)
+                    window.api.setTargetIp(ip)
                 }
             }
         }
@@ -269,7 +260,6 @@ function connectWebSocket(user) {
     async function startCall() {
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
-        // console.log('Offer Created:', { offer: offer.sdp })
         signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
     }
 

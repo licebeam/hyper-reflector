@@ -13,6 +13,10 @@ let upnpClient: null | any = null // This is used for the unpnp object.
 let proxyListener: null | any = null // This is a socket server that is used to handle proxying data to the emulator.
 const portForUPNP = 7000
 
+let currentTargetIp = '127.0.0.1' // We change this if we get a message from player and try to target that ip.
+let currentTargetPort = 7000 // We change this when we recieve a message from a player on a different port, this means one is not using upnp.
+let currentPlayerNum = 0 // We change this when we recieve a message first otherwise we are player 1 unless specified somewhere else.
+
 // - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from 'firebase/app'
 import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth'
@@ -207,13 +211,25 @@ const createWindow = () => {
         api.externalApiDoSomething(auth)
     })
 
+    ipcMain.on('setTargetIp', (event, ip) => {
+        // This data comes from renderer when we successfully use stun with another person.
+        if (ip) {
+            console.log('the current target IP = ', ip)
+            currentTargetIp = ip
+        }
+        // TODO: add error handling this is an important function.
+    })
+
     ipcMain.on('startOnlineMatch', (event, data) => {
+        if (!currentTargetIp) {
+            console.log('hey current target ip was not ready, retry')
+        }
         mainWindow.webContents.send('message-from-main', 'starting match')
         startPlayingOnline({
             config,
-            localPort: data.myPort || 7000,
-            remoteIp: data.ip || '127.0.0.1',
-            remotePort: data.port || 7001,
+            localPort: portForUPNP || 7000,
+            remoteIp: currentTargetIp || '127.0.0.1',
+            remotePort: currentTargetPort || 7001,
             player: data.player,
             delay: data.delay,
         })
@@ -379,16 +395,24 @@ app.whenReady().then(async () => {
 
         // we use this to send traffic from 7000 to 7001
         proxyListener.on('message', (msg, rinfo) => {
-            
+            // we should check that we aren't getting requests from random IPs
+
+            if (rinfo.port !== 7000) {
+                currentTargetPort = rinfo.port
+                console.log('Player isnt using upnp -> changing target port to: ', rinfo.port)
+            }
+
             // prevent keep alive from being forwarded to the emulator - it crashes
             const messageContent = msg.toString()
             if (messageContent === 'ping') {
                 console.log(`Ignoring keep-alive message from ${rinfo.address}:${rinfo.port}`)
                 return
             }
-            console.log(`proxy recieved packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
-            sendLog(`proxy recieved packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
+            // debug to see realtime packets from your opponents emulator.
+            // console.log(`proxy recieved packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
+
             // Forward packet to emulator on or listen port + 1 on localhost
+            // supposedly this shouldn't add much overhead in lag, we'll need to run some tests.
             forwardPacket(msg, 7000 + 1, '127.0.0.1')
         })
 
@@ -452,7 +476,7 @@ app.whenReady().then(async () => {
         //     function sendKeepAlive() {
         //         socket.send(msg, targetPort, targetIP, (err) => {
         //             if (err) console.error(`Error sending NAT punch: ${err.message}`)
-        //             else console.log(`🌍 NAT punch sent to ${targetIP}:${targetPort}`)
+        //             else console.log(`NAT punch sent to ${targetIP}:${targetPort}`)
         //         })
         //     }
 
@@ -461,7 +485,7 @@ app.whenReady().then(async () => {
 
         //     // Listen for responses and immediately reply to complete the hole punch
         //     socket.on('message', (msg, rinfo) => {
-        //         console.log(`🔄 Received from ${rinfo.address}:${rinfo.port}`)
+        //         console.log(`Received from ${rinfo.address}:${rinfo.port}`)
 
         //         // Reply immediately (force NAT to open the path)
         //         socket.send(msg, rinfo.port, rinfo.address)
