@@ -17,25 +17,26 @@ export default function OfflinePage() {
                     onChange={(e) => setPlayer(e.target.value)}
                     placeholder="player -- either 0 or 1"
                 />
-                <input
+                {/* WE NEED TO ENABLE SOME OF THIS FUNCTIONALITY SO THAT PLAYERS CAN PLAY OFFLINE IF WANTED */}
+                {/* <input
                     type="text"
                     value={opponentIp}
                     onChange={(e) => setOpponentIp(e.target.value)}
                     placeholder="opponent public ip"
-                />
-                <input
+                /> */}
+                {/* <input
                     type="text"
                     value={opponentPort}
                     onChange={(e) => setOpponentPort(e.target.value)}
                     placeholder="port"
-                />
-                <p> user port </p>
+                /> */}
+                {/* <p> user port </p>
                 <input
                     type="number"
                     value={myPort}
                     onChange={(e) => setMyPort(e.target.value)}
                     placeholder="my port"
-                />
+                /> */}
                 <button
                     onClick={() => {
                         window.api.serveMatch(opponentIp, opponentPort, player, 0, myPort)
@@ -53,14 +54,6 @@ export default function OfflinePage() {
                     Call
                 </button>
                 <button
-                    id="startCallBtn"
-                    onClick={() => {
-                        window.api.handShake('answer')
-                    }}
-                >
-                    Answer
-                </button>
-                <button
                     id="sendDataBtn"
                     onClick={() => {
                         window.api.sendDataChannel('Hello from another user')
@@ -68,7 +61,6 @@ export default function OfflinePage() {
                 >
                     Send Message Data Channel
                 </button>
-
                 <button
                     id="updateStunBtn"
                     onClick={() => {
@@ -79,7 +71,7 @@ export default function OfflinePage() {
                         })
                     }}
                 >
-                    Start NAT Punch
+                    Start UPNP
                 </button>
                 <br></br>
                 {/* <button onClick={() => console.log('go to offline page')}>
