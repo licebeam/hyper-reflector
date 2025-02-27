@@ -232,6 +232,7 @@ const createWindow = () => {
             remotePort: currentTargetPort || 7001,
             player: data.player,
             delay: data.delay,
+            isTraining: false, // Might be used in the future.
         })
     })
 
@@ -326,7 +327,7 @@ ipcMain.on('request-data', (event) => {
 // read files
 setInterval(() => {
     // currently we aren't really using this polling, but we will eventually need something like this
-    // readCommand();
+    readCommand();
 }, 1000) // read from reflector.text every 1000 ms
 
 // This method will be called when Electron has finished

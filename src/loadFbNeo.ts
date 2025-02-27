@@ -44,6 +44,7 @@ export function startPlayingOnline({
     remotePort,
     player,
     delay,
+    isTraining = false,
 }: {
     config: Config
     localPort: number
@@ -51,19 +52,23 @@ export function startPlayingOnline({
     remotePort: number
     player: number
     delay: number
+    isTraining: boolean
 }) {
     console.log(localPort, remoteIp, remotePort)
     console.log('emulator target might be', remotePort + 1)
-
+    let luaPath = config.emulator.luaPath;
+    if(isTraining){
+        luaPath = config.emulator.trainingLuaPath;
+    }
     // we add +1 to local port because when we hole punch nat, the emulator assigns a socket to the next port
-    const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${config.emulator.luaPath}`
+    const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`
     console.log({ directCommand })
 
     launchGGPO(directCommand)
 }
 
 export function startSoloMode({ config }: { config: Config }) {
-    const directCommand = `${fightcadeCmd(config)} -game sfiii3nr1 ${config.emulator.luaPath}`
+    const directCommand = `${fightcadeCmd(config)} -game sfiii3nr1 ${config.emulator.trainingLuaPath}`
     console.log({ directCommand })
     launchGGPO(directCommand)
 }
