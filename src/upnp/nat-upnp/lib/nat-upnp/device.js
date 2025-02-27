@@ -1,11 +1,7 @@
 import nat from '../nat-upnp'
-// import request from 'request'
-// import url from 'url'
-// import xml2js from 'xml2js'
-// import { Buffer } from 'buffer'
-var request = require('request')
+import axios from 'axios'
+import { XMLParser } from 'fast-xml-parser'
 var url = require('url')
-var xml2js = require('xml2js')
 var Buffer = require('buffer').Buffer
 
 let device = {}
@@ -14,6 +10,7 @@ function Device(url) {
     this.description = url
     this.services = [
         'urn:schemas-upnp-org:service:WANIPConnection:1',
+        'urn:schemas-upnp-org:service:WANIPConnection:2',
         'urn:schemas-upnp-org:service:WANPPPConnection:1',
     ]
 }
@@ -22,7 +19,7 @@ device.create = function create(url) {
     return new Device(url)
 }
 
-Device.prototype._getXml = function _getXml(url, callback) {
+Device.prototype._getXml = async function _getXml(url, callback) {
     var once = false
     function respond(err, body) {
         if (once) return
@@ -31,21 +28,17 @@ Device.prototype._getXml = function _getXml(url, callback) {
         callback(err, body)
     }
 
-    request(url, function (err, res, body) {
-        if (err) return callback(err)
-
-        if (res.statusCode !== 200) {
-            respond(Error('Failed to lookup device description'))
-            return
-        }
-
-        var parser = new xml2js.Parser()
-        parser.parseString(body, function (err, body) {
-            if (err) return respond(err)
-
-            respond(null, body)
+    axios
+        .get(url)
+        .then(async ({ data }) => {
+            const parsedData = new XMLParser().parse(data)
+            const rootData = parsedData.root
+            respond(null, rootData)
         })
-    })
+        .catch((err) => {
+            callback(err)
+            respond(Error('Failed to lookup device description'))
+        })
 }
 
 Device.prototype.getService = function getService(types, callback) {
@@ -150,36 +143,41 @@ Device.prototype.run = function run(action, args, callback) {
             '</s:Body>' +
             '</s:Envelope>'
 
-        request(
-            {
-                method: 'POST',
-                url: info.controlURL,
+        axios
+            .post(info.controlURL, body, {
                 headers: {
                     'Content-Type': 'text/xml; charset="utf-8"',
-                    'Content-Length': Buffer.byteLength(body),
+                    'Content-Length': '' + Buffer.byteLength(body),
                     Connection: 'close',
                     SOAPAction: JSON.stringify(info.service + '#' + action),
                 },
-                body: body,
-            },
-            function (err, res, body) {
-                if (err) return callback(err)
+                responseType: 'text',
+            })
+            .then((res) => {
+                // console.log('Raw Response:', res.data);
 
-                var parser = new xml2js.Parser()
-                parser.parseString(body, function (err, body) {
-                    if (res.statusCode !== 200) {
-                        return callback(Error('Request failed: ' + res.statusCode))
-                    }
+                const xmlString = Buffer.isBuffer(res.data) ? res.data.toString() : res.data
+                const parser = new XMLParser({ ignoreAttributes: false, trimValues: true })
+                const parsedData = parser.parse(xmlString)
 
-                    var soapns = nat.utils.getNamespace(
-                        body,
-                        'http://schemas.xmlsoap.org/soap/envelope/'
-                    )
+                // console.log('Parsed XML:', JSON.stringify(parsedData, null, 2));
 
-                    callback(null, body[soapns + 'Body'])
-                })
-            }
-        )
+                var soapns = nat.utils.getNamespace(
+                    parsedData['s:Envelope'],
+                    'http://schemas.xmlsoap.org/soap/envelope/'
+                )
+                // console.log('SOAP Namespace:', soapns);
+
+                if (!soapns) {
+                    return callback(new Error('SOAP namespace not found in response'))
+                }
+
+                callback(null, parsedData['s:Envelope'][soapns + 'Body'])
+            })
+            .catch((err) => {
+                // console.log('Error in run:', err);
+                return callback(new Error('Request failed: ' + err.message))
+            })
     })
 }
 

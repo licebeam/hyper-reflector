@@ -42,19 +42,17 @@
     "@types/node": "^22.13.1",
     "@types/react": "^19.0.8",
     "@vitejs/plugin-react": "^4.3.4",
+    "async": "^2.1.5",
     "axios": "^1.7.9",
     "dgram": "^1.0.1",
     "electron-squirrel-startup": "^1.0.1",
+    "fast-xml-parser": "^5.0.8",
     "firebase": "^11.2.0",
-    "nat-upnp": "github:kaden-sharpin/node-nat-upnp",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "styled-components": "^6.1.15",
-    "zustand": "^5.0.3",
-    "xml2js": "~0.1.14",
     "request": "^2.79.0",
-    "async": "^2.1.5",
-    "ip": "^1.1.4"
+    "styled-components": "^6.1.15",
+    "zustand": "^5.0.3"
   },
   "build": {
     "extraResources": [

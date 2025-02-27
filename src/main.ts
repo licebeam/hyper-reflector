@@ -6,10 +6,12 @@ import { getConfig, type Config } from './config'
 import keys from './private/keys'
 // external api
 import api from './external-api/requests'
+// p2p networking
+const dgram = require('dgram')
 import upnp from './upnp/nat-upnp'
-// var upnp = require('nat-upnp');
+let upnpClient: null | any = null // This is used for the unpnp object.
+let proxyListener: null | any = null // This is a socket server that is used to handle proxying data to the emulator.
 const portForUPNP = 7000
-// import natUpnp from 'nat-upnp'
 
 // - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from 'firebase/app'
@@ -98,13 +100,12 @@ const createWindow = () => {
                     }
                 })
                 .catch((err) => console.log(err))
-            // getEmulatorPath()
         } catch (error) {
             console.log(error)
         }
     }
 
-    // firebase test
+    // firebase login
     async function handleLogin(email: string, password: string) {
         mainWindow.webContents.send('logging-in', 'trying to log in')
         try {
@@ -218,17 +219,6 @@ const createWindow = () => {
         })
     })
 
-    ipcMain.on('startP2', (event, data) => {
-        startPlayingOnline({
-            config,
-            localPort: 7001,
-            remoteIp: data.ip || '127.0.0.1',
-            remotePort: data.port || 7000,
-            player: 1,
-            delay: 0,
-        })
-    })
-
     ipcMain.on('start-solo-mode', (event) => {
         startSoloMode({ config })
     })
@@ -279,29 +269,35 @@ const createWindow = () => {
 
     // handle cleanup on closing window
     mainWindow.on('close', async (event) => {
-        await client
-            .removeMapping({ public: portForUPNP })
-            .then()
-            .catch((err) => {
-                if (!err) return
-                console.log('error closing port mapping', err)
-            })
-        // client.portUnmapping({ public: portForUPNP }, (err) => {
-        //     if (!err) return
-        //     console.log('error closing port mapping', err)
-        // })
         console.log('closing app as', userUID)
+        await handleExitApp()
         event.preventDefault()
-        if (userUID) {
-            // remove user from websockets and log them out of firebase on close
-            await api.removeLoggedInUser(auth)
-            mainWindow?.webContents.send('closing-app', { uid: userUID })
-        }
-        setTimeout(() => {
-            client.close()
-            mainWindow?.destroy() // force window to close when we finish
-        }, 500)
     })
+}
+
+async function handleExitApp() {
+    if (proxyListener !== null) {
+        console.log('closing proxy server')
+        await proxyListener.close()
+        proxyListener = null
+    }
+    if (upnpClient !== null) {
+        await upnpClient.portUnmapping({ public: portForUPNP }, (err) => {
+            if (!err) return
+            console.log('failed to close port', err)
+        })
+        setTimeout(() => {
+            upnpClient.close()
+        }, 500)
+    }
+    if (userUID) {
+        // remove user from websockets and log them out of firebase on close
+        await api.removeLoggedInUser(auth)
+        mainWindow?.webContents.send('closing-app', { uid: userUID })
+    }
+    setTimeout(() => {
+        mainWindow?.destroy() // force window to close when we finish
+    }, 500)
 }
 
 // Listen for a request and respond to it
@@ -325,10 +321,27 @@ app.on('ready', createWindow)
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
+    await handleExitApp()
     if (process.platform !== 'darwin') {
         app.quit()
     }
+})
+
+app.on('before-quit', async () => {
+    console.log('app trying to quit')
+})
+
+process.on('SIGINT', async () => {
+    await handleExitApp()
+    console.log('SIGINT received (CTRL+C or process kill)')
+    app.quit()
+})
+
+process.on('SIGTERM', async () => {
+    await handleExitApp()
+    console.log('SIGTERM received (system shutdown or process termination)')
+    app.quit()
 })
 
 app.on('activate', () => {
@@ -339,93 +352,84 @@ app.on('activate', () => {
     }
 })
 
-const dgram = require('dgram')
-let listener = null
-let expected_peer_ip = 'x.x.x.x' // The external IP of the other player (from STUN)
-let stun_port = 50000 // The external port this PC is using (from STUN)
-let emulatorPort = 7000 // The fixed local port for the emulator
-
 app.whenReady().then(async () => {
+    // HOW THIS APP NETWORKS
+    // first we set hit the stun server by logging in.
+    // secondly we start listening for messages on port 7000
+    // thirdly a user who wishes to connect upnp maps port 7000 for a networked connection
+    // fourthly we start the emulator and we proxy incoming data from port 7000 to the emulators port of 7001
+    // profit, users should be successfully connecting the emulators together with eachother.
+
     // UPNP is working! but we need to fix the upnp library so that we can make a build.
     ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
-        var client = upnp.createClient()
-        // const client = new natUpnp.Client()
+        // we must initialize the client here or nothing works correctly.
+        upnpClient = upnp.createClient()
 
-        //listener
-        const server = dgram.createSocket('udp4')
-
-        server.on('message', (msg, rinfo) => {
-            console.log(`Received message: ${msg} from ${rinfo.address}:${rinfo.port}`)
+        await upnpClient?.portUnmapping({ public: portForUPNP }, (err) => {
+            if (!err) return
+            //console.log('failed to close port', err)
         })
 
-        server.bind(portForUPNP, () => {
-            console.log(`Listening on port ${portForUPNP}...`)
-        })
-        // listener --
+        // listener and proxy.
+        proxyListener = dgram.createSocket('udp4')
 
-        client.portMapping(
+        proxyListener.bind(portForUPNP, () => {
+            console.log(`proxy listening on port ${portForUPNP}...`)
+        })
+
+        // we use this to send traffic from 7000 to 7001
+        proxyListener.on('message', (msg, rinfo) => {
+            
+            // prevent keep alive from being forwarded to the emulator - it crashes
+            const messageContent = msg.toString()
+            if (messageContent === 'ping') {
+                console.log(`Ignoring keep-alive message from ${rinfo.address}:${rinfo.port}`)
+                return
+            }
+            console.log(`proxy recieved packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
+            sendLog(`proxy recieved packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
+            // Forward packet to emulator on or listen port + 1 on localhost
+            forwardPacket(msg, 7000 + 1, '127.0.0.1')
+        })
+
+        function forwardPacket(data, targetPort, targetIP) {
+            const socket = dgram.createSocket('udp4')
+            socket.send(data, targetPort, targetIP, (err) => {
+                if (err) console.log(`Proxy forwarding Error: ${err.message}`)
+                socket.close()
+            })
+        }
+
+        // unpn mapping and usage
+        upnpClient.portMapping(
             {
                 public: portForUPNP,
                 private: portForUPNP,
                 ttl: 0,
-                protocol: "UDP"
+                protocol: 'UDP',
             },
             function (err) {
                 if (err) {
                     console.error(`Failed to set up UPnP: ${err.message}`)
+                    sendLog(`Failed to set up UPnP: ${err.message}`)
                 } else {
                     console.log(`UPnP Port Mapping created: ${portForUPNP} , ${portForUPNP}}`)
+                    sendLog(`UPnP Port Mapping created: ${portForUPNP} , ${portForUPNP}}`)
                 }
             }
         )
 
-        client.getMappings(function (err, results) {
+        upnpClient.getMappings({ local: true }, function (err, results) {
             console.log(results)
-            if (err) {
-                console.log('failed to get mapping')
-            }
+            sendLog(results)
         })
 
-        client.getMappings({ local: true }, function (err, results) { console.log(results)})
-
-        client.externalIp(function (err, ip) {
+        upnpClient.externalIp(function (err, ip) {
             console.log(ip)
             if (err) {
                 console.log('failed to get external ip')
             }
         })
-        //// -- old version above--------------------------------
-
-        // UPNP ---
-        // sendLog('Should load the upnp client')
-        // console.log(natUpnp)
-
-        // await client
-        //     .removeMapping({ public: portForUPNP })
-        //     .then()
-        //     .catch((err) => {
-        //         if (!err) return
-        //         console.log('error closing port mapping', err)
-        //     })
-
-        // await client
-        //     .createMapping({
-        //         public: portForUPNP,
-        //         private: portForUPNP,
-        //         ttl: 0,
-        //         protocol: 'UDP',
-        //     })
-        //     .then((res) => console.log(res))
-        //     .catch((err) => console.log(err))
-
-        // const pubIp = await client.getPublicIp()
-        // console.log(pubIp)
-
-        // const maps = await client.getMappings()
-        // console.log(maps)
-        // sendLog(JSON.stringify(maps))
-
-        // UPNP END ---
 
         // console.log('Starting listener...')
         // stun_port = port
@@ -502,7 +506,7 @@ app.whenReady().then(async () => {
         // }
 
         // listener.on('error', (err) => {
-        //     console.error(`❌ UDP Listener Error: ${err.message}`)
+        //     console.error(`UDP Listener Error: ${err.message}`)
         //     listener.close()
         // })
     })

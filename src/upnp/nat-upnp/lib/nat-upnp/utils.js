@@ -1,22 +1,19 @@
 let utils = {}
 
 utils.getNamespace = function getNamespace(data, uri) {
-    console.log(data, uri, 'testing')
-    var ns
+    console.log('Namespace Debug - Data:', JSON.stringify(data, null, 2), 'URI:', uri)
 
-    if (data['@']) {
-        Object.keys(data['@']).some(function (key) {
-            if (!/^xmlns:/.test(key)) return
-            if (data['@'][key] !== uri) {
-                return
-            }
-
-            ns = key.replace(/^xmlns:/, '')
-            return true
-        })
+    for (const key in data) {
+        if (key.startsWith('@_xmlns:') && data[key] === uri) {
+            return key.replace('@_xmlns:', '') + ':'
+        }
     }
 
-    return ns ? ns + ':' : ''
+    if (data['s:Envelope'] && data['s:Envelope']['@_xmlns:s'] === uri) {
+        return 's:' // return the namespace prefix
+    }
+
+    return '' // return empty if namespace is not found
 }
 
 export default utils
