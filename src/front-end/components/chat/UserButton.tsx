@@ -16,6 +16,7 @@ export default function UserButton({ user }) {
     return (
         <div>
             {user.name}
+            {user.uid}
             {!isUserChallenging() && user.uid !== userState.uid && (
                 <button
                     onClick={() => {
