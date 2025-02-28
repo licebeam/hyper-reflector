@@ -98,8 +98,8 @@ window.api.on('closing-app', async (user) => {
 
 function connectWebSocket(user) {
     if (signalServerSocket) return // Prevent duplicate ws connections from same client
-    signalServerSocket = new WebSocket(`ws://127.0.0.1:3000`) // for testing server
-    // signalServerSocket = new WebSocket(`ws://${keys.COTURN_IP}:3000`)
+    // signalServerSocket = new WebSocket(`ws://127.0.0.1:3000`) // for testing server
+    signalServerSocket = new WebSocket(`ws://${keys.COTURN_IP}:3000`)
     signalServerSocket.onopen = () => {
         signalServerSocket.send(JSON.stringify({ type: 'join', user }))
         signalServerSocket.send(JSON.stringify({ type: 'user-connect', user }))
