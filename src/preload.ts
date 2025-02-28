@@ -5,7 +5,8 @@ contextBridge.exposeInMainWorld('api', {
     sendIceCandidate: (data: { targetId: string; candidate: any }) =>
         ipcRenderer.send('iceCandidate', data),
     callUser: (data: { callerId: string; calleeId: string }) => ipcRenderer.send('callUser', data),
-    answerCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('iceCandidate', data),
+    answerCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('answerCall', data),
+    receivedCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('receivedCall', data),
     // server and online
     loginUser: (loginObject: { email: string; name: string; pass: string }) =>
         ipcRenderer.send('login-user', loginObject),
