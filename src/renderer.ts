@@ -268,17 +268,15 @@ function connectWebSocket(user) {
         if (data.type === 'callAnswered') {
             console.log('Call answered:', data.data.answer)
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.data.answer))
-            callerIdState = data.data.callerId
-            // Now send the stored ICE candidates
-            // while (candidateList.length > 0) {
-            //     let candidate = candidateList.shift()
-            //     signalServerSocket.send(
-            //         JSON.stringify({
-            //             type: 'iceCandidate',
-            //             data: { targetId: data.data.callerId, candidate },
-            //         })
-            //     )
-            // }
+            while (candidateList.length > 0) {
+                let candidate = candidateList.shift()
+                signalServerSocket.send(
+                    JSON.stringify({
+                        type: 'iceCandidate',
+                        data: { targetId: data.data.callerId, candidate },
+                    })
+                )
+            }
         }
 
         if (data.type === 'iceCandidate') {
