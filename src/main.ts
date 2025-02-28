@@ -271,13 +271,13 @@ const createWindow = () => {
         mainWindow.webContents.send('user-name-changed', complete)
     })
 
-    // matchmaking 
+    // matchmaking
     ipcMain.on('callUser', (event, data) => {
         mainWindow.webContents.send('callUser', data)
     })
 
     ipcMain.on('answerCall', (event, data) => {
-        mainWindow.webContents.send('answerCall', data)
+        mainWindow.webContents.send('answerCall', { ...data, answererId: userUID })
     })
 
     ipcMain.on('receivedCall', (event, data) => {

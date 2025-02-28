@@ -5,7 +5,7 @@ import './front-end/app'
 
 let signalServerSocket: WebSocket = null // WebSocket reference
 let candidateList = []
-let callerIdState = null;
+let callerIdState = null
 
 // handle connection to remote turn server
 const googleStuns = [
@@ -49,12 +49,11 @@ function setupLogging(peer, userLabel, event) {
                 console.log(`${userLabel} External IP: ${ip}, Port: ${port}`)
             }
             candidateList.push(event.candidate)
-            while (candidateList.length > 0) {
-                let candidate = candidateList.shift()
+            if (callerIdState) {
                 signalServerSocket.send(
                     JSON.stringify({
                         type: 'iceCandidate',
-                        data: { targetId: callerIdState, candidate },
+                        data: { targetId: callerIdState, candidate: event.candidate },
                     })
                 )
             }
@@ -142,24 +141,28 @@ function connectWebSocket(user) {
     )
 
     // handle send answer to specific user
-    window.api.on('answerCall', async ({ callerId }: { callerId: string }) => {
-        // Automatically accept call (or prompt user for acceptance)
-        let answer = await peerConnection.createAnswer()
-        await peerConnection.setLocalDescription(answer)
+    window.api.on(
+        'answerCall',
+        async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
+            // Automatically accept call (or prompt user for acceptance)
+            let answer = await peerConnection.createAnswer()
+            await peerConnection.setLocalDescription(answer)
 
-        console.log('we should be answering the call')
-        console.log('sending out call', callerId, answer)
-        signalServerSocket.send(
-            JSON.stringify({
-                type: 'answerCall',
-                data: {
-                    callerId,
-                    answer,
-                },
-            })
-        )
-        callerIdState = callerId;
-    })
+            console.log('we should be answering the call')
+            console.log('sending out answer', callerId, answer)
+            signalServerSocket.send(
+                JSON.stringify({
+                    type: 'answerCall',
+                    data: {
+                        callerId,
+                        answer,
+                        answererId,
+                    },
+                })
+            )
+            callerIdState = callerId
+        }
+    )
 
     // window.api.on('iceCandidate', (targetId: string, iceCandidate: any) => {
     //     signalServerSocket.send(
@@ -266,17 +269,19 @@ function connectWebSocket(user) {
         }
 
         if (data.type === 'callAnswered') {
-            console.log('Call answered:', data.data.answer)
+            console.log('Call answered:', data)
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.data.answer))
-            while (candidateList.length > 0) {
-                let candidate = candidateList.shift()
-                signalServerSocket.send(
-                    JSON.stringify({
-                        type: 'iceCandidate',
-                        data: { targetId: data.data.callerId, candidate },
-                    })
-                )
-            }
+            console.log(
+                'Answering call, trying to send some data; ',
+                data.data.callerId,
+                candidateList[0]
+            )
+            signalServerSocket.send(
+                JSON.stringify({
+                    type: 'iceCandidate',
+                    data: { targetId: data.data.answererId, candidate: candidateList[0] },
+                })
+            )
         }
 
         if (data.type === 'iceCandidate') {
