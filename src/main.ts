@@ -191,7 +191,6 @@ const createWindow = () => {
         mainWindow.webContents.send('send-data-channel', data)
     })
 
-    //
     ipcMain.on('setEmulatorPath', () => {
         setEmulatorPath()
     })

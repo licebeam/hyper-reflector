@@ -54,6 +54,7 @@ function setupLogging(peer, userLabel, event) {
             candidateList.push(event.candidate) // Store the candidate to send later
         }
 
+        // commented out, we dont need relay currently
         // if (event.candidate.candidate.includes('relay')) {
         //     // Extract IP and Port
         //     let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
@@ -146,7 +147,31 @@ function connectWebSocket(user) {
         console.error('WebSocket Error:', error)
     }
 
-    //allow users to chat
+    // window.api.on() -- for copy pasting lol
+
+    // handle matchmaking
+    // handle send call to specific user
+    window.api.on('callUser', async (callerId: string, calleeId: string) => {
+        const offer = await peerConnection.createOffer()
+        await peerConnection.setLocalDescription(offer)
+        const localDescription = peerConnection.localDescription
+        signalServerSocket.send(
+            JSON.stringify({ type: 'callUser', data: { callerId, calleeId, localDescription } })
+        )
+    })
+
+    // handle send answer to specific user
+    window.api.on('answerCall', (callerId: string, answer: any) => {
+        signalServerSocket.send(JSON.stringify({ type: 'answerCall', data: { callerId, answer } }))
+    })
+
+    window.api.on('iceCandidate', (targetId: string, iceCandidate: any) => {
+        signalServerSocket.send(
+            JSON.stringify({ type: 'iceCandidate', data: { targetId, iceCandidate } })
+        )
+    })
+
+    // allow users to chat
     window.api.on('user-message', (text: string) => {
         console.log(JSON.stringify(candidateList))
         // sends a message over to another user
@@ -227,16 +252,36 @@ function connectWebSocket(user) {
         if (data.type === 'user-message') {
             window.api.sendRoomMessage(data)
         }
-        if (data.type === 'offer') {
-            peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
+        if (data.type === 'incomingCall') {
+            console.log('Incoming call from:', data.callerId)
+
+            // Automatically accept call (or prompt user for acceptance)
             let answer = await peerConnection.createAnswer()
             await peerConnection.setLocalDescription(answer)
-            signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
+
+            // we should move this to be a manual answering, but for now lets just automatically send
+            signalServerSocket.send(
+                JSON.stringify({
+                    type: 'answerCall',
+                    callerId: data.callerId,
+                    answer,
+                })
+            )
         }
-        if (data.type === 'answer') {
+        // if (data.type === 'offer') {
+        //     peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
+        //     let answer = await peerConnection.createAnswer()
+        //     await peerConnection.setLocalDescription(answer)
+        //     signalServerSocket.send(JSON.stringify({ type: 'answer', answer }))
+        // }
+        if (data.type === 'callAnswered') {
+            console.log('Call answered:', data.answer)
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         }
-        if (data.type === 'ice-candidate') {
+        // if (data.type === 'answer') {
+        //     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
+        // }
+        if (data.type === 'iceCandidate') {
             peerConnection
                 .addIceCandidate(new RTCIceCandidate(data.candidate))
                 .then(() => console.log(`ICE Candidate added successfully!`))
@@ -255,13 +300,32 @@ function connectWebSocket(user) {
                 }
             }
         }
+        // if (data.type === 'ice-candidate') {
+        //     peerConnection
+        //         .addIceCandidate(new RTCIceCandidate(data.candidate))
+        //         .then(() => console.log(`ICE Candidate added successfully!`))
+        //         .catch((err) => console.error(`Failed to add ICE Candidate:`, err))
+
+        //     const candidate = data.candidate.candidate
+        //     if (candidate.includes('srflx')) {
+        //         console.log(`${'external user'} STUN Candidate:`, candidate)
+
+        //         // Extract IP and Port
+        //         let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
+        //         if (matches) {
+        //             let [ip, port] = matches[0].split(' ')
+        //             console.log(`${'external user'} IP: ${ip}, Port: ${port}`)
+        //             window.api.setTargetIp(ip)
+        //         }
+        //     }
+        // }
     }
 
-    async function startCall() {
-        const offer = await peerConnection.createOffer()
-        await peerConnection.setLocalDescription(offer)
-        signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
-    }
+    // async function startCall() {
+    //     const offer = await peerConnection.createOffer()
+    //     await peerConnection.setLocalDescription(offer)
+    //     signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
+    // }
 
     window.api.on('hand-shake-users', (type: string) => {
         startCall()

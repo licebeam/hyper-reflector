@@ -1,8 +1,11 @@
-// See the Electron documentation for details on how to use preload scripts:
-// https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('api', {
+    // websocket related
+    sendIceCandidate: (data: { targetId: string; candidate: any }) =>
+        ipcRenderer.send('iceCandidate', data),
+    callUser: (data: { callerId: string; calleeId: string }) => ipcRenderer.send('callUser', data),
+    answerCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('iceCandidate', data),
     // server and online
     loginUser: (loginObject: { email: string; name: string; pass: string }) =>
         ipcRenderer.send('login-user', loginObject),
