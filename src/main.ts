@@ -324,9 +324,9 @@ ipcMain.on('request-data', (event) => {
 })
 
 // read files
-setInterval(() => {
+const readInterval = setInterval(() => {
     // currently we aren't really using this polling, but we will eventually need something like this
-    readCommand();
+    readCommand()
 }, 1000) // read from reflector.text every 1000 ms
 
 // This method will be called when Electron has finished
@@ -338,6 +338,9 @@ app.on('ready', createWindow)
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
 app.on('window-all-closed', async () => {
+    if (readInterval) {
+        clearInterval(readInterval)
+    }
     await handleExitApp()
     if (process.platform !== 'darwin') {
         app.quit()

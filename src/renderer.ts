@@ -152,6 +152,7 @@ function connectWebSocket(user) {
     // handle matchmaking
     // handle send call to specific user
     window.api.on('callUser', async (callerId: string, calleeId: string) => {
+        console.log('we are trying to make a call to :', calleeId)
         const offer = await peerConnection.createOffer()
         await peerConnection.setLocalDescription(offer)
         const localDescription = peerConnection.localDescription
@@ -161,15 +162,15 @@ function connectWebSocket(user) {
     })
 
     // handle send answer to specific user
-    window.api.on('answerCall', (callerId: string, answer: any) => {
-        signalServerSocket.send(JSON.stringify({ type: 'answerCall', data: { callerId, answer } }))
-    })
+    // window.api.on('answerCall', (callerId: string, answer: any) => {
+    //     signalServerSocket.send(JSON.stringify({ type: 'answerCall', data: { callerId, answer } }))
+    // })
 
-    window.api.on('iceCandidate', (targetId: string, iceCandidate: any) => {
-        signalServerSocket.send(
-            JSON.stringify({ type: 'iceCandidate', data: { targetId, iceCandidate } })
-        )
-    })
+    // window.api.on('iceCandidate', (targetId: string, iceCandidate: any) => {
+    //     signalServerSocket.send(
+    //         JSON.stringify({ type: 'iceCandidate', data: { targetId, iceCandidate } })
+    //     )
+    // })
 
     // allow users to chat
     window.api.on('user-message', (text: string) => {
@@ -241,17 +242,21 @@ function connectWebSocket(user) {
                 window.api.addUserGroupToRoom(data.users)
             }
         }
+
         if (data.type === 'user-connect') {
             signalServerSocket.send(JSON.stringify({ type: 'join', user }))
             // window.api.addUserToRoom(user)
         }
+
         if (data.type === 'user-disconnect') {
             signalServerSocket.send(JSON.stringify({ type: 'join', user }))
             // window.api.removeUserFromRoom(user)
         }
+
         if (data.type === 'user-message') {
             window.api.sendRoomMessage(data)
         }
+
         if (data.type === 'incomingCall') {
             console.log('Incoming call from:', data.callerId)
 
@@ -282,6 +287,7 @@ function connectWebSocket(user) {
         //     await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
         // }
         if (data.type === 'iceCandidate') {
+            console.log('recieved an ice candidate from another user')
             peerConnection
                 .addIceCandidate(new RTCIceCandidate(data.candidate))
                 .then(() => console.log(`ICE Candidate added successfully!`))
