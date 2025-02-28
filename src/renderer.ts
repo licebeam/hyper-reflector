@@ -2,6 +2,7 @@ import keys from './private/keys'
 import './index.css'
 // Load our react app
 import './front-end/app'
+import { l } from 'vite/dist/node/types.d-aGj9QkWt'
 
 let signalServerSocket: WebSocket = null // WebSocket reference
 let candidateList = []
@@ -21,20 +22,63 @@ const googleStuns = [
     'stun:stun4.l.google.com:5349',
 ]
 
-const peerConnection = new RTCPeerConnection({
-    iceServers: [
-        {
-            urls: 'stun:stun.l.google.com:19302',
-            // urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
-        },
-        {
-            urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
-            username: 'turn',
-            credential: 'turn',
-        },
-    ],
-    iceTransportPolicy: 'all',
-})
+const peerConnections: Record<string, RTCPeerConnection> = {}
+
+async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
+    console.log('trying to create a new peer connection with - ', userUID)
+    const peerConnection = new RTCPeerConnection({
+        iceServers: [
+            {
+                urls: 'stun:stun.l.google.com:19302',
+                // urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+            },
+            {
+                urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+                username: 'turn',
+                credential: 'turn',
+            },
+        ],
+        iceTransportPolicy: 'all',
+    })
+
+    let dataChannel // Will store the game data channel
+
+    // create data channel
+    if (isInitiator) {
+        // Only the initiator creates a data channel
+        dataChannel = peerConnection.createDataChannel('game');
+        dataChannel.onopen = () => console.log('Data channel open');
+        dataChannel.onmessage = (event) => console.log('Received:', event.data);
+    } else {
+        // Answerer handles data channel event
+        peerConnection.ondatachannel = (event) => {
+            dataChannel = event.channel;
+            dataChannel.onopen = () => console.log('Data channel open');
+            dataChannel.onmessage = (event) => console.log('Received peer:', event.data);
+        };
+    }
+
+    // send new ice candidates from the coturn server
+    peerConnection.onicecandidate = (event) => {
+        console.log(event)
+        if (event.candidate) {
+            setupLogging(peerConnection, userName, event)
+        } else {
+            console.log('ICE Candidate gathering complete!')
+        }
+    }
+
+    peerConnection.oniceconnectionstatechange = () => {
+        if (peerConnection.iceConnectionState === 'connected') {
+            console.log('Connected! Ready to send data.')
+        } else if (peerConnection.iceConnectionState === 'failed') {
+            console.log('ICE connection failed. Check STUN/TURN settings.')
+        }
+    }
+
+    peerConnections[userUID] = peerConnection
+    return peerConnection
+}
 
 function setupLogging(peer, userLabel, event) {
     if (event.candidate) {
@@ -62,7 +106,6 @@ function setupLogging(peer, userLabel, event) {
 }
 
 let userName
-let dataChannel // Will store the game data channel
 
 window.api.on('login-success', (user) => {
     if (user) {
@@ -130,10 +173,12 @@ function connectWebSocket(user) {
     window.api.on(
         'callUser',
         async ({ callerId, calleeId }: { callerId: string; calleeId: string }) => {
+            console.log(calleeId, calleeId)
+            await createNewPeerConnection(calleeId, true).catch((err) => console.log(err))
             console.log('we are trying to make a call to :', calleeId)
-            const offer = await peerConnection.createOffer()
-            await peerConnection.setLocalDescription(offer)
-            const localDescription = peerConnection.localDescription
+            const offer = await peerConnections[calleeId].createOffer()
+            await peerConnections[calleeId].setLocalDescription(offer)
+            const localDescription = peerConnections[calleeId].localDescription
             signalServerSocket.send(
                 JSON.stringify({ type: 'callUser', data: { callerId, calleeId, localDescription } })
             )
@@ -145,8 +190,8 @@ function connectWebSocket(user) {
         'answerCall',
         async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
             // Automatically accept call (or prompt user for acceptance)
-            let answer = await peerConnection.createAnswer()
-            await peerConnection.setLocalDescription(answer)
+            let answer = await peerConnections[answererId].createAnswer()
+            await peerConnections[answererId].setLocalDescription(answer)
 
             console.log('we should be answering the call')
             console.log('sending out answer', callerId, answer)
@@ -180,41 +225,6 @@ function connectWebSocket(user) {
             )
         }
     })
-
-    // create data channel
-    function createDataChannel() {
-        const dataChannel = peerConnection.createDataChannel('game')
-        dataChannel.onopen = () => console.log('data chanel open')
-        dataChannel.onmessage = (event) => console.log('Received:', event.data)
-    }
-
-    // automatically create the data channel
-    createDataChannel()
-
-    // handle recieve data from channel
-    peerConnection.ondatachannel = (event) => {
-        dataChannel = event.channel
-        dataChannel.onopen = () => console.log('data channel open')
-        dataChannel.onmessage = (event) => console.log('Received peer:', event.data)
-    }
-
-    // send new ice candidates from the coturn server
-    peerConnection.onicecandidate = (event) => {
-        console.log(event)
-        if (event.candidate) {
-            setupLogging(peerConnection, userName, event)
-        } else {
-            console.log('ICE Candidate gathering complete!')
-        }
-    }
-
-    peerConnection.oniceconnectionstatechange = () => {
-        if (peerConnection.iceConnectionState === 'connected') {
-            console.log('Connected! Ready to send data.')
-        } else if (peerConnection.iceConnectionState === 'failed') {
-            console.log('ICE connection failed. Check STUN/TURN settings.')
-        }
-    }
 
     async function convertBlob(event: any) {
         try {
@@ -259,8 +269,9 @@ function connectWebSocket(user) {
         if (data.type === 'incomingCall') {
             console.log('Incoming call from:', data.callerId)
             console.log(data)
+            await createNewPeerConnection(data.callerId, false)
 
-            await peerConnection
+            await peerConnections[data.callerId]
                 .setRemoteDescription(new RTCSessionDescription(data.offer))
                 .catch((err) => console.log(err))
 
@@ -270,7 +281,9 @@ function connectWebSocket(user) {
 
         if (data.type === 'callAnswered') {
             console.log('Call answered:', data)
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.data.answer))
+            await peerConnections[data.data.answererId].setRemoteDescription(
+                new RTCSessionDescription(data.data.answer)
+            )
             console.log(
                 'Answering call, trying to send some data; ',
                 data.data.callerId,
@@ -285,7 +298,16 @@ function connectWebSocket(user) {
         }
 
         if (data.type === 'iceCandidate') {
-            console.log('Received ICE Candidate from peer:', data.candidate)
+            console.log('Received ICE Candidate from peer:', data.candidate.candidate)
+            let matches = data.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
+            console.log('matches', matches)
+            if (matches) {
+                let [ip, port] = matches[0].split(' ')
+                // 0 is our delay settings which we'll need to adjust for.
+                const playerNum = 0 // this should be set by a list of whatever ongoing challenges are running
+                console.log(`Connecting to ${ip}, Port: ${port}`)
+                window.api.serveMatch(ip, 7000, playerNum, 0, 7000)
+            }
             try {
                 await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
                 console.log('ICE Candidate added successfully')
@@ -294,16 +316,6 @@ function connectWebSocket(user) {
             }
         }
     }
-
-    // async function startCall() {
-    //     const offer = await peerConnection.createOffer()
-    //     await peerConnection.setLocalDescription(offer)
-    //     signalServerSocket.send(JSON.stringify({ type: 'offer', offer }))
-    // }
-
-    // window.api.on('hand-shake-users', (type: string) => {
-    //     startCall()
-    // })
 
     window.api.on('send-data-channel', async (data: string) => {
         console.log(
