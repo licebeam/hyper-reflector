@@ -5,6 +5,7 @@ import './front-end/app'
 
 let signalServerSocket: WebSocket = null // WebSocket reference
 let candidateList = []
+let callerIdState = null;
 
 // handle connection to remote turn server
 const googleStuns = [
@@ -48,10 +49,15 @@ function setupLogging(peer, userLabel, event) {
                 console.log(`${userLabel} External IP: ${ip}, Port: ${port}`)
             }
             candidateList.push(event.candidate)
-            console.log(candidateList)
-            signalServerSocket.send(
-                JSON.stringify({ type: 'iceCandidate', candidate: candidateList[0] })
-            )
+            while (candidateList.length > 0) {
+                let candidate = candidateList.shift()
+                signalServerSocket.send(
+                    JSON.stringify({
+                        type: 'iceCandidate',
+                        data: { targetId: callerIdState, candidate },
+                    })
+                )
+            }
         }
     }
 }
@@ -152,7 +158,7 @@ function connectWebSocket(user) {
                 },
             })
         )
-        // signalServerSocket.send(JSON.stringify({ type: 'iceCandidate', candidate }))
+        callerIdState = callerId;
     })
 
     // window.api.on('iceCandidate', (targetId: string, iceCandidate: any) => {
@@ -260,14 +266,19 @@ function connectWebSocket(user) {
         }
 
         if (data.type === 'callAnswered') {
-            console.log('Call answered:', data.answer)
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
-
+            console.log('Call answered:', data.data.answer)
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.data.answer))
+            callerIdState = data.data.callerId
             // Now send the stored ICE candidates
-            while (candidateList.length > 0) {
-                let candidate = candidateList.shift()
-                signalServerSocket.send(JSON.stringify({ type: 'iceCandidate', candidate }))
-            }
+            // while (candidateList.length > 0) {
+            //     let candidate = candidateList.shift()
+            //     signalServerSocket.send(
+            //         JSON.stringify({
+            //             type: 'iceCandidate',
+            //             data: { targetId: data.data.callerId, candidate },
+            //         })
+            //     )
+            // }
         }
 
         if (data.type === 'iceCandidate') {
