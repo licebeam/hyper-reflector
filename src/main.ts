@@ -220,6 +220,7 @@ const createWindow = () => {
     })
 
     ipcMain.on('startOnlineMatch', (event, data) => {
+        console.log("should start a match up")
         if (!currentTargetIp) {
             console.log('hey current target ip was not ready, retry')
         }
