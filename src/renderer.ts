@@ -189,7 +189,6 @@ function connectWebSocket(user) {
     window.api.on(
         'answerCall',
         async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
-            await createNewPeerConnection(callerId, false)
             // Automatically accept call (or prompt user for acceptance)
             let answer = await peerConnections[callerId].createAnswer()
             await peerConnections[callerId].setLocalDescription(answer)
@@ -270,6 +269,7 @@ function connectWebSocket(user) {
         if (data.type === 'incomingCall') {
             console.log('Incoming call from:', data.callerId)
             console.log(data)
+            await createNewPeerConnection(data.callerId, false)
             await peerConnections[data.callerId]
                 .setRemoteDescription(new RTCSessionDescription(data.offer))
                 .catch((err) => console.log(err))
