@@ -1,5 +1,4 @@
 import nat from '../nat-upnp'
-import async from 'async';
 
 let client = {}
 
@@ -17,7 +16,6 @@ function normalizeOptions(options) {
         if (typeof addr === 'number') return { port: addr }
         if (typeof addr === 'string' && !isNaN(addr)) return { port: Number(addr) }
         if (typeof addr === 'object') return addr
-
         return {}
     }
 
@@ -27,20 +25,13 @@ function normalizeOptions(options) {
     }
 }
 
-Client.prototype.portMapping = function portMapping(options, callback) {
-    if (!callback) callback = function () {}
-
-    this.findGateway(function (err, gateway, address) {
+Client.prototype.portMapping = function portMapping(options, callback = () => {}) {
+    this.findGateway((err, gateway, address) => {
         if (err) return callback(err)
 
-        var ports = normalizeOptions(options)
-        var ttl = 60 * 30
-        if (typeof options.ttl === 'number') {
-            ttl = options.ttl
-        }
-        if (typeof options.ttl === 'string' && !isNaN(options.ttl)) {
-            ttl = Number(options.ttl)
-        }
+        const ports = normalizeOptions(options)
+        let ttl =
+            typeof options.ttl === 'number' ? options.ttl : parseInt(options.ttl, 10) || 60 * 30
 
         gateway.run(
             'AddPortMapping',
@@ -59,13 +50,11 @@ Client.prototype.portMapping = function portMapping(options, callback) {
     })
 }
 
-Client.prototype.portUnmapping = function portMapping(options, callback) {
-    if (!callback) callback = function () {}
-
-    this.findGateway(function (err, gateway /*, address*/) {
+Client.prototype.portUnmapping = function portUnmapping(options, callback = () => {}) {
+    this.findGateway((err, gateway) => {
         if (err) return callback(err)
 
-        var ports = normalizeOptions(options)
+        const ports = normalizeOptions(options)
 
         gateway.run(
             'DeletePortMapping',
@@ -79,135 +68,100 @@ Client.prototype.portUnmapping = function portMapping(options, callback) {
     })
 }
 
-Client.prototype.getMappings = function getMappings(options, callback) {
-    if (typeof options === 'function') {
-        callback = options
-        options = null
-    }
-
-    if (!options) options = {}
-
-    this.findGateway(function (err, gateway, address) {
+Client.prototype.getMappings = function getMappings(options = {}, callback) {
+    this.findGateway(async (err, gateway, address) => {
         if (err) return callback(err)
-        var i = 0
-        var end = false
-        var results = []
 
-        async.whilst(
-            function () {
-                return !end
-            },
-            function (callback) {
-                gateway.run(
-                    'GetGenericPortMappingEntry',
-                    [['NewPortMappingIndex', i++]],
-                    function (err, data) {
-                        if (err) {
-                            // If we got an error on index 0, ignore it in case this router starts indicies on 1
-                            if (i !== 1) {
-                                end = true
-                            }
-                            return callback(null)
+        let i = 0
+        let results = []
+
+        while (true) {
+            try {
+                let data = await new Promise((resolve, reject) => {
+                    gateway.run(
+                        'GetGenericPortMappingEntry',
+                        [['NewPortMappingIndex', i++]],
+                        (err, data) => {
+                            if (err) return reject(err)
+                            resolve(data)
                         }
+                    )
+                })
 
-                        var key
-                        Object.keys(data).some(function (k) {
-                            if (!/:GetGenericPortMappingEntryResponse/.test(k)) return false
-
-                            key = k
-                            return true
-                        })
-                        data = data[key]
-
-                        var result = {
-                            public: {
-                                host:
-                                    (typeof data.NewRemoteHost === 'string' &&
-                                        data.NewRemoteHost) ||
-                                    '',
-                                port: parseInt(data.NewExternalPort, 10),
-                            },
-                            private: {
-                                host: data.NewInternalClient,
-                                port: parseInt(data.NewInternalPort, 10),
-                            },
-                            protocol: data.NewProtocol.toLowerCase(),
-                            enabled: data.NewEnabled === '1',
-                            description: data.NewPortMappingDescription,
-                            ttl: parseInt(data.NewLeaseDuration, 10),
-                        }
-                        result.local = result.private.host === address
-
-                        results.push(result)
-
-                        callback(null)
-                    }
+                let key = Object.keys(data).find((k) =>
+                    /:GetGenericPortMappingEntryResponse/.test(k)
                 )
-            },
-            function (err) {
-                if (err) return callback(err)
+                if (!key) break
 
-                if (options.local) {
-                    results = results.filter(function (item) {
-                        return item.local
-                    })
-                }
-
-                if (options.description) {
-                    results = results.filter(function (item) {
-                        if (typeof item.description !== 'string') return
-
-                        if (options.description instanceof RegExp) {
-                            return item.description.match(options.description) !== null
-                        } else {
-                            return item.description.indexOf(options.description) !== -1
-                        }
-                    })
-                }
-
-                callback(null, results)
+                data = data[key]
+                results.push({
+                    public: {
+                        host: typeof data.NewRemoteHost === 'string' ? data.NewRemoteHost : '',
+                        port: parseInt(data.NewExternalPort, 10),
+                    },
+                    private: {
+                        host: data.NewInternalClient,
+                        port: parseInt(data.NewInternalPort, 10),
+                    },
+                    protocol: data.NewProtocol.toLowerCase(),
+                    enabled: data.NewEnabled === '1',
+                    description: data.NewPortMappingDescription,
+                    ttl: parseInt(data.NewLeaseDuration, 10),
+                    local: data.NewInternalClient === address,
+                })
+            } catch {
+                break // No more mappings
             }
-        )
+        }
+
+        if (options.local) {
+            results = results.filter((item) => item.local)
+        }
+
+        if (options.description) {
+            results = results.filter(
+                (item) =>
+                    typeof item.description === 'string' &&
+                    (options.description instanceof RegExp
+                        ? options.description.test(item.description)
+                        : item.description.includes(options.description))
+            )
+        }
+
+        callback(null, results)
     })
 }
 
 Client.prototype.externalIp = function externalIp(callback) {
-    this.findGateway(function (err, gateway /*, address*/) {
+    this.findGateway((err, gateway) => {
         if (err) return callback(err)
-        gateway.run('GetExternalIPAddress', [], function (err, data) {
+
+        gateway.run('GetExternalIPAddress', [], (err, data) => {
             if (err) return callback(err)
-            var key
 
-            Object.keys(data).some(function (k) {
-                if (!/:GetExternalIPAddressResponse$/.test(k)) return false
-
-                key = k
-                return true
-            })
-
+            let key = Object.keys(data).find((k) => /:GetExternalIPAddressResponse$/.test(k))
             if (!key) return callback(Error('Incorrect response'))
+
             callback(null, data[key].NewExternalIPAddress)
         })
     })
 }
 
 Client.prototype.findGateway = function findGateway(callback) {
-    var timeout
-    var timeouted = false
-    var p = this.ssdp.search('urn:schemas-upnp-org:device:InternetGatewayDevice:1')
+    let timeout
+    let timeouted = false
+    const p = this.ssdp.search('urn:schemas-upnp-org:device:InternetGatewayDevice:1')
 
-    timeout = setTimeout(function () {
+    timeout = setTimeout(() => {
         timeouted = true
         p.emit('end')
         callback(new Error('timeout'))
     }, this.timeout)
 
-    p.on('device', function (info, address) {
+    p.on('device', (info, address) => {
         if (timeouted) return
         p.emit('end')
         clearTimeout(timeout)
-
-        // Create gateway
         callback(null, nat.device.create(info.location), address)
     })
 }
