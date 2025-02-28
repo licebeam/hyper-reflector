@@ -307,26 +307,27 @@ function connectWebSocket(user) {
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 window.api.serveMatch(ip, 7000, playerNum, 0, 7000)
             }
-            try {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
-                console.log('ICE Candidate added successfully')
-            } catch (err) {
-                console.error('Failed to add ICE Candidate:', err)
-            }
+            // try {
+            //     await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
+            //     console.log('ICE Candidate added successfully')
+            // } catch (err) {
+            //     console.error('Failed to add ICE Candidate:', err)
+            // }
         }
     }
 
-    window.api.on('send-data-channel', async (data: string) => {
-        console.log(
-            ' PEER STATS ',
-            (await peerConnection.getStats()).forEach((r) => {
-                if (r.candidateType === 'srflx') {
-                    console.log(r)
-                }
-            })
-        )
-        if (dataChannel && dataChannel.readyState === 'open') {
-            dataChannel.send(JSON.stringify(data))
-        }
-    })
+    // Fix this later, we need to get the actual user IP.
+    // window.api.on('send-data-channel', async (data: string) => {
+    //     console.log(
+    //         ' PEER STATS ',
+    //         (await peerConnection.getStats()).forEach((r) => {
+    //             if (r.candidateType === 'srflx') {
+    //                 console.log(r)
+    //             }
+    //         })
+    //     )
+    //     if (dataChannel && dataChannel.readyState === 'open') {
+    //         dataChannel.send(JSON.stringify(data))
+    //     }
+    // })
 }
