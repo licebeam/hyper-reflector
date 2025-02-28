@@ -48,6 +48,10 @@ function setupLogging(peer, userLabel, event) {
                 console.log(`${userLabel} External IP: ${ip}, Port: ${port}`)
             }
             candidateList.push(event.candidate)
+            console.log(candidateList)
+            signalServerSocket.send(
+                JSON.stringify({ type: 'iceCandidate', candidate: candidateList[0] })
+            )
         }
     }
 }
@@ -148,6 +152,7 @@ function connectWebSocket(user) {
                 },
             })
         )
+        // signalServerSocket.send(JSON.stringify({ type: 'iceCandidate', candidate }))
     })
 
     // window.api.on('iceCandidate', (targetId: string, iceCandidate: any) => {
