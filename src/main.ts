@@ -271,6 +271,19 @@ const createWindow = () => {
         mainWindow.webContents.send('user-name-changed', complete)
     })
 
+    // matchmaking 
+    ipcMain.on('callUser', (event, data) => {
+        mainWindow.webContents.send('callUser', data)
+    })
+
+    ipcMain.on('answerCall', (event, data) => {
+        mainWindow.webContents.send('answerCall', data)
+    })
+
+    ipcMain.on('receivedCall', (event, data) => {
+        mainWindow.webContents.send('receivedCall', data)
+    })
+
     // ipcMain.on('createAccount', async (event, name, email) => {
     //     const complete = await api.createAccount(auth, name, email)
     //     // mainWindow.webContents.send('user-account-created', complete)
@@ -326,7 +339,8 @@ ipcMain.on('request-data', (event) => {
 // read files
 const readInterval = setInterval(() => {
     // currently we aren't really using this polling, but we will eventually need something like this
-    readCommand()
+    // we also need to set this up so it only works in a match.
+    // readCommand()
 }, 1000) // read from reflector.text every 1000 ms
 
 // This method will be called when Electron has finished
