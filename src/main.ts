@@ -19,8 +19,14 @@ let currentPlayerNum = 0 // We change this when we recieve a message first other
 
 // - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from 'firebase/app'
-import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth'
+import {
+    getAuth,
+    signInWithEmailAndPassword,
+    signOut,
+    createUserWithEmailAndPassword,
+} from 'firebase/auth'
 import { firebaseConfig } from './private/firebase'
+import { TLogin } from './types'
 
 // Initialize Firebase
 const fbapp = initializeApp(firebaseConfig)
@@ -110,10 +116,10 @@ const createWindow = () => {
     }
 
     // firebase login
-    async function handleLogin(email: string, password: string) {
+    async function handleLogin({ email, pass }: TLogin) {
         mainWindow.webContents.send('logging-in', 'trying to log in')
         try {
-            await signInWithEmailAndPassword(auth, email, password)
+            await signInWithEmailAndPassword(auth, email, pass)
                 .then(() => {
                     return true
                 })
@@ -129,36 +135,41 @@ const createWindow = () => {
     }
 
     async function handleLogOut() {
-        try {
-            signOut(auth)
-                .then(() => {
-                    mainWindow.webContents.send('logged-out', 'user logged out')
-                })
-                .catch((error) => {
-                    console.log('user logging out failed', error)
-                })
-        } catch (error) {
-            console.log(error)
-        }
+        await signOut(auth)
+            .then(() => {
+                try {
+                    console.log("logout success")
+                    mainWindow.webContents.send('loggedOutSuccess', 'user logged out')
+                } catch (error) {
+                    console.log('sending signal to fe to log out')
+                }
+                
+            })
+            .catch((error) => {
+                console.log('user logging out failed', error)
+            })
     }
 
-    // handle ipc calls
-    ipcMain.on('login-user', async (event, login) => {
-        // this line seems to fail on mac??
+    async function startLoginProcess(login: TLogin) {
         const loginObject = await api
             .getLoggedInUser(login.email)
             .catch((err) => console.log('error checkig if user was loggin in', err))
-        console.log(loginObject)
-        if (loginObject && loginObject.loggedIn) return
-        await handleLogin(login.email, login.pass).catch((err) => console.log('failed to log in'))
+        if (loginObject && loginObject.loggedIn) {
+            // user is already logged in, handle relog
+            console.log('user was already logged in', loginObject)
+            await handleLogOut()
+        }
+        await handleLogin({ email: login.email, pass: login.pass }).catch((err) =>
+            console.log('failed to log in')
+        )
         await api
             .addLoggedInUser(auth)
             .catch((err) => console.log('failed to add user to logged in users list'))
         //test first time log
-        await api
-            .createAccount(auth, login.name, login.email)
-            .catch((err) => console.log('failed to create new account'))
-        const user = await api.getUserByAuth(auth)
+
+        const user = await api
+            .getUserByAuth(auth)
+            .catch((err) => console.log('err getting user by auth'))
         if (user) {
             // send our user object to the front end
             mainWindow.webContents.send('login-success', {
@@ -169,16 +180,43 @@ const createWindow = () => {
             userUID = user.uid
             console.log('user is: ', user)
         }
+    }
+
+    // handle ipc calls
+    ipcMain.on('loginUser', async (event, login) => {
+        // this line seems to fail on mac??
+        await startLoginProcess(login).catch((err) => console.log(err))
     })
 
-    ipcMain.on('log-out', async (event, login) => {
-        console.log('should log out user', login)
-        await api.removeLoggedInUser(auth)
-        handleLogOut()
+    ipcMain.on('createAccount', async (event, info) => {
+        await createUserWithEmailAndPassword(auth, info.email, info.pass)
+            .then((userCredential) => {
+                console.log('creating new account for user', info.email)
+                const user = userCredential.user
+                // account created successfully, send message to FE
+                mainWindow.webContents.send('accountCreationSuccess')
+            })
+            .catch((error) => {
+                const errorCode = error.code
+                const errorMessage = error.message
+                console.log('error adding user', info.email, error.code, error.message)
+                // account creation failed, send message to FE
+                return mainWindow.webContents.send('accountCreationFailure')
+            })
+        await api
+            .createAccount(auth, info.name, info.email)
+            .catch((err) => console.log('failed to create new account'))
+        await startLoginProcess(info).catch((err) => console.log(err))
     })
 
-    ipcMain.on('check-logged-in', async (event, uid) => {
-        const isLoggedIn = await api.getLoggedInUser(uid)
+    ipcMain.on('logOutUser', async (event, login) => {
+        console.log('should log out user', userUID)
+        await api.removeLoggedInUser(auth).catch((err) => console.log(err))
+        await handleLogOut().catch((err) => console.log(err))
+    })
+
+    ipcMain.on('getLoggedInUser', async (event, uid) => {
+        const isLoggedIn = await api.getLoggedInUser(uid).catch((err) => console.log(err))
         return isLoggedIn
     })
 
@@ -268,7 +306,7 @@ const createWindow = () => {
 
     // PROFILE RELATED IPC CALLS
     ipcMain.on('changeUserName', async (event, name) => {
-        const complete = await api.changeUserName(auth, name)
+        const complete = await api.changeUserName(auth, name).catch((err) => console.log(err))
         mainWindow.webContents.send('user-name-changed', complete)
     })
 
@@ -285,11 +323,6 @@ const createWindow = () => {
         mainWindow.webContents.send('receivedCall', data)
     })
 
-    // ipcMain.on('createAccount', async (event, name, email) => {
-    //     const complete = await api.createAccount(auth, name, email)
-    //     // mainWindow.webContents.send('user-account-created', complete)
-    // })
-
     // and load the index.html of the app.
     if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
         mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
@@ -300,7 +333,7 @@ const createWindow = () => {
     // handle cleanup on closing window
     mainWindow.on('close', async (event) => {
         console.log('closing app as', userUID)
-        await handleExitApp()
+        await handleExitApp().catch((err) => console.log(err))
         event.preventDefault()
     })
 }
@@ -308,19 +341,21 @@ const createWindow = () => {
 async function handleExitApp() {
     if (userUID) {
         // remove user from websockets and log them out of firebase on close
-        await api.removeLoggedInUser(auth)
+        await api.removeLoggedInUser(auth).catch((err) => console.log(err))
         mainWindow?.webContents.send('closingApp', { uid: userUID })
     }
     if (proxyListener !== null) {
         console.log('closing proxy server')
-        await proxyListener.close()
+        await proxyListener.close().catch((err) => console.log(err))
         proxyListener = null
     }
     if (upnpClient !== null) {
-        await upnpClient.portUnmapping({ public: portForUPNP }, (err) => {
-            if (!err) return
-            console.log('failed to close port', err)
-        })
+        await upnpClient
+            .portUnmapping({ public: portForUPNP }, (err) => {
+                if (!err) return
+                console.log('failed to close port', err)
+            })
+            .catch((err) => console.log(err))
         setTimeout(() => {
             upnpClient.close()
         }, 500)
@@ -356,7 +391,7 @@ app.on('window-all-closed', async () => {
     if (readInterval) {
         clearInterval(readInterval)
     }
-    await handleExitApp()
+    await handleExitApp().catch((err) => console.log(err))
     if (process.platform !== 'darwin') {
         app.quit()
     }
@@ -367,13 +402,13 @@ app.on('window-all-closed', async () => {
 // })
 
 process.on('SIGINT', async () => {
-    await handleExitApp()
+    await handleExitApp().catch((err) => console.log(err))
     console.log('SIGINT received (CTRL+C or process kill)')
     app.quit()
 })
 
 process.on('SIGTERM', async () => {
-    await handleExitApp()
+    await handleExitApp().catch((err) => console.log(err))
     console.log('SIGTERM received (system shutdown or process termination)')
     app.quit()
 })
@@ -399,10 +434,12 @@ app.whenReady().then(async () => {
         // we must initialize the client here or nothing works correctly.
         upnpClient = upnp.createClient()
 
-        await upnpClient?.portUnmapping({ public: portForUPNP }, (err) => {
-            if (!err) return
-            //console.log('failed to close port', err)
-        })
+        await upnpClient
+            ?.portUnmapping({ public: portForUPNP }, (err) => {
+                if (!err) return
+                //console.log('failed to close port', err)
+            })
+            .catch((err) => console.log(err))
 
         // listener and proxy.
         proxyListener = dgram.createSocket('udp4')

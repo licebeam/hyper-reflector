@@ -9,9 +9,11 @@ contextBridge.exposeInMainWorld('api', {
     receivedCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('receivedCall', data),
     // server and online
     loginUser: (loginObject: { email: string; name: string; pass: string }) =>
-        ipcRenderer.send('login-user', loginObject),
-    logOut: () => ipcRenderer.send('log-out'),
-    getLoggedInUser: (uid: string) => ipcRenderer.send('check-logged-in', uid),
+        ipcRenderer.send('loginUser', loginObject),
+    createAccount: (accountObject: { email: string; name: string; pass: string }) =>
+        ipcRenderer.send('createAccount', accountObject),
+    logOutUser: () => ipcRenderer.send('logOutUser'),
+    getLoggedInUser: (uid: string) => ipcRenderer.send('getLoggedInUser', uid),
     sendMessage: (text: string) => ipcRenderer.send('sendMessage', text),
     sendRoomMessage: (text: string) => ipcRenderer.send('roomMessage', text),
     addUserToRoom: (user: any) => ipcRenderer.send('addUserToRoom', user),
