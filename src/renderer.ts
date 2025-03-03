@@ -2,11 +2,13 @@ import keys from './private/keys'
 import './index.css'
 // Load our react app
 import './front-end/app'
-import { l } from 'vite/dist/node/types.d-aGj9QkWt'
 
-let signalServerSocket: WebSocket = null // WebSocket reference
+let signalServerSocket: WebSocket = null // socket reference
 let candidateList = []
 let callerIdState = null
+
+// const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
+const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000`  // live
 
 // handle connection to remote turn server
 const googleStuns = [
@@ -46,16 +48,16 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
     // create data channel
     if (isInitiator) {
         // Only the initiator creates a data channel
-        dataChannel = peerConnection.createDataChannel('game');
-        dataChannel.onopen = () => console.log('Data channel open');
-        dataChannel.onmessage = (event) => console.log('Received:', event.data);
+        dataChannel = peerConnection.createDataChannel('game')
+        dataChannel.onopen = () => console.log('Data channel open')
+        dataChannel.onmessage = (event) => console.log('Received:', event.data)
     } else {
         // Answerer handles data channel event
         peerConnection.ondatachannel = (event) => {
-            dataChannel = event.channel;
-            dataChannel.onopen = () => console.log('Data channel open');
-            dataChannel.onmessage = (event) => console.log('Received peer:', event.data);
-        };
+            dataChannel = event.channel
+            dataChannel.onopen = () => console.log('Data channel open')
+            dataChannel.onmessage = (event) => console.log('Received peer:', event.data)
+        }
     }
 
     // send new ice candidates from the coturn server
@@ -78,6 +80,17 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
 
     peerConnections[userUID] = peerConnection
     return peerConnection
+}
+
+function closePeerConnection(userId: string) {
+    if (peerConnections[userId]) {
+        console.log(`closing peer connection with ${userId}`)
+        peerConnections[userId].getSenders().forEach((sender) => {
+            peerConnections[userId].removeTrack(sender)
+        })
+        peerConnections[userId].close()
+        delete peerConnections[userId] // delete user from our map
+    }
 }
 
 function setupLogging(peer, userLabel, event) {
@@ -132,17 +145,17 @@ window.api.on('login-failed', () => {
 window.api.on('logged-out', (user) => {
     // kill the socket connection
     if (signalServerSocket) {
-        signalServerSocket.send(JSON.stringify({ type: 'user-disconnect', user }))
+        signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
         signalServerSocket.close()
         signalServerSocket = null
     }
 })
 
-window.api.on('closing-app', async (user) => {
+window.api.on('closingApp', async (user) => {
     // kill the socket connection
     if (signalServerSocket) {
         console.log('we are killing the socket user')
-        await signalServerSocket.send(JSON.stringify({ type: 'user-disconnect', user }))
+        await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
         signalServerSocket.close()
         signalServerSocket = null
     }
@@ -151,7 +164,7 @@ window.api.on('closing-app', async (user) => {
 function connectWebSocket(user) {
     if (signalServerSocket) return // Prevent duplicate ws connections from same client
     // signalServerSocket = new WebSocket(`ws://127.0.0.1:3000`) // for testing server
-    signalServerSocket = new WebSocket(`ws://${keys.COTURN_IP}:3000`)
+    signalServerSocket = new WebSocket(SOCKET_ADDRESS)
     signalServerSocket.onopen = () => {
         signalServerSocket.send(JSON.stringify({ type: 'join', user }))
         signalServerSocket.send(JSON.stringify({ type: 'user-connect', user }))
@@ -159,7 +172,7 @@ function connectWebSocket(user) {
 
     signalServerSocket.onclose = async (user) => {
         if (signalServerSocket) {
-            await signalServerSocket.send(JSON.stringify({ type: 'user-disconnect', user }))
+            await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
         }
         signalServerSocket = null
     }
@@ -209,12 +222,6 @@ function connectWebSocket(user) {
         }
     )
 
-    // window.api.on('iceCandidate', (targetId: string, iceCandidate: any) => {
-    //     signalServerSocket.send(
-    //         JSON.stringify({ type: 'iceCandidate', data: { targetId, iceCandidate } })
-    //     )
-    // })
-
     // allow users to chat
     window.api.on('user-message', (text: string) => {
         console.log(JSON.stringify(candidateList))
@@ -226,6 +233,7 @@ function connectWebSocket(user) {
         }
     })
 
+    // This is a function for handling messages from the websocket server
     async function convertBlob(event: any) {
         try {
             // check if event is not JSON but is blob
@@ -245,6 +253,7 @@ function connectWebSocket(user) {
 
     signalServerSocket.onmessage = async (message) => {
         const data = await convertBlob(message).then((res) => res)
+        console.log(data)
         if (data.type === 'connected-users') {
             if (data.users.length) {
                 // console.log('connected users = ', data.users)
@@ -257,9 +266,12 @@ function connectWebSocket(user) {
             // window.api.addUserToRoom(user)
         }
 
-        if (data.type === 'user-disconnect') {
-            signalServerSocket.send(JSON.stringify({ type: 'join', user }))
+        if (data.type === 'userDisconnect') {
+            console.log('should DC users?')
+            //signalServerSocket.send(JSON.stringify({ type: 'join', user }))
             // window.api.removeUserFromRoom(user)
+            // Here we want to close the Peer connection if a user leaves if the connection already exists.
+            closePeerConnection(data.userUID);
         }
 
         if (data.type === 'user-message') {
@@ -304,15 +316,11 @@ function connectWebSocket(user) {
                 let [ip, port] = matches[0].split(' ')
                 // 0 is our delay settings which we'll need to adjust for.
                 const playerNum = 0 // this should be set by a list of whatever ongoing challenges are running
+                await window.api.updateStun()
                 console.log(`Connecting to ${ip}, Port: ${port}`)
+                await window.api.setTargetIp(ip)
                 window.api.serveMatch(ip, 7000, playerNum, 0, 7000)
             }
-            // try {
-            //     await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate))
-            //     console.log('ICE Candidate added successfully')
-            // } catch (err) {
-            //     console.error('Failed to add ICE Candidate:', err)
-            // }
         }
     }
 
