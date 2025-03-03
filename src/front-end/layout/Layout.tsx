@@ -1,8 +1,9 @@
-import * as React from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useLoginStore, useMessageStore } from '../state/store'
 
 export default function Layout({ children }) {
+    const [isLoading, setIsLoading] = useState(false)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const userState = useLoginStore((state) => state.userState)
     const setUserState = useLoginStore((state) => state.setUserState)
@@ -11,12 +12,14 @@ export default function Layout({ children }) {
     const clearUserList = useMessageStore((state) => state.clearUserList)
     const navigate = useNavigate()
 
-    React.useEffect(() => {
-        window.api.on('logged-out', (event) => {
+    useEffect(() => {
+        window.api.on('loggedOutSuccess', (event) => {
+            console.log('log out reset state')
             clearUserList()
             clearMessageState()
             setUserState({ email: '' })
             loggedOut()
+            setIsLoading(false)
             navigate({ to: '/' })
             // handle do some funky stateful call for logging in redirect etc
         })
@@ -50,7 +53,18 @@ export default function Layout({ children }) {
                             Login
                         </Link>
                     )}
-                    {isLoggedIn && <button onClick={() => window.api.logOut()}>Log Out</button>}
+                    {isLoggedIn && (
+                        <button
+                            disabled={isLoading}
+                            onClick={() => {
+                                console.log("trying to log out")
+                                setIsLoading(true)
+                                window.api.logOutUser()
+                            }}
+                        >
+                            Log Out
+                        </button>
+                    )}
                 </div>
                 <hr />
             </div>

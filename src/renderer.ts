@@ -8,7 +8,7 @@ let candidateList = []
 let callerIdState = null
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
-const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000`  // live
+const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
 
 // handle connection to remote turn server
 const googleStuns = [
@@ -83,6 +83,7 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
 }
 
 function closePeerConnection(userId: string) {
+    console.log(peerConnections)
     if (peerConnections[userId]) {
         console.log(`closing peer connection with ${userId}`)
         peerConnections[userId].getSenders().forEach((sender) => {
@@ -142,10 +143,11 @@ window.api.on('login-failed', () => {
     }
 })
 
-window.api.on('logged-out', (user) => {
+window.api.on('loggedOutSuccess', async (user) => {
+    console.log('user logged out, kill socket')
     // kill the socket connection
     if (signalServerSocket) {
-        signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
+        await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
         signalServerSocket.close()
         signalServerSocket = null
     }
@@ -268,10 +270,8 @@ function connectWebSocket(user) {
 
         if (data.type === 'userDisconnect') {
             console.log('should DC users?')
-            //signalServerSocket.send(JSON.stringify({ type: 'join', user }))
-            // window.api.removeUserFromRoom(user)
             // Here we want to close the Peer connection if a user leaves if the connection already exists.
-            closePeerConnection(data.userUID);
+            closePeerConnection(data.userUID)
         }
 
         if (data.type === 'user-message') {

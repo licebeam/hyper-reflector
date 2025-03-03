@@ -14,6 +14,7 @@ import OfflinePage from './pages/OfflinePage'
 import NewsPage from './pages/NewsPage'
 import PlayerProfilePage from './pages/PlayerProfilePage'
 import SettingsPage from './pages/SettingsPage'
+import CreateAccountPage from './pages/CreateAccountPage'
 
 const rootRoute = createRootRoute({
     component: () => (
@@ -43,6 +44,18 @@ const newsRoute = createRoute({
         return (
             <div className="p-2">
                 <NewsPage />
+            </div>
+        )
+    },
+})
+
+const createAccountRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/create',
+    component: function News() {
+        return (
+            <div className="p-2">
+                <CreateAccountPage />
             </div>
         )
     },
@@ -103,6 +116,7 @@ const routeTree = rootRoute.addChildren([
     chatRoute,
     profileRoute,
     settingsRoute,
+    createAccountRoute,
 ])
 
 // this allows electron to hash the routing

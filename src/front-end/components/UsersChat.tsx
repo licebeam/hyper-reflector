@@ -35,6 +35,7 @@ export default function UsersChat() {
         console.log(data)
         setCallData(data)
     }
+    
     // get users from websockets
     useEffect(() => {
         window.api.removeAllListeners('room-users-add-group', handleUserJoinGroup)
