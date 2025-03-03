@@ -220,7 +220,7 @@ const createWindow = () => {
     })
 
     ipcMain.on('startOnlineMatch', (event, data) => {
-        console.log("should start a match up")
+        console.log('should start a match up')
         if (!currentTargetIp) {
             console.log('hey current target ip was not ready, retry')
         }
@@ -306,6 +306,11 @@ const createWindow = () => {
 }
 
 async function handleExitApp() {
+    if (userUID) {
+        // remove user from websockets and log them out of firebase on close
+        await api.removeLoggedInUser(auth)
+        mainWindow?.webContents.send('closingApp', { uid: userUID })
+    }
     if (proxyListener !== null) {
         console.log('closing proxy server')
         await proxyListener.close()
@@ -319,11 +324,6 @@ async function handleExitApp() {
         setTimeout(() => {
             upnpClient.close()
         }, 500)
-    }
-    if (userUID) {
-        // remove user from websockets and log them out of firebase on close
-        await api.removeLoggedInUser(auth)
-        mainWindow?.webContents.send('closing-app', { uid: userUID })
     }
     setTimeout(() => {
         mainWindow?.destroy() // force window to close when we finish
@@ -362,9 +362,9 @@ app.on('window-all-closed', async () => {
     }
 })
 
-app.on('before-quit', async () => {
-    console.log('app trying to quit')
-})
+// app.on('before-quit', async () => {
+//     console.log('app trying to quit')
+// })
 
 process.on('SIGINT', async () => {
     await handleExitApp()
@@ -395,7 +395,7 @@ app.whenReady().then(async () => {
     // profit, users should be successfully connecting the emulators together with eachother.
 
     // UPNP is working! but we need to fix the upnp library so that we can make a build.
-    ipcMain.on('updateStun', async (event, { port, ip, extPort }) => {
+    ipcMain.on('updateStun', async () => {
         // we must initialize the client here or nothing works correctly.
         upnpClient = upnp.createClient()
 
@@ -413,6 +413,7 @@ app.whenReady().then(async () => {
 
         // we use this to send traffic from 7000 to 7001
         proxyListener.on('message', (msg, rinfo) => {
+            if (!rinfo) return
             // we should check that we aren't getting requests from random IPs
 
             if (rinfo.port !== 7000) {
@@ -427,7 +428,7 @@ app.whenReady().then(async () => {
                 return
             }
             // debug to see realtime packets from your opponents emulator.
-            // console.log(`proxy recieved packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
+            console.log(`proxy recieved packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
 
             // Forward packet to emulator on or listen port + 1 on localhost
             // supposedly this shouldn't add much overhead in lag, we'll need to run some tests.

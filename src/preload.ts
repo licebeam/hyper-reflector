@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('api', {
     addUserGroupToRoom: (users: [any]) => ipcRenderer.send('addUserGroupToRoom', users),
     handShake: (type: string) => ipcRenderer.send('hand-shake-users', type),
     sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
-    updateStun: (data) => ipcRenderer.send('updateStun', data),
+    updateStun: () => ipcRenderer.send('updateStun'), // will need to add ports back later so we can connect offline users.
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     // sends text to the emulator using the fbneo_commands.txt
     sendText: (text: string) => ipcRenderer.send('send-text', text),

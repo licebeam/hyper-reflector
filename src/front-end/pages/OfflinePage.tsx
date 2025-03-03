@@ -61,7 +61,7 @@ export default function OfflinePage() {
                 >
                     Send Message Data Channel
                 </button>
-                <button
+                {/* <button
                     id="updateStunBtn"
                     onClick={() => {
                         window.api.updateStun({
@@ -72,7 +72,7 @@ export default function OfflinePage() {
                     }}
                 >
                     Start UPNP
-                </button>
+                </button> */}
                 <br></br>
                 {/* <button onClick={() => console.log('go to offline page')}>
                     Direct Connections
