@@ -1,3 +1,4 @@
+// import { ChakraProvider } from '@chakra-ui/react'
 import { createRoot } from 'react-dom/client'
 import {
     Outlet,
@@ -15,6 +16,7 @@ import NewsPage from './pages/NewsPage'
 import PlayerProfilePage from './pages/PlayerProfilePage'
 import SettingsPage from './pages/SettingsPage'
 import CreateAccountPage from './pages/CreateAccountPage'
+import ErrorBoundary from './ErrorBoundary'
 
 const rootRoute = createRootRoute({
     component: () => (
@@ -131,7 +133,14 @@ declare module '@tanstack/react-router' {
         router: typeof router
     }
 }
-console.log(window.location.href)
+
+import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
+
 const root = createRoot(document.body)
-root.render(<RouterProvider router={router} />)
-// root.render(<div>Test</div>)
+root.render(
+    <ErrorBoundary>
+        <ChakraProvider value={defaultSystem}>
+            <RouterProvider router={router} />
+        </ChakraProvider>
+    </ErrorBoundary>
+)
