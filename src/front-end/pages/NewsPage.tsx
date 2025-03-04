@@ -1,25 +1,23 @@
-import { Bleed, Box, Heading, Stack, Text } from '@chakra-ui/react'
+import { Bleed, Box, Heading, Stack, Text, Flex } from '@chakra-ui/react'
+import BlogPost from '../components/BlogPost'
 
-const Demo = () => {
-    return (
-        <Box padding="10" rounded="sm" borderWidth="1px">
-            <Bleed inline="10">
-                <div>test</div>
-            </Bleed>
-
-            <Stack mt="6">
-                <Heading size="md">Some Heading</Heading>
-                <Text>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</Text>
-            </Stack>
-        </Box>
-    )
-}
+const blogsArray = [
+    {
+        title: 'Hyper Reflector Alpha!',
+        date: '3/4/2025',
+        content: 'Welcome to the alpha, hop in the discord',
+    },
+]
 
 export default function NewsPage() {
     return (
-        <>
-            <Demo />
-            <div> Here is news about development </div>
-        </>
+        <Stack gap="2">
+            <Heading size="md">Updates</Heading>
+            <Stack>
+                {blogsArray.map((blog) => (
+                    <BlogPost blog={blog} />
+                ))}
+            </Stack>
+        </Stack>
     )
 }
