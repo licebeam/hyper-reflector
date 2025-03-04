@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import styled from 'styled-components'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, Link } from '@tanstack/react-router'
 import { useLoginStore, useMessageStore } from '../state/store'
-
-const Input = styled('input')(() => ({
-    width: '100px',
-}))
+import { Button, Stack, Input, Box, Center, Spinner, Text, Flex, Heading } from '@chakra-ui/react'
+import { PasswordInput } from './chakra/ui/password-input'
+import { Field } from './chakra/ui/field'
+import { ArrowLeft } from 'lucide-react'
 
 export default function CreateAccountBlock() {
     const [isLoading, setIsLoading] = useState(false)
@@ -16,10 +15,10 @@ export default function CreateAccountBlock() {
     const addUser = useMessageStore((state) => state.pushUser)
     const clearUserList = useMessageStore((state) => state.clearUserList)
     const [login, setLogin] = useState({
-        name: 'bobby-blake',
-        email: 'test@test.com',
-        pass: 'test123',
-        repass: 'test123',
+        name: '',
+        email: '',
+        pass: '',
+        repass: '',
     })
     const navigate = useNavigate()
 
@@ -48,29 +47,49 @@ export default function CreateAccountBlock() {
         window.api.removeExtraListeners('accountCreationSuccess', handleCreateSuccess)
         window.api.on('accountCreationSuccess', handleCreateSuccess)
 
-        window.api.removeExtraListeners('login-success', handleLogIn)
-        window.api.on('login-success', handleLogIn)
+        window.api.removeExtraListeners('loginSuccess', handleLogIn)
+        window.api.on('loginSuccess', handleLogIn)
 
         window.api.removeExtraListeners('login-failed', handleLoginFail)
         window.api.on('login-failed', handleLoginFail)
 
         return () => {
             window.api.removeListener('accountCreationSuccess', handleCreateSuccess)
-            window.api.removeListener('login-success', handleLogIn)
+            window.api.removeListener('loginSuccess', handleLogIn)
             window.api.removeListener('login-failed', handleLoginFail)
         }
     }, [])
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <p>Create a new account</p>
-            <div style={{ display: 'flex' }}>
-                {isLoading && <div>Creating...</div>}
+        <Stack gap={2}>
+            <Flex alignItems="center" gap="2">
+                <Text textStyle="xs">
+                    <Link to="/" className="[&.active]:font-bold">
+                        <Flex gap="1">
+                            <ArrowLeft size={18} />
+                            <p>Login</p>
+                        </Flex>
+                    </Link>
+                </Text>
+                <Heading size="md">Account Creation</Heading>
+            </Flex>
+            <Box>
+                {isLoading && (
+                    <Box pos="absolute" inset="0" bg="bg/80">
+                        <Center h="full">
+                            <Spinner color="teal.500" />
+                        </Center>
+                    </Box>
+                )}
                 {!isLoading && !isLoggedIn && (
-                    <>
-                        <div>
-                            <p>User Name</p>
+                    <Stack gap={6}>
+                        <Field
+                            label="Display Name"
+                            required
+                            helperText="This is the name that other users will see, you can also change it later."
+                        >
                             <Input
+                                placeholder="my_user_name"
                                 onChange={(e) =>
                                     setLogin({
                                         name: e.target.value,
@@ -82,10 +101,10 @@ export default function CreateAccountBlock() {
                                 type="text"
                                 value={login.name}
                             />
-                        </div>
-                        <div>
-                            <p>User Email</p>
+                        </Field>
+                        <Field label="Email" required>
                             <Input
+                                placeholder="blake@example.com"
                                 onChange={(e) =>
                                     setLogin({
                                         name: login.name,
@@ -97,10 +116,14 @@ export default function CreateAccountBlock() {
                                 type="text"
                                 value={login.email}
                             />
-                        </div>
-                        <div>
-                            <p>Password</p>
-                            <Input
+                        </Field>
+                        <Field
+                            label="Password"
+                            required
+                            helperText="Must be atleast 6 alphanumeric characters in length."
+                        >
+                            <PasswordInput
+                                placeholder="password"
                                 onChange={(e) =>
                                     setLogin({
                                         name: login.name,
@@ -112,8 +135,10 @@ export default function CreateAccountBlock() {
                                 type="password"
                                 value={login.pass}
                             />
-                            <p>Re-type Password</p>
-                            <Input
+                        </Field>
+                        <Field label="Re-enter Password" required>
+                            <PasswordInput
+                                placeholder="re-enter password"
                                 onChange={(e) =>
                                     setLogin({
                                         name: login.name,
@@ -125,21 +150,22 @@ export default function CreateAccountBlock() {
                                 type="password"
                                 value={login.repass}
                             />
-                        </div>
-                        <button
-                            disabled={isLoading}
-                            id="create-btn"
-                            onClick={() => {
-                                setIsLoading(true)
-                                window.api.createAccount(login)
-                            }}
-                        >
-                            Create Account
-                        </button>
-                        {isLoggedIn}
-                    </>
+                        </Field>
+                        <Stack>
+                            <Button
+                                disabled={isLoading}
+                                id="create-btn"
+                                onClick={() => {
+                                    setIsLoading(true)
+                                    window.api.createAccount(login)
+                                }}
+                            >
+                                Create Account
+                            </Button>
+                        </Stack>
+                    </Stack>
                 )}
-            </div>
-        </div>
+            </Box>
+        </Stack>
     )
 }

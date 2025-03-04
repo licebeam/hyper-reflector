@@ -64,7 +64,7 @@ const createWindow = () => {
     // Create the browser window.
     mainWindow = new BrowserWindow({
         width: 1200,
-        height: 600,
+        height: 700,
         webPreferences: {
             nodeIntegration: true,
             preload: path.join(__dirname, 'preload.js'),
@@ -73,6 +73,7 @@ const createWindow = () => {
     })
 
     let config: Config
+
     try {
         config = getConfig()
         console.log({ config })
@@ -82,7 +83,7 @@ const createWindow = () => {
     }
 
     // Open the DevTools.
-    mainWindow.webContents.openDevTools()
+    // mainWindow.webContents.openDevTools()
 
     if (!config.app.emuPath) {
         new Notification({
@@ -138,12 +139,11 @@ const createWindow = () => {
         await signOut(auth)
             .then(() => {
                 try {
-                    console.log("logout success")
+                    console.log('logout success')
                     mainWindow.webContents.send('loggedOutSuccess', 'user logged out')
                 } catch (error) {
                     console.log('sending signal to fe to log out')
                 }
-                
             })
             .catch((error) => {
                 console.log('user logging out failed', error)
@@ -172,7 +172,7 @@ const createWindow = () => {
             .catch((err) => console.log('err getting user by auth'))
         if (user) {
             // send our user object to the front end
-            mainWindow.webContents.send('login-success', {
+            mainWindow.webContents.send('loginSuccess', {
                 name: user.userName,
                 email: user.userEmail,
                 uid: user.uid,
@@ -257,7 +257,7 @@ const createWindow = () => {
         // TODO: add error handling this is an important function.
     })
 
-    ipcMain.on('startOnlineMatch', (event, data) => {
+    ipcMain.on('serveMatch', (event, data) => {
         console.log('should start a match up')
         if (!currentTargetIp) {
             console.log('hey current target ip was not ready, retry')
@@ -273,6 +273,33 @@ const createWindow = () => {
             isTraining: false, // Might be used in the future.
         })
     })
+
+    ipcMain.on(
+        'serveMatchOffline',
+        async (
+            event,
+            data = { ip: '127.0.0.1', port: '7000', myPort: '7000', player: '0', delay: '0' }
+        ) => {
+            currentTargetIp = data.ip // we set this here since we aren't using the server, but it's still needed for upnp updating
+            currentTargetPort = data.port
+            console.log(`Connecting to ${data.ip}, Port: ${data.port}`)
+            await startUPNP().catch((err) => console.log(err))
+            console.log('should start a match up')
+            if (!currentTargetIp) {
+                console.log('hey current target ip was not ready, retry')
+            }
+            mainWindow.webContents.send('message-from-main', 'starting match')
+            startPlayingOnline({
+                config,
+                localPort: portForUPNP || 7000,
+                remoteIp: currentTargetIp || '127.0.0.1',
+                remotePort: currentTargetPort || 7001,
+                player: data.player,
+                delay: data.delay,
+                isTraining: false, // Might be used in the future.
+            })
+        }
+    )
 
     ipcMain.on('start-solo-mode', (event) => {
         startSoloMode({ config })
@@ -431,137 +458,47 @@ app.whenReady().then(async () => {
 
     // UPNP is working! but we need to fix the upnp library so that we can make a build.
     ipcMain.on('updateStun', async () => {
+        await startUPNP()
         // we must initialize the client here or nothing works correctly.
-        upnpClient = upnp.createClient()
-
-        await upnpClient
-            ?.portUnmapping({ public: portForUPNP }, (err) => {
-                if (!err) return
-                //console.log('failed to close port', err)
-            })
-            .catch((err) => console.log(err))
-
-        // listener and proxy.
-        proxyListener = dgram.createSocket('udp4')
-
-        proxyListener.bind(portForUPNP, () => {
-            console.log(`proxy listening on port ${portForUPNP}...`)
-        })
-
-        // we use this to send traffic from 7000 to 7001
-        proxyListener.on('message', (msg, rinfo) => {
-            if (!rinfo) return
-            // we should check that we aren't getting requests from random IPs
-
-            if (rinfo.port !== 7000) {
-                currentTargetPort = rinfo.port
-                console.log('Player isnt using upnp -> changing target port to: ', rinfo.port)
-            }
-
-            // prevent keep alive from being forwarded to the emulator - it crashes
-            const messageContent = msg.toString()
-            if (messageContent === 'ping') {
-                console.log(`Ignoring keep-alive message from ${rinfo.address}:${rinfo.port}`)
-                return
-            }
-            // debug to see realtime packets from your opponents emulator.
-            console.log(`proxy recieved packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
-
-            // Forward packet to emulator on or listen port + 1 on localhost
-            // supposedly this shouldn't add much overhead in lag, we'll need to run some tests.
-            forwardPacket(msg, 7000 + 1, '127.0.0.1')
-        })
-
-        function forwardPacket(data, targetPort, targetIP) {
-            const socket = dgram.createSocket('udp4')
-            socket.send(data, targetPort, targetIP, (err) => {
-                if (err) console.log(`Proxy forwarding Error: ${err.message}`)
-                socket.close()
-            })
-        }
-
-        // unpn mapping and usage
-        upnpClient.portMapping(
-            {
-                public: portForUPNP,
-                private: portForUPNP,
-                ttl: 0,
-                protocol: 'UDP',
-            },
-            function (err) {
-                if (err) {
-                    console.error(`Failed to set up UPnP: ${err.message}`)
-                    sendLog(`Failed to set up UPnP: ${err.message}`)
-                } else {
-                    console.log(`UPnP Port Mapping created: ${portForUPNP} , ${portForUPNP}}`)
-                    sendLog(`UPnP Port Mapping created: ${portForUPNP} , ${portForUPNP}}`)
-                }
-            }
-        )
-
-        upnpClient.getMappings({ local: true }, function (err, results) {
-            console.log(results)
-            sendLog(results)
-        })
-
-        upnpClient.externalIp(function (err, ip) {
-            console.log(ip)
-            if (err) {
-                console.log('failed to get external ip')
-            }
-        })
-
         // console.log('Starting listener...')
         // stun_port = port
         // expected_peer_ip = ip
         // console.log(`STUN Port: ${stun_port}, Expected Peer: ${expected_peer_ip}`)
-
         // // Ensure we don't create multiple listeners
         // if (listener) {
         //     console.log('Closing existing listener...')
         //     listener.close()
         // }
-
         // // Create a fresh listener
         // listener = dgram.createSocket('udp4')
-
         // function openNatPath(targetIP, targetPort) {
         //     const socket = dgram.createSocket('udp4')
         //     const msg = Buffer.from('ping')
-
         //     function sendKeepAlive() {
         //         socket.send(msg, targetPort, targetIP, (err) => {
         //             if (err) console.error(`Error sending NAT punch: ${err.message}`)
         //             else console.log(`NAT punch sent to ${targetIP}:${targetPort}`)
         //         })
         //     }
-
         //     // Send first punch
         //     sendKeepAlive()
-
         //     // Listen for responses and immediately reply to complete the hole punch
         //     socket.on('message', (msg, rinfo) => {
         //         console.log(`Received from ${rinfo.address}:${rinfo.port}`)
-
         //         // Reply immediately (force NAT to open the path)
         //         socket.send(msg, rinfo.port, rinfo.address)
         //     })
-
         //     // Send keep-alive packets every 5 seconds
         //     const keepAliveInterval = setInterval(sendKeepAlive, 5000)
-
         //     // Clean up socket when app closes
         //     socket.on('close', () => clearInterval(keepAliveInterval))
         // }
-
         // // Punch NAT hole to the external STUN-mapped port
         // openNatPath(expected_peer_ip, extPort)
-
         // // Start listening on the STUN port for incoming packets
         // listener.bind(stun_port, () => {
         //     console.log(`Listening on STUN port ${stun_port}...`)
         // })
-
         // listener.on('message', (msg, rinfo) => {
         //     console.log(rinfo)
         //     if (rinfo.address === expected_peer_ip) {
@@ -576,7 +513,6 @@ app.whenReady().then(async () => {
         //         forwardPacket(msg, emulatorPort + 1, '127.0.0.1')
         //     }
         // })
-
         // function forwardPacket(data, targetPort, targetIP) {
         //     const socket = dgram.createSocket('udp4')
         //     socket.send(data, targetPort, targetIP, (err) => {
@@ -584,10 +520,91 @@ app.whenReady().then(async () => {
         //         socket.close()
         //     })
         // }
-
         // listener.on('error', (err) => {
         //     console.error(`UDP Listener Error: ${err.message}`)
         //     listener.close()
         // })
     })
 })
+
+async function startUPNP() {
+    console.log('starting UPNP server')
+    upnpClient = upnp.createClient()
+
+    await upnpClient
+        ?.portUnmapping({ public: portForUPNP }, (err) => {
+            if (!err) return
+            //console.log('failed to close port', err)
+        })
+        .catch((err) => console.log(err))
+
+    // listener and proxy.
+    proxyListener = dgram.createSocket('udp4')
+
+    proxyListener.bind(portForUPNP, () => {
+        console.log(`proxy listening on port ${portForUPNP}...`)
+    })
+
+    // we use this to send traffic from 7000 to 7001
+    proxyListener.on('message', (msg, rinfo) => {
+        if (!rinfo) return
+        // we should check that we aren't getting requests from random IPs
+
+        if (rinfo.port !== 7000) {
+            currentTargetPort = rinfo.port
+            console.log('Player isnt using upnp -> changing target port to: ', rinfo.port)
+        }
+
+        // prevent keep alive from being forwarded to the emulator - it crashes
+        const messageContent = msg.toString()
+        if (messageContent === 'ping') {
+            console.log(`Ignoring keep-alive message from ${rinfo.address}:${rinfo.port}`)
+            return
+        }
+        // debug to see realtime packets from your opponents emulator.
+        console.log(`proxy recieved packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
+
+        // Forward packet to emulator on or listen port + 1 on localhost
+        // supposedly this shouldn't add much overhead in lag, we'll need to run some tests.
+        forwardPacket(msg, 7000 + 1, '127.0.0.1')
+    })
+
+    function forwardPacket(data, targetPort, targetIP) {
+        const socket = dgram.createSocket('udp4')
+        socket.send(data, targetPort, targetIP, (err) => {
+            if (err) console.log(`Proxy forwarding Error: ${err.message}`)
+            socket.close()
+        })
+    }
+
+    // unpn mapping and usage
+    upnpClient.portMapping(
+        {
+            public: portForUPNP,
+            private: portForUPNP,
+            ttl: 0,
+            protocol: 'UDP',
+        },
+        function (err) {
+            if (err) {
+                console.error(`Failed to set up UPnP: ${err.message}`)
+                sendLog(`Failed to set up UPnP: ${err.message}`)
+            } else {
+                console.log(`UPnP Port Mapping created: ${portForUPNP} , ${portForUPNP}}`)
+                sendLog(`UPnP Port Mapping created: ${portForUPNP} , ${portForUPNP}}`)
+            }
+        }
+    )
+
+    upnpClient.getMappings({ local: true }, function (err, results) {
+        console.log(results)
+        sendLog(results)
+    })
+
+    upnpClient.externalIp(function (err, ip) {
+        console.log(ip)
+        if (err) {
+            console.log('failed to get external ip')
+        }
+    })
+}

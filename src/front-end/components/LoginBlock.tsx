@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
-import styled from 'styled-components'
 import { useNavigate, Link } from '@tanstack/react-router'
 import { useLoginStore, useMessageStore } from '../state/store'
-
-const Input = styled('input')(() => ({
-    width: '100px',
-}))
+import { Button, Stack, Input, Box, Center, Spinner, Text, Heading, Flex } from '@chakra-ui/react'
+import { PasswordInput } from './chakra/ui/password-input'
+import { Field } from './chakra/ui/field'
+import { Camera, Hammer } from 'lucide-react'
 
 export default function LoginBlock() {
     const [isLoading, setIsLoading] = useState(false)
@@ -16,7 +15,7 @@ export default function LoginBlock() {
     const addUser = useMessageStore((state) => state.pushUser)
     const clearUserList = useMessageStore((state) => state.clearUserList)
     const [login, setLogin] = useState({
-        name: 'bobby-blake',
+        name: 'no-one',
         email: 'test@test.com',
         pass: 'test123',
     })
@@ -48,72 +47,87 @@ export default function LoginBlock() {
         window.api.removeExtraListeners('logging-in', handleIsLoggingIn)
         window.api.on('logging-in', handleIsLoggingIn)
 
-        window.api.removeExtraListeners('login-success', handleLogIn)
-        window.api.on('login-success', handleLogIn)
+        window.api.removeExtraListeners('loginSuccess', handleLogIn)
+        window.api.on('loginSuccess', handleLogIn)
 
         window.api.removeExtraListeners('login-failed', handleLoginFail)
         window.api.on('login-failed', handleLoginFail)
 
         return () => {
             window.api.removeListener('logging-in', handleIsLoggingIn)
-            window.api.removeListener('login-success', handleLogIn)
+            window.api.removeListener('loginSuccess', handleLogIn)
             window.api.removeListener('login-failed', handleLoginFail)
         }
     }, [])
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <p>Log in</p>
-            <div style={{ display: 'flex' }}>
-                {isLoading && <div>LOADING...</div>}
-                {!isLoading && !isLoggedIn && (
-                    <>
-                        <div>
-                            <p>User Email</p>
-                            <Input
-                                onChange={(e) =>
-                                    setLogin({
-                                        name: login.name,
-                                        email: e.target.value,
-                                        pass: login.pass,
-                                    })
-                                }
-                                type="text"
-                                value={login.email}
-                            />
-                        </div>
-                        <div>
-                            <p>Password</p>
-                            <Input
-                                onChange={(e) =>
-                                    setLogin({
-                                        name: login.name,
-                                        email: login.email,
-                                        pass: e.target.value,
-                                    })
-                                }
-                                type="password"
-                                value={login.pass}
-                            />
-                        </div>
-                        <button
-                            disabled={isLoading}
-                            id="login-btn"
-                            onClick={() => {
-                                setIsLoading(true)
-                                window.api.loginUser(login)
-                            }}
-                        >
-                            Log In
-                        </button>
-                        <p>need an account?</p>
-                        <Link to="/create" className="[&.active]:font-bold">
-                            Create Account
-                        </Link>
-                        {isLoggedIn}
-                    </>
-                )}
-            </div>
-        </div>
+        <>
+            {isLoading && (
+                <Box pos="absolute" inset="0" bg="bg/80">
+                    <Center h="full">
+                        <Spinner color="red.500" />
+                    </Center>
+                </Box>
+            )}
+            <Stack gap={2}>
+                {!isLoading && <Heading size="md">Sign In</Heading>}
+                <Box>
+                    {!isLoading && !isLoggedIn && (
+                        <Stack gap={6}>
+                            <Field label="Email" required>
+                                <Input
+                                    placeholder="bobby@example.com"
+                                    disabled={isLoading}
+                                    onChange={(e) =>
+                                        setLogin({
+                                            name: login.name,
+                                            email: e.target.value,
+                                            pass: login.pass,
+                                        })
+                                    }
+                                    type="text"
+                                    value={login.email}
+                                />
+                            </Field>
+                            <Field label="Password" required>
+                                <PasswordInput
+                                    placeholder="password"
+                                    disabled={isLoading}
+                                    onChange={(e) =>
+                                        setLogin({
+                                            name: login.name,
+                                            email: login.email,
+                                            pass: e.target.value,
+                                        })
+                                    }
+                                    type="password"
+                                    value={login.pass}
+                                />
+                            </Field>
+                            <Stack>
+                                <Button
+                                    disabled={isLoading}
+                                    id="login-btn"
+                                    onClick={() => {
+                                        setIsLoading(true)
+                                        window.api.loginUser(login)
+                                    }}
+                                >
+                                    Log In
+                                </Button>
+                                <Text textStyle="sm">
+                                    <Link to="/create" className="[&.active]:font-bold">
+                                        <Flex gap="1">
+                                            <p> Create New Account</p>
+                                            <Hammer size={18} />
+                                        </Flex>
+                                    </Link>
+                                </Text>
+                            </Stack>
+                        </Stack>
+                    )}
+                </Box>
+            </Stack>
+        </>
     )
 }
