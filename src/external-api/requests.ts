@@ -86,7 +86,6 @@ async function removeLoggedInUser(auth) {
         const idToken = await auth.currentUser.getIdToken().then((res) => res)
         console.log(idToken)
         try {
-            console.log('test2')
             // ${keys.COTURN_IP}
             // works but maybe we should move to an ssl cert for https
             fetch(`http://${SERVER}:${keys.API_PORT}/log-out`, {

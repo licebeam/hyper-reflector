@@ -155,15 +155,16 @@ window.api.on('loggedOutSuccess', async (user) => {
     }
 })
 
-window.api.on('closingApp', async (user) => {
-    // kill the socket connection
-    if (signalServerSocket) {
-        console.log('we are killing the socket user')
-        await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
-        signalServerSocket.close()
-        signalServerSocket = null
-    }
-})
+// below code causes some app hanging
+// window.api.on('closingApp', async (user) => {
+//     // kill the socket connection
+//     if (signalServerSocket) {
+//         console.log('we are killing the socket user')
+//         await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
+//         signalServerSocket.close()
+//         signalServerSocket = null
+//     }
+// })
 
 function connectWebSocket(user) {
     if (signalServerSocket) return // Prevent duplicate ws connections from same client
