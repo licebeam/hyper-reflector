@@ -8,6 +8,7 @@ import {
     createRootRoute,
     createMemoryHistory,
 } from '@tanstack/react-router'
+import { ChakraProvider, defaultConfig, defineConfig, createSystem } from '@chakra-ui/react'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import StartPage from './pages/StartPage'
 import LobbyPage from './pages/LobbyPage'
@@ -17,11 +18,14 @@ import PlayerProfilePage from './pages/PlayerProfilePage'
 import SettingsPage from './pages/SettingsPage'
 import CreateAccountPage from './pages/CreateAccountPage'
 import ErrorBoundary from './ErrorBoundary'
+import Layout from './layout/Layout'
 
 const rootRoute = createRootRoute({
     component: () => (
         <>
-            <Outlet />
+            <Layout>
+                <Outlet />
+            </Layout>
             <TanStackRouterDevtools />
         </>
     ),
@@ -89,7 +93,7 @@ const chatRoute = createRoute({
 
 const profileRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '/player',
+    path: '/profile',
     component: function Settings() {
         return (
             <div className="p-2">
@@ -134,12 +138,28 @@ declare module '@tanstack/react-router' {
     }
 }
 
-import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
+const customConfig = defineConfig({
+    theme: {
+        tokens: {
+            colors: {
+                brand: {
+                    50: { value: '#e6f2ff' },
+                    100: { value: '#e6f2ff' },
+                    200: { value: '#bfdeff' },
+                    300: { value: '#99caff' },
+                    950: { value: '#001a33' },
+                },
+            },
+        },
+    },
+})
+
+export const system = createSystem(defaultConfig, customConfig)
 
 const root = createRoot(document.body)
 root.render(
     <ErrorBoundary>
-        <ChakraProvider value={defaultSystem}>
+        <ChakraProvider value={system}>
             <RouterProvider router={router} />
         </ChakraProvider>
     </ErrorBoundary>

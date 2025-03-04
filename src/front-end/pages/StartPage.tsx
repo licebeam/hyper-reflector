@@ -4,14 +4,8 @@ import { Link } from '@tanstack/react-router'
 
 export default function StartPage() {
     return (
-        <Layout>
-            Welcome to hyper reflector
+        <div>
             <LoginBlock />
-            <div>
-                <Link to="/offline" className="[&.active]:font-bold">
-                    Play Offline
-                </Link>
-            </div>
-        </Layout>
+        </div>
     )
 }

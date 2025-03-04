@@ -6,6 +6,7 @@ import './front-end/app'
 let signalServerSocket: WebSocket = null // socket reference
 let candidateList = []
 let callerIdState = null
+let isCaller
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
 const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
@@ -78,6 +79,7 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
         }
     }
 
+    peerConnection.isInitiator = isInitiator // type error but we can fix this later. We'll use this line to make sure we set the correct player number
     peerConnections[userUID] = peerConnection
     return peerConnection
 }
@@ -121,7 +123,7 @@ function setupLogging(peer, userLabel, event) {
 
 let userName
 
-window.api.on('login-success', (user) => {
+window.api.on('loginSuccess', (user) => {
     if (user) {
         console.log('User logged in:', user.email)
         userName = user.email
@@ -315,10 +317,12 @@ function connectWebSocket(user) {
             if (matches) {
                 let [ip, port] = matches[0].split(' ')
                 // 0 is our delay settings which we'll need to adjust for.
+                //TODO set the player number based on who initialized the peer connections
                 const playerNum = 0 // this should be set by a list of whatever ongoing challenges are running
                 await window.api.updateStun()
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
+                // this automatically serves the match when we get a successful candidate, we should probably hanges this.
                 window.api.serveMatch(ip, 7000, playerNum, 0, 7000)
             }
         }

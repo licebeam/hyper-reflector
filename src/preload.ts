@@ -6,7 +6,8 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.send('iceCandidate', data),
     callUser: (data: { callerId: string; calleeId: string }) => ipcRenderer.send('callUser', data),
     answerCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('answerCall', data),
-    receivedCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('receivedCall', data),
+    receivedCall: (data: { callerId: string; answer: any }) =>
+        ipcRenderer.send('receivedCall', data),
     // server and online
     loginUser: (loginObject: { email: string; name: string; pass: string }) =>
         ipcRenderer.send('loginUser', loginObject),
@@ -28,7 +29,9 @@ contextBridge.exposeInMainWorld('api', {
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),
     setTargetIp: (ip: string) => ipcRenderer.send('setTargetIp', ip),
     serveMatch: (ip: string, port: number, player: number, delay: number, myPort: number) =>
-        ipcRenderer.send('startOnlineMatch', { ip, port, player, delay, myPort }),
+        ipcRenderer.send('serveMatch', { ip, port, player, delay, myPort }),
+    serveMatchOffline: (ip: string, port: number, player: number, delay: number, myPort: number) =>
+        ipcRenderer.send('serveMatchOffline', { ip, port, player, delay, myPort }),
     startSoloTraining: () => ipcRenderer.send('start-solo-mode'),
     // ipc call stuff
     on: (channel, callback) => {
