@@ -257,7 +257,8 @@ const createWindow = () => {
         // TODO: add error handling this is an important function.
     })
 
-    ipcMain.on('serveMatch', (event, data) => {
+    ipcMain.on('serveMatch', async (event, data) => {
+        await startUPNP()
         console.log('should start a match up')
         if (!currentTargetIp) {
             console.log('hey current target ip was not ready, retry')
@@ -283,7 +284,7 @@ const createWindow = () => {
             currentTargetIp = data.ip // we set this here since we aren't using the server, but it's still needed for upnp updating
             currentTargetPort = data.port
             console.log(`Connecting to ${data.ip}, Port: ${data.port}`)
-            await startUPNP().catch((err) => console.log(err))
+            await startUPNP().catch((err) => console.log('error starting upnp server', err))
             console.log('should start a match up')
             if (!currentTargetIp) {
                 console.log('hey current target ip was not ready, retry')
@@ -360,7 +361,9 @@ const createWindow = () => {
     // handle cleanup on closing window
     mainWindow.on('close', async (event) => {
         console.log('closing app as', userUID)
-        await handleExitApp().catch((err) => console.log(err))
+        setTimeout(() => {
+            mainWindow?.destroy() // force window to close when we finish
+        }, 500)
         event.preventDefault()
     })
 }
@@ -368,28 +371,27 @@ const createWindow = () => {
 async function handleExitApp() {
     if (userUID) {
         // remove user from websockets and log them out of firebase on close
-        await api.removeLoggedInUser(auth).catch((err) => console.log(err))
-        mainWindow?.webContents.send('closingApp', { uid: userUID })
+        await api.removeLoggedInUser(auth)
+        // mainWindow?.webContents.send('closingApp', { uid: userUID })
     }
-    if (proxyListener !== null) {
+    if (proxyListener) {
         console.log('closing proxy server')
-        await proxyListener.close().catch((err) => console.log(err))
+        await proxyListener.close()
         proxyListener = null
     }
-    if (upnpClient !== null) {
-        await upnpClient
-            .portUnmapping({ public: portForUPNP }, (err) => {
-                if (!err) return
-                console.log('failed to close port', err)
-            })
-            .catch((err) => console.log(err))
+    if (upnpClient) {
+        // TODO fix this
+        // this request is causing a lot of issues
+        // await upnpClient
+        //     .portUnmapping({ public: portForUPNP }, (err) => {
+        //         if (!err) return
+        //         console.log('failed to close port', err)
+        //     })
+        //     .catch((err) => console.log(err))
         setTimeout(() => {
             upnpClient.close()
         }, 500)
     }
-    setTimeout(() => {
-        mainWindow?.destroy() // force window to close when we finish
-    }, 500)
 }
 
 // Listen for a request and respond to it
@@ -418,7 +420,7 @@ app.on('window-all-closed', async () => {
     if (readInterval) {
         clearInterval(readInterval)
     }
-    await handleExitApp().catch((err) => console.log(err))
+    await handleExitApp()
     if (process.platform !== 'darwin') {
         app.quit()
     }
@@ -427,15 +429,18 @@ app.on('window-all-closed', async () => {
 // app.on('before-quit', async () => {
 //     console.log('app trying to quit')
 // })
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Promise Rejection:', reason)
+})
 
 process.on('SIGINT', async () => {
-    await handleExitApp().catch((err) => console.log(err))
+    await handleExitApp()
     console.log('SIGINT received (CTRL+C or process kill)')
     app.quit()
 })
 
 process.on('SIGTERM', async () => {
-    await handleExitApp().catch((err) => console.log(err))
+    await handleExitApp()
     console.log('SIGTERM received (system shutdown or process termination)')
     app.quit()
 })
@@ -458,7 +463,7 @@ app.whenReady().then(async () => {
 
     // UPNP is working! but we need to fix the upnp library so that we can make a build.
     ipcMain.on('updateStun', async () => {
-        await startUPNP()
+        // await startUPNP()
         // we must initialize the client here or nothing works correctly.
         // console.log('Starting listener...')
         // stun_port = port
@@ -528,15 +533,16 @@ app.whenReady().then(async () => {
 })
 
 async function startUPNP() {
-    console.log('starting UPNP server')
     upnpClient = upnp.createClient()
+    console.log('starting UPNP server normally')
 
-    await upnpClient
-        ?.portUnmapping({ public: portForUPNP }, (err) => {
-            if (!err) return
-            //console.log('failed to close port', err)
-        })
-        .catch((err) => console.log(err))
+    // we should unmap ports -- currently this breaks the server
+    // await upnpClient
+    //     ?.portUnmapping({ public: portForUPNP }, (err) => {
+    //         if (!err) return
+    //         //console.log('failed to close port', err)
+    //     })
+    //     .catch((err) => console.log(err))
 
     // listener and proxy.
     proxyListener = dgram.createSocket('udp4')
@@ -573,6 +579,7 @@ async function startUPNP() {
         const socket = dgram.createSocket('udp4')
         socket.send(data, targetPort, targetIP, (err) => {
             if (err) console.log(`Proxy forwarding Error: ${err.message}`)
+            // do we need to close this?
             socket.close()
         })
     }
