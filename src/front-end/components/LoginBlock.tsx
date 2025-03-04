@@ -118,7 +118,7 @@ export default function LoginBlock() {
                                 <Text textStyle="sm">
                                     <Link to="/create" className="[&.active]:font-bold">
                                         <Flex gap="1">
-                                            <p> Create New Account</p>
+                                            <p> Create New Account </p>
                                             <Hammer size={18} />
                                         </Flex>
                                     </Link>

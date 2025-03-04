@@ -275,32 +275,27 @@ const createWindow = () => {
         })
     })
 
-    ipcMain.on(
-        'serveMatchOffline',
-        async (
-            event,
-            data = { ip: '127.0.0.1', port: '7000', myPort: '7000', player: '0', delay: '0' }
-        ) => {
-            currentTargetIp = data.ip // we set this here since we aren't using the server, but it's still needed for upnp updating
-            currentTargetPort = data.port
-            console.log(`Connecting to ${data.ip}, Port: ${data.port}`)
-            await startUPNP().catch((err) => console.log('error starting upnp server', err))
-            console.log('should start a match up')
-            if (!currentTargetIp) {
-                console.log('hey current target ip was not ready, retry')
-            }
-            mainWindow.webContents.send('message-from-main', 'starting match')
-            startPlayingOnline({
-                config,
-                localPort: portForUPNP || 7000,
-                remoteIp: currentTargetIp || '127.0.0.1',
-                remotePort: currentTargetPort || 7001,
-                player: data.player,
-                delay: data.delay,
-                isTraining: false, // Might be used in the future.
-            })
+    ipcMain.on('serveMatchOffline', async (event, data) => {
+        console.log('data------------------------', data)
+        currentTargetIp = data.ip || '127.0.0.1' // we set this here since we aren't using the server, but it's still needed for upnp updating
+        currentTargetPort = data.port || 7000
+        console.log(`Connecting to ${data.ip}, Port: ${data.port}`)
+        await startUPNP().catch((err) => console.log('error starting upnp server', err))
+        console.log('should start a match up')
+        if (!currentTargetIp) {
+            console.log('hey current target ip was not ready, retry')
         }
-    )
+        mainWindow.webContents.send('message-from-main', 'starting match')
+        startPlayingOnline({
+            config,
+            localPort: portForUPNP || 7000,
+            remoteIp: currentTargetIp || '127.0.0.1',
+            remotePort: currentTargetPort || 7000, // if no target, retarget ourselves for testing
+            player: data.player,
+            delay: data.delay,
+            isTraining: false, // Might be used in the future.
+        })
+    })
 
     ipcMain.on('start-solo-mode', (event) => {
         startSoloMode({ config })
