@@ -1,33 +1,28 @@
 const { exec, spawn } = require('child_process')
-
-import { ipcMain } from 'electron'
 import { Config } from './config'
 
-export default function launchGGPO(command) {
-    try {
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error starting Fightcade-FBNeo: ${error.message}`)
-                return
-            }
-            if (stderr) {
-                console.error(`stderr: ${stderr}`)
-                return
-            }
-            console.log(`stdout: ${stdout}`)
-        })
-    } catch (error) {
-        console.log(error)
-    }
-}
+// export default function launchGGPO(command) {
+//     try {
+//         exec(command, (error, stdout, stderr) => {
+//             if (error) {
+//                 console.error(`Error starting Fightcade-FBNeo: ${error.message}`)
+//                 return
+//             }
+//             if (stderr) {
+//                 console.error(`stderr: ${stderr}`)
+//                 return
+//             }
+//             console.log(`stdout: ${stdout}`)
+//         })
+//     } catch (error) {
+//         console.log(error)
+//     }
+// }
 
 export function launchGGPOSpawn(command: string, callBack: () => any) {
     try {
         const [cmd, ...args] = command.split(' ')
         const child = spawn(cmd, args, { stdio: 'inherit', shell: true })
-
-        console.log(`Started Fightcade-FBNeo with PID: ${child.pid}`)
-
         // listening for process exit
         child.on('exit', (code, signal) => {
             if (code !== null) {
@@ -45,7 +40,7 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
             console.error(`Failed to start Fightcade-FBNeo: ${error.message}`)
         })
 
-        return child; // return the emulator reference so that we can close it if needed.
+        return child // return the emulator reference so that we can close it if needed.
     } catch (error) {
         console.log(error)
     }
@@ -94,13 +89,10 @@ export function startPlayingOnline({
     }
     // we add +1 to local port because when we hole punch nat, the emulator assigns a socket to the next port
     const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`
-    console.log({ directCommand })
-
     return launchGGPOSpawn(directCommand, callBack)
 }
 
 export function startSoloMode({ config, callBack }: { config: Config; callBack: () => any }) {
     const directCommand = `${fightcadeCmd(config)} -game sfiii3nr1 ${config.emulator.trainingLuaPath}`
-    console.log({ directCommand })
     return launchGGPOSpawn(directCommand, callBack)
 }
