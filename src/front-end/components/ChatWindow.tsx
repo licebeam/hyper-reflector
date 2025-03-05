@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import styled from 'styled-components'
+import { Button, Stack, Input, Flex } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
 
 export default function ChatWindow() {
@@ -49,15 +49,15 @@ export default function ChatWindow() {
             var timestamp = new Date()
             // really simple chat display
             return (
-                <div key={index + timestamp + message.message}>
+                <Flex key={index + timestamp + message.message}>
                     {message.sender}: {message.message}
-                </div>
+                </Flex>
             )
         })
     }
 
     return (
-        <div key={'my-chatroom'} style={{ display: 'flex', flexDirection: 'column' }}>
+        <Stack key={'my-chatroom'}>
             {isLoggedIn && (
                 <div id="chatbox-id" style={{ height: 300, overflowY: 'scroll' }}>
                     <p> messages</p>
@@ -65,6 +65,6 @@ export default function ChatWindow() {
                     <div ref={chatEndRef} />
                 </div>
             )}
-        </div>
+        </Stack>
     )
 }

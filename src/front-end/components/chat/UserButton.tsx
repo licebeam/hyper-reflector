@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLoginStore, useMessageStore } from '../../state/store'
+import { Button, Stack, Input, Flex } from '@chakra-ui/react'
 
 export default function UserButton({ user }) {
     const [isInMatch, setIsInMatch] = useState(false)
@@ -24,7 +25,7 @@ export default function UserButton({ user }) {
             {user.name}
             {/* {user.uid} */}
             {!isUserChallenging() && user.uid !== userState.uid && (
-                <button
+                <Button
                     disabled={isInMatch}
                     onClick={() => {
                         console.log(
@@ -36,11 +37,11 @@ export default function UserButton({ user }) {
                         window.api.callUser({ callerId: userState.uid, calleeId: user.uid })
                     }}
                 >
-                    challenge
-                </button>
+                    Challenge
+                </Button>
             )}
             {isUserChallenging() && (
-                <button
+                <Button
                     disabled={isInMatch}
                     onClick={() => {
                         const caller = callData.find((call) => call.callerId === user.uid)
@@ -49,8 +50,8 @@ export default function UserButton({ user }) {
                         window.api.answerCall(caller)
                     }}
                 >
-                    accept fate
-                </button>
+                    Accept
+                </Button>
             )}
         </div>
     )
