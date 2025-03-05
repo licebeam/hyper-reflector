@@ -277,7 +277,7 @@ function connectWebSocket(user) {
             closePeerConnection(data.userUID)
         }
 
-        if (data.type === 'sendRoomMessage') {
+        if (data.type === 'getRoomMessage') {
             console.log('received a message ==============================================')
             window.api.sendRoomMessage(data)
         }
