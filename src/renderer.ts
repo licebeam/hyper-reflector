@@ -6,6 +6,7 @@ import './front-end/app'
 let signalServerSocket: WebSocket = null // socket reference
 let candidateList = []
 let callerIdState = null
+let myUID = null
 let isCaller
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
@@ -113,7 +114,11 @@ function setupLogging(peer, userLabel, event) {
                 signalServerSocket.send(
                     JSON.stringify({
                         type: 'iceCandidate',
-                        data: { targetId: callerIdState, candidate: event.candidate },
+                        data: {
+                            targetId: callerIdState,
+                            candidate: event.candidate,
+                            callerId: myUID,
+                        },
                     })
                 )
             }
@@ -125,6 +130,7 @@ let userName
 
 window.api.on('loginSuccess', (user) => {
     if (user) {
+        myUID = user.uid
         console.log('User logged in:', user.email)
         userName = user.email
         connectWebSocket(user)
@@ -207,7 +213,6 @@ function connectWebSocket(user) {
     window.api.on(
         'answerCall',
         async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
-            // Automatically accept call (or prompt user for acceptance)
             let answer = await peerConnections[callerId].createAnswer()
             await peerConnections[callerId].setLocalDescription(answer)
 
@@ -313,9 +318,11 @@ function connectWebSocket(user) {
         }
 
         if (data.type === 'iceCandidate') {
-            console.log('Received ICE Candidate from peer:', data.candidate.candidate)
-            let matches = data.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
+            // TODO fix this ugly data stuff
+            console.log('Received ICE Candidate from peer:', data.data.candidate.candidate)
+            let matches = data.data.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
             console.log('matches', matches)
+            console.log(peerConnections[data.data.callerId])
             if (matches) {
                 let [ip, port] = matches[0].split(' ')
                 // 0 is our delay settings which we'll need to adjust for.
