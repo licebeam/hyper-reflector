@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Button, Stack, Input, Text, Heading, Flex, createListCollection } from '@chakra-ui/react'
+import { Button, Stack, Input, Text, Heading, createListCollection } from '@chakra-ui/react'
 import {
     SelectContent,
     SelectItem,
@@ -35,6 +35,7 @@ export default function SettingsPage() {
     }
 
     useEffect(() => {
+        // There is a bug setting delay
         window.api.setEmulatorDelay(currentDelay)
     }, [currentDelay])
 

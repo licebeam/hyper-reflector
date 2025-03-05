@@ -1,6 +1,6 @@
-const { exec } = require('child_process')
-const path = require('path')
+const { exec, spawn } = require('child_process')
 
+import { ipcMain } from 'electron'
 import { Config } from './config'
 
 export default function launchGGPO(command) {
@@ -16,6 +16,36 @@ export default function launchGGPO(command) {
             }
             console.log(`stdout: ${stdout}`)
         })
+    } catch (error) {
+        console.log(error)
+    }
+}
+
+export function launchGGPOSpawn(command: string, callBack: () => any) {
+    try {
+        const [cmd, ...args] = command.split(' ')
+        const child = spawn(cmd, args, { stdio: 'inherit', shell: true })
+
+        console.log(`Started Fightcade-FBNeo with PID: ${child.pid}`)
+
+        // listening for process exit
+        child.on('exit', (code, signal) => {
+            if (code !== null) {
+                console.log(`Fightcade-FBNeo exited with code ${code}`)
+            } else {
+                console.log(`Fightcade-FBNeo terminated by signal ${signal}`)
+            }
+            if (callBack) {
+                callBack()
+            }
+        })
+
+        // listening for for errors
+        child.on('error', (error) => {
+            console.error(`Failed to start Fightcade-FBNeo: ${error.message}`)
+        })
+
+        return child; // return the emulator reference so that we can close it if needed.
     } catch (error) {
         console.log(error)
     }
@@ -45,6 +75,7 @@ export function startPlayingOnline({
     player,
     delay,
     isTraining = false,
+    callBack,
 }: {
     config: Config
     localPort: number
@@ -53,22 +84,23 @@ export function startPlayingOnline({
     player: number
     delay: number
     isTraining: boolean
+    callBack: () => any
 }) {
     console.log(localPort, remoteIp, remotePort)
     console.log('emulator target might be', remotePort + 1)
-    let luaPath = config.emulator.luaPath;
-    if(isTraining){
-        luaPath = config.emulator.trainingLuaPath;
+    let luaPath = config.emulator.luaPath
+    if (isTraining) {
+        luaPath = config.emulator.trainingLuaPath
     }
     // we add +1 to local port because when we hole punch nat, the emulator assigns a socket to the next port
     const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`
     console.log({ directCommand })
 
-    launchGGPO(directCommand)
+    return launchGGPOSpawn(directCommand, callBack)
 }
 
-export function startSoloMode({ config }: { config: Config }) {
+export function startSoloMode({ config, callBack }: { config: Config; callBack: () => any }) {
     const directCommand = `${fightcadeCmd(config)} -game sfiii3nr1 ${config.emulator.trainingLuaPath}`
     console.log({ directCommand })
-    launchGGPO(directCommand)
+    return launchGGPOSpawn(directCommand, callBack)
 }

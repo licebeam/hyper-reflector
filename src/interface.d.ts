@@ -22,6 +22,8 @@ export interface IElectronAPI {
     getEmulatorPath: any
     setEmulatorDelay: any
     getEmulatorDelay: any
+    endMatch: any
+    killEmulator: any
     // sends text to the emulator using the fbneo_commands.txt
     sendText: any
     sendCommand: any

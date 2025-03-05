@@ -282,6 +282,13 @@ function connectWebSocket(user) {
             closePeerConnection(data.userUID)
         }
 
+        if (data.type === "matchEndedClose"){
+            //user the userUID and close all matches.
+            closePeerConnection(data.userUID)
+            console.log("killing emulator")
+            window.api.killEmulator();
+        }
+
         if (data.type === 'getRoomMessage') {
             console.log('received a message ==============================================')
             window.api.sendRoomMessage(data)
@@ -363,3 +370,16 @@ function connectWebSocket(user) {
     //     }
     // })
 }
+
+//ends match with any player who has an active connection with you, this should also close the rtc connection
+window.api.on('endMatch', (userUID: string) => {
+    console.log('ending match')
+    if (userUID) {
+        signalServerSocket.send(
+            JSON.stringify({
+                type: 'matchEnd',
+                uid: myUID,
+            })
+        )
+    }
+})
