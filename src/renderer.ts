@@ -80,7 +80,7 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
         }
     }
 
-    peerConnection.isInitiator = isInitiator // type error but we can fix this later. We'll use this line to make sure we set the correct player number
+    peerConnection.isInitiator = isInitiator || false // type error but we can fix this later. We'll use this line to make sure we set the correct player number
     peerConnections[userUID] = peerConnection
     return peerConnection
 }
@@ -321,14 +321,22 @@ function connectWebSocket(user) {
             // TODO fix this ugly data stuff
             console.log('Received ICE Candidate from peer:', data.data.candidate.candidate)
             let matches = data.data.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
-            console.log('matches', matches)
-            console.log(data)
-            console.log(peerConnections[data.data.userUID].isInitiator)
+            // console.log('matches', matches)
+            // console.log(data)
+            // console.log(peerConnections[data.data.userUID].isInitiator)
             if (matches) {
                 let [ip, port] = matches[0].split(' ')
                 // 0 is our delay settings which we'll need to adjust for.
                 //TODO set the player number based on who initialized the peer connections
-                const playerNum = peerConnections[data.data.userUID]?.isInitiator ? 0 : 1 // this should be set by a list of whatever ongoing challenges are running
+                let playerNum
+                if(peerConnections[data.data.userUID]?.isInitiator){
+                    console.log('I am player 1 ------------------------------------->>>>>>')
+                    playerNum = 0;
+                } else {
+                    console.log('I should be set to player 2 --------------------------------->>>>>')
+                    playerNum = 1;
+                }
+                 // this should be set by a list of whatever ongoing challenges are running
                 await window.api.updateStun()
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
