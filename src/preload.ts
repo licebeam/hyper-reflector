@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld('api', {
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
     setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),
     getEmulatorDelay: () => ipcRenderer.send('getEmulatorDelay'),
+    endMatch: (userUID: string) => ipcRenderer.send('endMatch', userUID),
+    killEmulator: () => ipcRenderer.send('killEmulator'),
     // sends text to the emulator using the fbneo_commands.txt
     sendText: (text: string) => ipcRenderer.send('send-text', text),
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),
@@ -64,10 +66,9 @@ contextBridge.exposeInMainWorld('api', {
     },
 })
 
-// // testing sending messages from ipc main to ipcrenderer
-// ipcRenderer.on('message-from-main', (event, message) => {
-//     console.log('Received:', message);
-// });
+ipcRenderer.on('message-from-main', (event, message) => {
+    console.log('Stats to update the UI with:', message)
+})
 
 ipcRenderer.on('stats-from-main', (event, message) => {
     console.log('Stats to update the UI with:', message)

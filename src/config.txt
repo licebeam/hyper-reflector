@@ -1,2 +1,2 @@
 emuPath=C:\Users\dusti\Documents\Fightcade\emulator\fbneo
-emuDelay=0
+emuDelay=3

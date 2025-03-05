@@ -4,7 +4,7 @@ import { sendCommand, readCommand, readStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
 import { getConfig, type Config } from './config'
 // updating automatically
-import  { updateElectronApp, UpdateSourceType } from 'update-electron-app';
+import { updateElectronApp, UpdateSourceType } from 'update-electron-app'
 updateElectronApp()
 import keys from './private/keys'
 // external api
@@ -19,6 +19,7 @@ const portForUPNP = 7000
 let currentTargetIp = '127.0.0.1' // We change this if we get a message from player and try to target that ip.
 let currentTargetPort = 7000 // We change this when we recieve a message from a player on a different port, this means one is not using upnp.
 let currentPlayerNum = 0 // We change this when we recieve a message first otherwise we are player 1 unless specified somewhere else.
+let spawnedEmulator = null //used to handle closing the emulator process
 
 // - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from 'firebase/app'
@@ -324,7 +325,7 @@ const createWindow = () => {
             console.log('hey current target ip was not ready, retry')
         }
         mainWindow.webContents.send('message-from-main', 'starting match')
-        startPlayingOnline({
+        const emu = startPlayingOnline({
             config,
             localPort: portForUPNP || 7000,
             remoteIp: currentTargetIp || '127.0.0.1',
@@ -332,7 +333,9 @@ const createWindow = () => {
             player: data.player || 0,
             delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.
+            callBack: () => mainWindow.webContents.send('endMatch', userUID),
         })
+        spawnedEmulator = emu // in the future we can use this to check for online training etc.
     })
 
     ipcMain.on('serveMatchOffline', async (event, data) => {
@@ -346,7 +349,7 @@ const createWindow = () => {
             console.log('hey current target ip was not ready, retry')
         }
         mainWindow.webContents.send('message-from-main', 'starting match')
-        startPlayingOnline({
+        const emu = startPlayingOnline({
             config,
             localPort: portForUPNP || 7000,
             remoteIp: currentTargetIp || '127.0.0.1',
@@ -354,7 +357,23 @@ const createWindow = () => {
             player: data.player || 0,
             delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.
+            callBack: () => mainWindow.webContents.send('endMatch', userUID),
         })
+        spawnedEmulator = emu // in the future we can use this to check for online training etc.
+    })
+
+    ipcMain.on('killEmulator', () => {
+        mainWindow.webContents.send('message-from-main', 'attempting to gracefully close emu')
+        try {
+            console.log('trying to close emulator')
+            if (spawnedEmulator !== null) {
+                spawnedEmulator.kill('SIGTERM')
+                mainWindow.webContents.send('message-from-main', 'emulator exists closing')
+            }
+        } catch {
+            mainWindow.webContents.send('message-from-main', 'could not close emu')
+            console.log('failed to close emulator')
+        }
     })
 
     ipcMain.on('start-solo-mode', (event) => {
