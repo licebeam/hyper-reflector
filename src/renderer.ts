@@ -322,12 +322,13 @@ function connectWebSocket(user) {
             console.log('Received ICE Candidate from peer:', data.data.candidate.candidate)
             let matches = data.data.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
             console.log('matches', matches)
-            console.log(peerConnections[data.data.callerId])
+            console.log(data)
+            console.log(peerConnections[data.data.userUID].isInitiator)
             if (matches) {
                 let [ip, port] = matches[0].split(' ')
                 // 0 is our delay settings which we'll need to adjust for.
                 //TODO set the player number based on who initialized the peer connections
-                const playerNum = 0 // this should be set by a list of whatever ongoing challenges are running
+                const playerNum = peerConnections[data.data.userUID]?.isInitiator ? 0 : 1 // this should be set by a list of whatever ongoing challenges are running
                 await window.api.updateStun()
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
