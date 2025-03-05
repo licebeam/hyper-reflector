@@ -4,7 +4,7 @@ import { sendCommand, readCommand, readStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
 import { getConfig, type Config } from './config'
 // updating automatically
-const { updateElectronApp, UpdateSourceType } = require('update-electron-app');
+const { updateElectronApp, UpdateSourceType } = require('update-electron-app')
 updateElectronApp()
 import keys from './private/keys'
 // external api
@@ -104,7 +104,7 @@ const createWindow = () => {
                         // write our file path to the config.txt file
                         const filePath = path.join(filePathBase, 'config.txt')
                         mainWindow.webContents.send('message-from-main', res)
-                        console.log('writing to: ', res)
+                        console.log('CONFIG: writing to: ', res)
                         fs.writeFileSync(filePath, `emuPath=${res.filePaths[0]}`, {
                             encoding: 'utf8',
                         })
@@ -117,6 +117,51 @@ const createWindow = () => {
         } catch (error) {
             console.log(error)
         }
+    }
+
+    const getEmulatorPath = () => {
+        mainWindow.webContents.send('emulatorPath', config.app.emuPath)
+    }
+
+    const setEmulatorDelay = async (delayNum: number) => {
+        console.log('attempting set delay', delayNum)
+        try {
+            const filePath = path.join(filePathBase, 'config.txt')
+            mainWindow.webContents.send('message-from-main', `Set emulator delay to: ${delayNum}`)
+
+            // Read the existing file
+            let fileContent = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : ''
+
+            // Split the file into lines
+            let lines = fileContent.split('\n')
+
+            // Find and update the delay line
+            let found = false
+            lines = lines.map((line: string) => {
+                if (line.startsWith('emuDelay=')) {
+                    found = true
+                    return `emuDelay=${delayNum}` // Replace the delay line
+                }
+                return line // Keep other lines the same
+            })
+
+            // If no emuDelay= line exists, append it
+            if (!found) {
+                lines.push(`emuDelay=${delayNum}`)
+            }
+
+            // Write back the modified content
+            fs.writeFileSync(filePath, lines.join('\n'), 'utf8')
+
+            console.log(`CONFIG: Updated delay to ${delayNum}`)
+        } catch (error) {
+            mainWindow.webContents.send('message-from-main', error)
+            console.error('Failed to write to config file:', error)
+        }
+    }
+
+    const getEmulatorDelay = () => {
+        mainWindow.webContents.send('emulatorDelay', config.app.emuDelay)
     }
 
     // firebase login
@@ -236,6 +281,18 @@ const createWindow = () => {
         setEmulatorPath()
     })
 
+    ipcMain.on('getEmulatorPath', () => {
+        getEmulatorPath()
+    })
+
+    ipcMain.on('setEmulatorDelay', (event, delay) => {
+        setEmulatorDelay(delay)
+    })
+
+    ipcMain.on('getEmulatorDelay', () => {
+        getEmulatorDelay()
+    })
+
     // receives text from front end sends it to emulator
     ipcMain.on('send-text', (event, text: string) => {
         sendCommand(`textinput:${text}`)
@@ -272,8 +329,8 @@ const createWindow = () => {
             localPort: portForUPNP || 7000,
             remoteIp: currentTargetIp || '127.0.0.1',
             remotePort: currentTargetPort || 7001,
-            player: data.player,
-            delay: data.delay,
+            player: data.player || 0,
+            delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.
         })
     })
@@ -294,8 +351,8 @@ const createWindow = () => {
             localPort: portForUPNP || 7000,
             remoteIp: currentTargetIp || '127.0.0.1',
             remotePort: currentTargetPort || 7000, // if no target, retarget ourselves for testing
-            player: data.player,
-            delay: data.delay,
+            player: data.player || 0,
+            delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.
         })
     })

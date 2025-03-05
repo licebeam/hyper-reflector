@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('api', {
     sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
     updateStun: () => ipcRenderer.send('updateStun'), // will need to add ports back later so we can connect offline users.
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
+    getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
+    setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),
+    getEmulatorDelay: () => ipcRenderer.send('getEmulatorDelay'),
     // sends text to the emulator using the fbneo_commands.txt
     sendText: (text: string) => ipcRenderer.send('send-text', text),
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),

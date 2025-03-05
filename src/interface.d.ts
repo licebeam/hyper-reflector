@@ -19,6 +19,9 @@ export interface IElectronAPI {
     sendDataChannel: any
     updateStun: any
     setEmulatorPath: any
+    getEmulatorPath: any
+    setEmulatorDelay: any
+    getEmulatorDelay: any
     // sends text to the emulator using the fbneo_commands.txt
     sendText: any
     sendCommand: any
