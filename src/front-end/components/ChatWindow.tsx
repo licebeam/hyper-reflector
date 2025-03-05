@@ -19,10 +19,10 @@ export default function ChatWindow() {
 
     // get message from websockets
     useEffect(() => {
-        window.api.removeAllListeners('room-message', handleRoomMessage)
-        window.api.on('room-message', handleRoomMessage)
+        window.api.removeAllListeners('sendRoomMessage', handleRoomMessage)
+        window.api.on('sendRoomMessage', handleRoomMessage)
         return () => {
-            window.api.removeListener('room-message', handleRoomMessage)
+            window.api.removeListener('sendRoomMessage', handleRoomMessage)
         }
     }, [])
 

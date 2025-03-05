@@ -308,12 +308,12 @@ const createWindow = () => {
     ipcMain.on('sendMessage', (event, text: string) => {
         // here we can parse the string etc
         console.log('Main process received message:', text)
-        mainWindow.webContents.send('user-message', text)
+        mainWindow.webContents.send('sendMessage', text)
     })
 
     // this is used by websockets to populate our chat room with other peoples messages
-    ipcMain.on('roomMessage', (event, messageObject) => {
-        mainWindow.webContents.send('room-message', messageObject)
+    ipcMain.on('sendRoomMessage', (event, messageObject) => {
+        mainWindow.webContents.send('sendRoomMessage', messageObject)
     })
 
     // add a user to the current chat room
