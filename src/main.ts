@@ -1,10 +1,11 @@
-import { app, BrowserWindow, ipcMain, dialog, Notification, protocol } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
 import started from 'electron-squirrel-startup'
 import { sendCommand, readCommand, readStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
 import { getConfig, type Config } from './config'
-
-
+// updating automatically
+const { updateElectronApp, UpdateSourceType } = require('update-electron-app');
+updateElectronApp()
 import keys from './private/keys'
 // external api
 import api from './external-api/requests'
@@ -63,7 +64,6 @@ const sendLog = (text: string) => {
 }
 
 const createWindow = () => {
-    console.log(process.env.GITHUB_TOKEN)
     // Create the browser window.
     mainWindow = new BrowserWindow({
         width: 1200,

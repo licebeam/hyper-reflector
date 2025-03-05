@@ -124,7 +124,7 @@ export default function Layout({ children }) {
             <Stack flex={'auto'}>{children}</Stack>
             <Flex alignSelf={'flex-end'}>
                 <div>https://discord.gg/T77dSXG7Re</div>
-                <div style={{ fontSize: '0.8rem' }}>Hyper Reflector version 0.1.3a 2025</div>
+                <div style={{ fontSize: '0.8rem' }}>Hyper Reflector version 0.1.4a 2025</div>
             </Flex>
         </Stack>
     )

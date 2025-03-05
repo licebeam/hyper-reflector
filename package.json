@@ -3,9 +3,13 @@
   "keywords": [],
   "author": "Hyper Reflector Team",
   "productName": "hyper-reflector",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "3rd Strike matchmaking and stat tracking application",
   "main": ".vite/build/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/licebeam/hyper-reflector.git"
+  },
   "scripts": {
     "start": "electron-forge start",
     "rebuild": "electron-rebuild",
@@ -60,6 +64,7 @@
     "react-icons": "^5.5.0",
     "request": "^2.79.0",
     "styled-components": "^6.1.15",
+    "update-electron-app": "^3.1.1",
     "zustand": "^5.0.3"
   },
   "build": {
