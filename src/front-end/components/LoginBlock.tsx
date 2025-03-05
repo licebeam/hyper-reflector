@@ -16,8 +16,8 @@ export default function LoginBlock() {
     const clearUserList = useMessageStore((state) => state.clearUserList)
     const [login, setLogin] = useState({
         name: 'no-one',
-        email: 'test@test.com',
-        pass: 'test123',
+        email: '',
+        pass: '',
     })
     const navigate = useNavigate()
 

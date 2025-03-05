@@ -3,6 +3,7 @@ import started from 'electron-squirrel-startup'
 import { sendCommand, readCommand, readStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
 import { getConfig, type Config } from './config'
+require('dotenv').config();
 import keys from './private/keys'
 // external api
 import api from './external-api/requests'
@@ -61,6 +62,7 @@ const sendLog = (text: string) => {
 }
 
 const createWindow = () => {
+    console.log(process.env.GITHUB_TOKEN)
     // Create the browser window.
     mainWindow = new BrowserWindow({
         width: 1200,
