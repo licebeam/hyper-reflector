@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('api', {
     // websocket related
-    sendIceCandidate: (data: { targetId: string; candidate: any }) =>
+    sendIceCandidate: (data: { targetId: string; candidate: any; callerId: string }) =>
         ipcRenderer.send('iceCandidate', data),
     callUser: (data: { callerId: string; calleeId: string }) => ipcRenderer.send('callUser', data),
     answerCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('answerCall', data),
