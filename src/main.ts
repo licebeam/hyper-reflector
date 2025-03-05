@@ -3,7 +3,8 @@ import started from 'electron-squirrel-startup'
 import { sendCommand, readCommand, readStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
 import { getConfig, type Config } from './config'
-require('dotenv').config();
+
+
 import keys from './private/keys'
 // external api
 import api from './external-api/requests'
