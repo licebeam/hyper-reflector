@@ -4,7 +4,7 @@ import { sendCommand, readCommand, readStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
 import { getConfig, type Config } from './config'
 // updating automatically
-const { updateElectronApp, UpdateSourceType } = require('update-electron-app')
+import  { updateElectronApp, UpdateSourceType } from 'update-electron-app';
 updateElectronApp()
 import keys from './private/keys'
 // external api
