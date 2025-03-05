@@ -228,12 +228,12 @@ function connectWebSocket(user) {
     )
 
     // allow users to chat
-    window.api.on('user-message', (text: string) => {
+    window.api.on('sendMessage', (text: string) => {
         console.log(JSON.stringify(candidateList))
         // sends a message over to another user
         if (text.length) {
             signalServerSocket.send(
-                JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.name })
+                JSON.stringify({ type: 'sendMessage', message: `${text}`, sender: user.name })
             )
         }
     })
@@ -277,7 +277,8 @@ function connectWebSocket(user) {
             closePeerConnection(data.userUID)
         }
 
-        if (data.type === 'user-message') {
+        if (data.type === 'sendRoomMessage') {
+            console.log('received a message ==============================================')
             window.api.sendRoomMessage(data)
         }
 

@@ -16,7 +16,7 @@ contextBridge.exposeInMainWorld('api', {
     logOutUser: () => ipcRenderer.send('logOutUser'),
     getLoggedInUser: (uid: string) => ipcRenderer.send('getLoggedInUser', uid),
     sendMessage: (text: string) => ipcRenderer.send('sendMessage', text),
-    sendRoomMessage: (text: string) => ipcRenderer.send('roomMessage', text),
+    sendRoomMessage: (text: string) => ipcRenderer.send('sendRoomMessage', text),
     addUserToRoom: (user: any) => ipcRenderer.send('addUserToRoom', user),
     removeUserFromRoom: (user: any) => ipcRenderer.send('removeUserFromRoom', user),
     addUserGroupToRoom: (users: [any]) => ipcRenderer.send('addUserGroupToRoom', users),
