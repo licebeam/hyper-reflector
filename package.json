@@ -12,7 +12,6 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "publish1": "node -r dotenv/config node_modules/.bin/electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
     "updateSub": "git submodule update --remote"
   },
@@ -51,7 +50,6 @@
     "async": "^2.1.5",
     "axios": "^1.7.9",
     "dgram": "^1.0.1",
-    "dotenv": "^16.4.7",
     "electron-squirrel-startup": "^1.0.1",
     "fast-xml-parser": "^5.0.8",
     "firebase": "^11.2.0",
