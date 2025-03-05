@@ -329,14 +329,16 @@ function connectWebSocket(user) {
                 // 0 is our delay settings which we'll need to adjust for.
                 //TODO set the player number based on who initialized the peer connections
                 let playerNum
-                if(peerConnections[data.data.userUID]?.isInitiator){
+                if (peerConnections[data.data.userUID]?.isInitiator) {
                     console.log('I am player 1 ------------------------------------->>>>>>')
-                    playerNum = 0;
+                    playerNum = 0
                 } else {
-                    console.log('I should be set to player 2 --------------------------------->>>>>')
-                    playerNum = 1;
+                    console.log(
+                        'I should be set to player 2 --------------------------------->>>>>'
+                    )
+                    playerNum = 1
                 }
-                 // this should be set by a list of whatever ongoing challenges are running
+                // this should be set by a list of whatever ongoing challenges are running
                 await window.api.updateStun()
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
