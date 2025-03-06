@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('api', {
     addUserGroupToRoom: (users: [any]) => ipcRenderer.send('addUserGroupToRoom', users),
     handShake: (type: string) => ipcRenderer.send('hand-shake-users', type),
     sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
-    updateStun: () => ipcRenderer.send('updateStun'), // will need to add ports back later so we can connect offline users.
+    updateStun: (data: any) => ipcRenderer.send('updateStun', data), // will need to add ports back later so we can connect offline users.
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
     setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),

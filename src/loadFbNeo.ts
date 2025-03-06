@@ -95,12 +95,11 @@ export function startPlayingOnline({
     callBack: () => any
 }) {
     console.log(localPort, remoteIp, remotePort)
-    console.log('emulator target might be', remotePort + 1)
+    console.log('emulator target might be listening on', remotePort + 1)
     let luaPath = config.emulator.luaPath
     if (isTraining) {
         luaPath = config.emulator.trainingLuaPath
     }
-    // we add +1 to local port because when we hole punch nat, the emulator assigns a socket to the next port
     const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`
     return launchGGPOSpawn(directCommand, callBack)
 }

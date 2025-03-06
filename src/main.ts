@@ -21,6 +21,11 @@ let currentTargetPort = 7000 // We change this when we recieve a message from a 
 let currentPlayerNum = 0 // We change this when we recieve a message first otherwise we are player 1 unless specified somewhere else.
 let spawnedEmulator = null //used to handle closing the emulator process
 
+//for testing purposes
+let currentEmuPort = 0
+let currentProxyPort = 0
+//
+
 // - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from 'firebase/app'
 import {
@@ -319,7 +324,7 @@ const createWindow = () => {
     })
 
     ipcMain.on('serveMatch', async (event, data) => {
-        await startUPNP()
+        // await startUPNP()
         if (!currentTargetIp) {
             console.log('hey current target ip was not ready, retry')
         }
@@ -335,6 +340,11 @@ const createWindow = () => {
             callBack: () => mainWindow.webContents.send('endMatch', userUID),
         })
         spawnedEmulator = emu // in the future we can use this to check for online training etc.
+        currentEmuPort = portForUPNP
+        mainWindow.webContents.send(
+            'message-from-main',
+            `${currentEmuPort} - current emulator listen port before proxy`
+        )
     })
 
     ipcMain.on('serveMatchOffline', async (event, data) => {
@@ -534,8 +544,9 @@ app.whenReady().then(async () => {
     // profit, users should be successfully connecting the emulators together with eachother.
 
     // UPNP is working! but we need to fix the upnp library so that we can make a build.
-    ipcMain.on('updateStun', async () => {
-        // await startUPNP()
+    ipcMain.on('updateStun', async (event, data) => {
+        console.log('trying hole punching setup')
+        udpHolePunch(data.ip, data.port)
         // we must initialize the client here or nothing works correctly.
         // console.log('Starting listener...')
         // stun_port = port
@@ -604,23 +615,17 @@ app.whenReady().then(async () => {
     })
 })
 
-async function startUPNP() {
-    upnpClient = upnp.createClient()
-    console.log('starting UPNP server normally')
-
-    // we should unmap ports -- currently this breaks the server
-    // await upnpClient
-    //     ?.portUnmapping({ public: portForUPNP }, (err) => {
-    //         if (!err) return
-    //         //console.log('failed to close port', err)
-    //     })
-    //     .catch((err) => console.log(err))
-
-    // listener and proxy.
+async function startProxyListener() {
+    mainWindow.webContents.send('message-from-main', `attempting proxy listener`)
     proxyListener = dgram.createSocket('udp4')
+    mainWindow.webContents.send('message-from-main', `socket created`)
 
     proxyListener.bind(portForUPNP, () => {
         console.log(`proxy listening on port ${portForUPNP}...`)
+        mainWindow.webContents.send(
+            'message-from-main',
+            `proxy listening on port ${portForUPNP}...`
+        )
     })
 
     // we use this to send traffic from 7000 to 7001
@@ -631,12 +636,17 @@ async function startUPNP() {
         if (rinfo.port !== 7000) {
             currentTargetPort = rinfo.port
             console.log('Player isnt using upnp -> changing target port to: ', rinfo.port)
+            console.log('currentTargetPort = ', currentTargetPort)
         }
 
         // prevent keep alive from being forwarded to the emulator - it crashes
         const messageContent = msg.toString()
         if (messageContent === 'ping') {
             console.log(`Ignoring keep-alive message from ${rinfo.address}:${rinfo.port}`)
+            mainWindow.webContents.send(
+                'message-from-main',
+                `Ignoring keep-alive message from ${rinfo.address}:${rinfo.port}`
+            )
             return
         }
         // debug to see realtime packets from your opponents emulator.
@@ -644,6 +654,10 @@ async function startUPNP() {
 
         // Forward packet to emulator on or listen port + 1 on localhost
         // supposedly this shouldn't add much overhead in lag, we'll need to run some tests.
+        mainWindow.webContents.send(
+            'message-from-main',
+            `proxy is forwarding message: ${messageContent} from:  ${rinfo.address}:${rinfo.port}`
+        )
         forwardPacket(msg, 7000 + 1, '127.0.0.1')
     })
 
@@ -655,7 +669,20 @@ async function startUPNP() {
             socket.close()
         })
     }
+}
 
+async function startUPNP() {
+    upnpClient = upnp.createClient()
+    console.log('starting UPNP server normally')
+
+    // we should unmap ports -- currently this breaks the server
+    // await upnpClient
+    //     ?.portUnmapping({ public: portForUPNP }, (err) => {
+    //         if (!err) return
+    //         //console.log('failed to close port', err)
+    //     })
+    //     .catch((err) => console.log(err))
+    await startProxyListener()
     // unpn mapping and usage
     upnpClient.portMapping(
         {
@@ -686,4 +713,118 @@ async function startUPNP() {
             console.log('failed to get external ip')
         }
     })
+}
+
+async function udpHolePunch(remoteIp: string, remotePort: string) {
+    // const STUN_SERVER = 'stun.l.google.com:19302' // Public STUN server
+    const socket = dgram.createSocket('udp4')
+    let natType = 'Unknown'
+
+    // start proxy
+    await startProxyListener()
+
+    // Start the UDP socket on a random port
+    socket.bind(() => {
+        const address = socket.address()
+        console.log(`UDP socket listening on ${address.address}:${address.port}`)
+    })
+
+    // Handle incoming messages
+    socket.on('message', (msg, rinfo) => {
+        console.log(`Received message from ${rinfo.address}:${rinfo.port} - ${msg.toString('hex')}`)
+    })
+
+    // Handle errors
+    socket.on('error', (err) => {
+        console.error('UDP socket error:', err)
+        socket.close()
+    })
+
+    // NAT Type Detection
+    // async function detectNATType() {
+    //     try {
+    //         const request = await stun.request(STUN_SERVER, { socket })
+
+    //         let addr1 = request.getXorAddress() || request.getMappedAddress() // Try both methods
+    //         if (!addr1) {
+    //             console.error('STUN response did not contain XOR-MAPPED-ADDRESS or MAPPED-ADDRESS.')
+    //             return
+    //         }
+    //         console.log('First STUN response:', addr1)
+
+    //         // Send another STUN request to check for port changes
+    //         const request2 = await stun.request(STUN_SERVER, { socket })
+    //         let addr2 = request2.getXorAddress() || request2.getMappedAddress()
+
+    //         if (!addr2) {
+    //             console.error(
+    //                 'Second STUN response did not contain XOR-MAPPED-ADDRESS or MAPPED-ADDRESS.'
+    //             )
+    //             return
+    //         }
+    //         console.log('Second STUN response:', addr2)
+
+    //         // Determine NAT type
+    //         if (addr1.address === addr2.address && addr1.port === addr2.port) {
+    //             natType = 'Full Cone NAT'
+    //         } else if (addr1.address === addr2.address && addr1.port !== addr2.port) {
+    //             natType = 'Port-Restricted NAT'
+    //         } else {
+    //             natType = 'Symmetric NAT'
+    //         }
+
+    //         console.log(`Detected NAT Type: ${natType}`)
+    //     } catch (error) {
+    //         console.error('STUN request failed:', error)
+    //     }
+    // }
+
+    // Send periodic keep-alive packets to maintain NAT mapping
+    function startKeepAlive() {
+        setInterval(() => {
+            const message = Buffer.from('ping')
+            socket.send(message, 0, message.length, remotePort, remoteIp, (err) => {
+                if (err) console.error('Failed to send keep-alive:', err)
+            })
+            console.log('Sent keep-alive packet.')
+        }, 1000)
+    }
+
+    // Attempt to establish a direct peer-to-peer connection
+    function attemptHolePunching(peerIP, peerPort) {
+        currentTargetIp = peerIP
+        // currentTargetPort = peerPort
+        // if (natType === 'Symmetric NAT') {
+        //     console.log('Symmetric NAT detected. Falling back to TURN.');
+        //     return useTURN(peerIP, peerPort);
+        // }
+
+        console.log(`Attempting UDP hole punching with peer ${peerIP}:${peerPort}`)
+        const message = Buffer.from('ping')
+        socket.send(message, 0, message.length, peerPort, peerIP, (err) => {
+            if (err) console.error('Failed to send hole punching message:', err)
+            else console.log(`Sent hole punching message to ${peerIP}:${peerPort}`)
+        })
+    }
+
+    // // Use TURN relay if UDP fails
+    // function useTURN(peerIP, peerPort) {
+    //     console.log(`Falling back to TURN relay via ${TURN_SERVER.host}:${TURN_SERVER.port}`);
+    //     const relayMessage = Buffer.from('relay me');
+    //     socket.send(relayMessage, 0, relayMessage.length, TURN_SERVER.port, TURN_SERVER.host, (err) => {
+    //         if (err) console.error('Failed to send TURN relay request:', err);
+    //         else console.log('Sent TURN relay request.');
+    //     });
+    // }
+
+    // Start NAT detection
+    // detectNATType().then(() => {
+
+    startKeepAlive()
+    // })
+
+    // Simulate a hole punch attempt (Replace with real peer IP & port)
+    setTimeout(() => {
+        attemptHolePunching(remoteIp, remotePort) // Replace with actual peer IP/Port
+    }, 5000)
 }

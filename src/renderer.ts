@@ -346,7 +346,7 @@ function connectWebSocket(user) {
                     playerNum = 1
                 }
                 // this should be set by a list of whatever ongoing challenges are running
-                await window.api.updateStun()
+                await window.api.updateStun({ip, port})
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
                 // this automatically serves the match when we get a successful candidate, we should probably hanges this.
