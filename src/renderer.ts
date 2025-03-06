@@ -7,6 +7,7 @@ let signalServerSocket: WebSocket = null // socket reference
 let candidateList = []
 let callerIdState = null
 let myUID = null
+let mylocalStunPort = 0 // set this later
 let isCaller
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
@@ -106,8 +107,9 @@ function setupLogging(peer, userLabel, event) {
 
             let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
             if (matches) {
-                let [ip, port] = matches[0].split(' ')
+                let [ip, port, relatedPort] = matches[0].split(' ')
                 console.log(`${userLabel} External IP: ${ip}, Port: ${port}`)
+                mylocalStunPort = relatedPort //set the stun port to use in main we need to use the related port.
             }
             candidateList.push(event.candidate)
             if (callerIdState) {
@@ -282,11 +284,11 @@ function connectWebSocket(user) {
             closePeerConnection(data.userUID)
         }
 
-        if (data.type === "matchEndedClose"){
+        if (data.type === 'matchEndedClose') {
             //user the userUID and close all matches.
             closePeerConnection(data.userUID)
-            console.log("killing emulator")
-            window.api.killEmulator();
+            console.log('killing emulator')
+            window.api.killEmulator()
         }
 
         if (data.type === 'getRoomMessage') {
@@ -346,7 +348,7 @@ function connectWebSocket(user) {
                     playerNum = 1
                 }
                 // this should be set by a list of whatever ongoing challenges are running
-                await window.api.updateStun({ip, port})
+                await window.api.updateStun({ ip, port, localStunPort: mylocalStunPort })
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
                 // this automatically serves the match when we get a successful candidate, we should probably hanges this.
