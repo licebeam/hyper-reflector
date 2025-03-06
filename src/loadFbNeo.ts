@@ -1,29 +1,42 @@
 const { exec, spawn } = require('child_process')
 import { Config } from './config'
 
-// export default function launchGGPO(command) {
-//     try {
-//         exec(command, (error, stdout, stderr) => {
-//             if (error) {
-//                 console.error(`Error starting Fightcade-FBNeo: ${error.message}`)
-//                 return
-//             }
-//             if (stderr) {
-//                 console.error(`stderr: ${stderr}`)
-//                 return
-//             }
-//             console.log(`stdout: ${stdout}`)
-//         })
-//     } catch (error) {
-//         console.log(error)
-//     }
-// }
+export default function launchGGPO(command, callBack: () => any) {
+    try {
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error starting Fightcade-FBNeo: ${error.message}`)
+                return
+            }
+            if (stderr) {
+                console.error(`stderr: ${stderr}`)
+                return
+            }
+            console.log(`stdout: ${stdout}`)
+        })
+        return true
+    } catch (error) {
+        console.log(error)
+    }
+}
 
 export function launchGGPOSpawn(command: string, callBack: () => any) {
     try {
         const [cmd, ...args] = command.split(' ')
-        const child = spawn(cmd, args, { stdio: 'inherit', shell: true })
-        // listening for process exit
+        
+        const child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] }) // Redirect stdout and stderr
+
+        // Capture stdout (logs from emulator)
+        child.stdout.on('data', (data) => {
+            console.log(`[Fightcade-FBNeo]: ${data.toString()}`)
+        });
+
+        // Capture stderr (errors)
+        child.stderr.on('data', (data) => {
+            console.error(`[Fightcade-FBNeo Error]: ${data.toString()}`)
+        });
+
+        // Listen for process exit
         child.on('exit', (code, signal) => {
             if (code !== null) {
                 console.log(`Fightcade-FBNeo exited with code ${code}`)
@@ -33,16 +46,16 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
             if (callBack) {
                 callBack()
             }
-        })
+        });
 
-        // listening for for errors
+        // Listen for errors
         child.on('error', (error) => {
             console.error(`Failed to start Fightcade-FBNeo: ${error.message}`)
-        })
+        });
 
-        return child // return the emulator reference so that we can close it if needed.
+        return child // Return process reference
     } catch (error) {
-        console.log(error)
+        console.error(`Launch error: ${error}`)
     }
 }
 
