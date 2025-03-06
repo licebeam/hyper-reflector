@@ -320,7 +320,6 @@ const createWindow = () => {
 
     ipcMain.on('serveMatch', async (event, data) => {
         await startUPNP()
-        console.log('should start a match up')
         if (!currentTargetIp) {
             console.log('hey current target ip was not ready, retry')
         }
@@ -344,7 +343,6 @@ const createWindow = () => {
         currentTargetPort = data.port || 7000
         console.log(`Connecting to ${data.ip}, Port: ${data.port}`)
         await startUPNP().catch((err) => console.log('error starting upnp server', err))
-        console.log('should start a match up')
         if (!currentTargetIp) {
             console.log('hey current target ip was not ready, retry')
         }
