@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('api', {
     endMatch: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     killEmulator: () => ipcRenderer.send('killEmulator'),
     sendUDPMessage: (data: any) => ipcRenderer.send('sendUDPMessage', data),
+    sendStunOverSocket: (data: {publicIp: string, publicPrt: string}) => (ipcRenderer.send('sendStunOverSocket', data)),
     // sends text to the emulator using the fbneo_commands.txt
     sendText: (text: string) => ipcRenderer.send('send-text', text),
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),

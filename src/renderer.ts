@@ -13,8 +13,8 @@ let isCaller
 let userName = null
 let opponentId = null
 
-// const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
-const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
+const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
+// const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
 
 // handle connection to remote turn server
 const googleStuns = [
@@ -376,6 +376,10 @@ function connectWebSocket(user) {
                 window.api.serveMatch(ip, 7000, playerNum, 0, 7000)
             }
         }
+
+        if (data.type === 'receiveHolePunchStun') {
+            console.log("got a hole punch candidate", data)
+        }
     }
 
     // Fix this later, we need to get the actual user IP.
@@ -406,4 +410,14 @@ window.api.on('endMatch', (userUID: string) => {
             })
         )
     }
+})
+
+window.api.on('stunOverSocket', (data: any, opponentUID: string) => {
+    signalServerSocket.send(
+        JSON.stringify({
+            type: 'sendStunOverSocket',
+            opponentUID,
+            data,
+        })
+    )
 })
