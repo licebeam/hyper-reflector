@@ -350,8 +350,8 @@ const createWindow = () => {
         const emu = startPlayingOnline({
             config,
             localPort: localStunPort || 7000,
-            remoteIp: data.opponentIp || '127.0.0.1',
-            remotePort: data.opponentPort || 7001,
+            remoteIp: data.ip || '127.0.0.1',
+            remotePort: data.port || 7001,
             player: data.player || 0,
             delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.
