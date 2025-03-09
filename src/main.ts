@@ -324,9 +324,11 @@ const createWindow = () => {
             console.log('hey current target ip was not ready, retry')
         }
         mainWindow.webContents.send('message-from-main', 'starting match')
+        const { publicPort, publicIp } = await udpHolePunch(data.ip, data.port, mainWindow)
+        await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort })
         const emu = startPlayingOnline({
             config,
-            localPort: portForUPNP || 7000,
+            localPort: publicPort || 7000,
             remoteIp: opponentIp || '127.0.0.1',
             remotePort: opponentPort || 7001,
             player: data.player || 0,
@@ -359,13 +361,13 @@ const createWindow = () => {
         if (!opponentIp) {
             console.log('hey current target ip was not ready, retry')
         }
-        
+
         mainWindow.webContents.send('message-from-main', 'starting match')
         const emu = startPlayingOnline({
             config,
             localPort: publicPort || 7000,
             remoteIp: opponentIp || '127.0.0.1',
-            remotePort: publicPort || 7000, // if no target, retarget ourselves for testing
+            remotePort: opponentPort || 7000, // if no target, retarget ourselves for testing
             player: data.player || 0,
             delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.
