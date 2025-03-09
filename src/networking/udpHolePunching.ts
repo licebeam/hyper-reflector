@@ -1,7 +1,11 @@
+import { c } from 'node_modules/vite/dist/node/types.d-aGj9QkWt'
+
 const LOCAL_EMULATOR_PORT = 7000
 const LOCAL_EMULATOR_IP = '127.0.0.1'
 const dgram = require('dgram')
 let updSocket: null | any = null
+let keepAliveInterval = null
+let holePunchInterval = null
 
 export async function udpHolePunch(remoteIp: string, remotePort: number, mainWindow: any) {
     updSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
@@ -52,7 +56,8 @@ export async function udpHolePunch(remoteIp: string, remotePort: number, mainWin
 
     // Send periodic keep-alive packets to maintain NAT mapping
     function startKeepAlive(targetIp, targetPort) {
-        setInterval(() => {
+        if (!updSocket) return
+        keepAliveInterval = setInterval(() => {
             const message = Buffer.from('ping')
             updSocket.send(message, 0, message.length, LOCAL_EMULATOR_PORT, targetIp, (err) => {
                 if (err) console.error('Failed to send keep-alive:', err)
@@ -68,7 +73,8 @@ export async function udpHolePunch(remoteIp: string, remotePort: number, mainWin
             `Attempting UDP hole punching with ${peerIP}:${peerPort}`
         )
 
-        setInterval(() => {
+        holePunchInterval = setInterval(() => {
+            if (!updSocket) return
             const message = Buffer.from('keep-ping')
             updSocket.send(message, 0, message.length, peerPort, peerIP, (err) => {
                 if (err) console.error('Failed to send hole punching message:', err)
@@ -83,7 +89,14 @@ export async function udpHolePunch(remoteIp: string, remotePort: number, mainWin
 
 export function killUdpSocket() {
     console.log('killing socket')
-    updSocket.close()
+    if (updSocket) {
+        updSocket.close()
+        updSocket = null
+        clearInterval(holePunchInterval)
+        clearInterval(keepAliveInterval)
+        holePunchInterval = null
+        keepAliveInterval = null
+    }
 }
 
 // async function udpHolePunch(

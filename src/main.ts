@@ -332,7 +332,12 @@ const createWindow = () => {
             player: data.player || 0,
             delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.
-            callBack: () => mainWindow.webContents.send('endMatch', userUID),
+            callBack: () => {
+                // attempt to kill the emulator
+                mainWindow.webContents.send('endMatch', userUID)
+                console.log('emulator should die')
+                killUdpSocket()
+            },
         })
         spawnedEmulator = emu // in the future we can use this to check for online training etc.
         currentEmuPort = portForUPNP
@@ -361,7 +366,12 @@ const createWindow = () => {
             player: data.player || 0,
             delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.
-            callBack: () => mainWindow.webContents.send('endMatch', userUID),
+            callBack: () => {
+                // attempt to kill the emulator
+                mainWindow.webContents.send('endMatch', userUID)
+                console.log('emulator should die')
+                killUdpSocket()
+            },
         })
         spawnedEmulator = emu // in the future we can use this to check for online training etc.
         currentEmuPort = portForUPNP
