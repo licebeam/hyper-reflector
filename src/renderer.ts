@@ -378,7 +378,7 @@ function connectWebSocket(user) {
         }
 
         if (data.type === 'receiveHolePunchStun') {
-            console.log("got a hole punch candidate", data)
+            console.log("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& got a hole punch candidate", data)
         }
     }
 
@@ -412,7 +412,8 @@ window.api.on('endMatch', (userUID: string) => {
     }
 })
 
-window.api.on('stunOverSocket', (data: any, opponentUID: string) => {
+window.api.on('sendStunOverSocket', (data: any, opponentUID: string) => {
+    console.log('TRYING TO SEND STUN OVER SOCKET!')
     signalServerSocket.send(
         JSON.stringify({
             type: 'sendStunOverSocket',
