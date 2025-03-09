@@ -63,6 +63,7 @@
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
     "request": "^2.79.0",
+    "stun": "^2.1.0",
     "styled-components": "^6.1.15",
     "update-electron-app": "^3.1.1",
     "zustand": "^5.0.3"

@@ -25,6 +25,7 @@ export interface IElectronAPI {
     endMatch: any
     killEmulator: any
     sendUDPMessage: any
+    sendStunOverSocket: any
     // sends text to the emulator using the fbneo_commands.txt
     sendText: any
     sendCommand: any
@@ -32,6 +33,7 @@ export interface IElectronAPI {
     serveMatch: any
     serveMatchOffline: any
     startSoloTraining: any
+
     // ipc call stuff
     on: any
     removeListener: any
