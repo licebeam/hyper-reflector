@@ -35,13 +35,18 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
         child.stderr.on('data', (data) => {
             console.error(`[Fightcade-FBNeo Error]: ${data.toString()}`)
             // call the kill code
-            callBack()
+            if (callBack) {
+                callBack()
+            }
         })
 
         // Listen for process exit
         child.on('exit', (code, signal) => {
             // call the kill code
-            callBack()
+            if (callBack) {
+                callBack()
+            }
+
             if (code !== null) {
                 console.log(`Fightcade-FBNeo exited with code ${code}`)
             } else {
