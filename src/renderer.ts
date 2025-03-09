@@ -247,6 +247,7 @@ function connectWebSocket(user) {
                 })
             )
             callerIdState = callerId
+            opponentId = callerId
         }
     )
 
@@ -378,7 +379,7 @@ function connectWebSocket(user) {
 
                 //TODO fix these references
                 matchPlayerNum = playerNum
-            } 
+            }
         }
 
         if (data.type === 'receiveHolePunchStun') {
