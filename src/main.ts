@@ -339,8 +339,10 @@ const createWindow = () => {
     })
 
     ipcMain.on('startGameOnline', async (event, data) => {
+        console.log(data)
+        //{ ip: undefined, port: undefined, player: 0, delay: 0, myPort: 7000 }
         try {
-            await startHolePunching(data.opponentIp, data.opponentPort, mainWindow)
+            await startHolePunching(data.ip, data.port, mainWindow)
         } catch (error) {
             console.log('error starting hole punch', error)
         }
