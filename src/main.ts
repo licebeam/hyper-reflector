@@ -325,7 +325,14 @@ const createWindow = () => {
         }
         mainWindow.webContents.send('message-from-main', 'starting match')
         const { publicPort, publicIp } = await udpHolePunch(data.ip, data.port, mainWindow)
-        await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort })
+        console.log('about to send stun over socket to renderer --0-0-0-0-0-0-0-0-0')
+        try {
+            await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort }) 
+        } catch (error) {
+            console.log('couldnt send stun over sock')
+        }
+        
+
         const emu = startPlayingOnline({
             config,
             localPort: publicPort || 7000,
