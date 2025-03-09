@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld('api', {
     setTargetIp: (ip: string) => ipcRenderer.send('setTargetIp', ip),
     serveMatch: (ip: string, port: number, player: number, delay: number, myPort: number) =>
         ipcRenderer.send('serveMatch', { ip, port, player, delay, myPort }),
+    startGameOnline: (ip: string, port: number, player: number, delay: number, myPort: number) =>
+        ipcRenderer.send('startGameOnline', { ip, port, player, delay, myPort }),
     serveMatchOffline: (ip: string, port: number, player: number, delay: number, myPort: number) =>
         ipcRenderer.send('serveMatchOffline', { ip, port, player, delay, myPort }),
     startSoloTraining: () => ipcRenderer.send('start-solo-mode'),

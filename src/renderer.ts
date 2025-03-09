@@ -12,6 +12,7 @@ let mylocalRealPort = 0 // set this later
 let isCaller
 let userName = null
 let opponentId = null
+let matchPlayerNum = 0
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
 const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
@@ -374,7 +375,10 @@ function connectWebSocket(user) {
                 await window.api.setTargetIp(ip)
                 // this automatically serves the match when we get a successful candidate, we should probably hanges this.
                 window.api.serveMatch(ip, 7000, playerNum, 0, 7000)
-            }
+
+                //TODO fix these references
+                matchPlayerNum = playerNum
+            } 
         }
 
         if (data.type === 'receiveHolePunchStun') {
@@ -382,6 +386,7 @@ function connectWebSocket(user) {
                 '&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& got a hole punch candidate',
                 data
             )
+            window.api.startGameOnline(data.opponentIp, data.opponentPort, matchPlayerNum, 0, 7000)
         }
     }
 
