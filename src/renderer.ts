@@ -8,7 +8,10 @@ let candidateList = []
 let callerIdState = null
 let myUID = null
 let mylocalStunPort = 0 // set this later
+let mylocalRealPort = 0 // set this later
 let isCaller
+let userName = null
+let opponentId = null
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
 const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
@@ -50,8 +53,9 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
 
     // create data channel
     if (isInitiator) {
+        console.log('creating a data channel')
         // Only the initiator creates a data channel
-        dataChannel = peerConnection.createDataChannel('game')
+        dataChannel = peerConnection.createDataChannel('updForwarding')
         dataChannel.onopen = () => console.log('Data channel open')
         dataChannel.onmessage = (event) => console.log('Received:', event.data)
     } else {
@@ -82,7 +86,9 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
     }
 
     peerConnection.isInitiator = isInitiator || false // type error but we can fix this later. We'll use this line to make sure we set the correct player number
+    peerConnection.dataChannel = dataChannel
     peerConnections[userUID] = peerConnection
+
     return peerConnection
 }
 
@@ -98,6 +104,11 @@ function closePeerConnection(userId: string) {
     }
 }
 
+window.api.on('sendUDPMessage', () => {
+    console.log('received a udp message from our emulator')
+    peerConnections[opponentId].dataChannel.send('test')
+})
+
 function setupLogging(peer, userLabel, event) {
     if (event.candidate) {
         let candidate = event.candidate.candidate
@@ -105,11 +116,17 @@ function setupLogging(peer, userLabel, event) {
         if (candidate.includes('srflx')) {
             console.log(`${userLabel} STUN Candidate (srflx):`, candidate)
 
-            let matches = candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
+            let regex = /([0-9]{1,3}\.){3}[0-9]{1,3} (\d+) typ srflx raddr ([0-9\.]+) rport (\d+)/
+            let matches = candidate.match(regex)
             if (matches) {
-                let [ip, port, relatedPort] = matches[0].split(' ')
+                let ip = matches[1] // The public IP (e.g., 133.32.4.39)
+                let port = matches[2] // The port (e.g., 50133)
+                let raddr = matches[3] // The private IP address (e.g., 192.168.11.2)
+                let rport = matches[4] // The rport (e.g., 50133)
                 console.log(`${userLabel} External IP: ${ip}, Port: ${port}`)
-                mylocalStunPort = relatedPort //set the stun port to use in main we need to use the related port.
+                console.log('----------------MATCHES ', matches, rport)
+                mylocalStunPort = port //set the stun port to use in main we need to use the related port.
+                mylocalRealPort = rport
             }
             candidateList.push(event.candidate)
             if (callerIdState) {
@@ -127,8 +144,6 @@ function setupLogging(peer, userLabel, event) {
         }
     }
 }
-
-let userName
 
 window.api.on('loginSuccess', (user) => {
     if (user) {
@@ -313,6 +328,7 @@ function connectWebSocket(user) {
             await peerConnections[data.data.answererId].setRemoteDescription(
                 new RTCSessionDescription(data.data.answer)
             )
+            opponentId = data.data.answererId // set the current opponent so we can get them from the peer list.
             console.log(
                 'Answering call, trying to send some data; ',
                 data.data.callerId,
@@ -348,7 +364,12 @@ function connectWebSocket(user) {
                     playerNum = 1
                 }
                 // this should be set by a list of whatever ongoing challenges are running
-                await window.api.updateStun({ ip, port, localStunPort: mylocalStunPort })
+                await window.api.updateStun({
+                    ip,
+                    port,
+                    localStunPort: mylocalStunPort,
+                    mylocalRealPort,
+                })
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
                 // this automatically serves the match when we get a successful candidate, we should probably hanges this.

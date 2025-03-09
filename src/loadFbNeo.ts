@@ -23,18 +23,18 @@ export default function launchGGPO(command, callBack: () => any) {
 export function launchGGPOSpawn(command: string, callBack: () => any) {
     try {
         const [cmd, ...args] = command.split(' ')
-        
+
         const child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] }) // Redirect stdout and stderr
 
         // Capture stdout (logs from emulator)
         child.stdout.on('data', (data) => {
             console.log(`[Fightcade-FBNeo]: ${data.toString()}`)
-        });
+        })
 
         // Capture stderr (errors)
         child.stderr.on('data', (data) => {
             console.error(`[Fightcade-FBNeo Error]: ${data.toString()}`)
-        });
+        })
 
         // Listen for process exit
         child.on('exit', (code, signal) => {
@@ -46,12 +46,12 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
             if (callBack) {
                 callBack()
             }
-        });
+        })
 
         // Listen for errors
         child.on('error', (error) => {
             console.error(`Failed to start Fightcade-FBNeo: ${error.message}`)
-        });
+        })
 
         return child // Return process reference
     } catch (error) {
