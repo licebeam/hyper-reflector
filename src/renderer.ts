@@ -396,7 +396,7 @@ function connectWebSocket(user) {
 
 //ends match with any player who has an active connection with you, this should also close the rtc connection
 window.api.on('endMatch', (userUID: string) => {
-    console.log('ending match', userUID)
+    console.log('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ending match', userUID)
     if (userUID) {
         console.log('sending socket signal to close')
         signalServerSocket.send(
