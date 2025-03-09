@@ -591,6 +591,6 @@ app.whenReady().then(async () => {
     // UPNP is working! but we need to fix the upnp library so that we can make a build.
     ipcMain.on('updateStun', async (event, data) => {
         console.log('trying hole punching setup')
-        udpHolePunch(data.ip, data.port, mainWindow)
+        // udpHolePunch(data.ip, data.port, mainWindow)
     })
 })
