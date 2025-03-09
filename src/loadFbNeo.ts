@@ -102,7 +102,14 @@ export function startPlayingOnline({
         luaPath = config.emulator.trainingLuaPath
     }
     const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`
-    return launchGGPOSpawn(directCommand, callBack)
+    switch (process.platform) {
+        case 'darwin':
+            return launchGGPOSpawn(directCommand, () => {})
+        case 'linux':
+            return launchGGPOSpawn(directCommand, callBack)
+        default:
+            return launchGGPOSpawn(directCommand, callBack)
+    }
 }
 
 export function startSoloMode({ config, callBack }: { config: Config; callBack: () => any }) {

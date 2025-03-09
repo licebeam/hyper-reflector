@@ -30,6 +30,7 @@ export async function udpHolePunch(remoteIp: string, remotePort: number, mainWin
     console.log(publicIp, publicPort)
 
     udpSocket.bind(publicPort, () => {
+        if (!udpSocket) return
         const { port } = udpSocket.address() // Get the actual assigned port
         console.log(`UDP socket bound to ${port}`)
         mainWindow.webContents.send('message-from-main', `UDP socket bound to ${port}`)
@@ -39,6 +40,7 @@ export async function udpHolePunch(remoteIp: string, remotePort: number, mainWin
     })
 
     udpSocket.on('message', (msg, rinfo) => {
+        if (!udpSocket) return
         console.log(`Received packet: ${msg} from ${rinfo.address}:${rinfo.port}`)
 
         const messageContent = msg.toString()
@@ -63,11 +65,13 @@ export async function udpHolePunch(remoteIp: string, remotePort: number, mainWin
 
     // Handle errors
     udpSocket.on('error', (err) => {
+        if (!udpSocket) return
         console.error('UDP socket error:', err)
         udpSocket.close()
     })
 
     function forwardPacket(data, targetPort, targetIP) {
+        if (!udpSocket) return
         console.log('forwarding message to', targetIP, targetPort)
         udpSocket.send(data, targetPort, targetIP, (err) => {
             if (err) console.log(`Proxy forwarding Error: ${err.message}`)
