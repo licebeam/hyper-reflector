@@ -10,7 +10,7 @@ import keys from './private/keys'
 // external api
 import api from './external-api/requests'
 // p2p networking
-import { udpHolePunch, killUdpSocket } from './networking/udpHolePunching'
+import { udpHolePunch, killUdpSocket, startHolePunching } from './networking/udpHolePunching'
 import { startUPNP, portForUPNP } from './networking/upnpRunner'
 let opponentIp = '127.0.0.1' // We change this if we get a message from player and try to target that ip.
 let opponentPort = 7000 // We change this when we recieve a message from a player on a different port, this means one is not using upnp.
@@ -318,6 +318,7 @@ const createWindow = () => {
         // TODO: add error handling this is an important function.
     })
 
+    let localStunPort = 0
     ipcMain.on('serveMatch', async (event, data) => {
         // await startUPNP(mainWindow, sendLog)
         if (!opponentIp) {
@@ -325,18 +326,30 @@ const createWindow = () => {
         }
         mainWindow.webContents.send('message-from-main', 'starting match')
         const { publicPort, publicIp } = await udpHolePunch(data.ip, data.port, mainWindow)
+            .then()
+            .catch((err) => console.log('error starting udp socket', err))
         console.log('about to send stun over socket to renderer --0-0-0-0-0-0-0-0-0')
         try {
             await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort })
         } catch (error) {
-            console.log('couldnt send stun over sock')
+            console.log('couldnt send stun over socket')
+        }
+
+        localStunPort = publicPort
+    })
+
+    ipcMain.on('startGameOnline', async (event, data) => {
+        try {
+            await startHolePunching(data.opponentIp, data.opponentPort, mainWindow)
+        } catch (error) {
+            console.log('error starting hole punch', error)
         }
 
         const emu = startPlayingOnline({
             config,
-            localPort: publicPort || 7000,
-            remoteIp: opponentIp || '127.0.0.1',
-            remotePort: opponentPort || 7001,
+            localPort: localStunPort || 7000,
+            remoteIp: data.opponentIp || '127.0.0.1',
+            remotePort: data.opponentPort || 7001,
             player: data.player || 0,
             delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.
