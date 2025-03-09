@@ -327,11 +327,10 @@ const createWindow = () => {
         const { publicPort, publicIp } = await udpHolePunch(data.ip, data.port, mainWindow)
         console.log('about to send stun over socket to renderer --0-0-0-0-0-0-0-0-0')
         try {
-            await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort }) 
+            await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort })
         } catch (error) {
             console.log('couldnt send stun over sock')
         }
-        
 
         const emu = startPlayingOnline({
             config,
@@ -483,6 +482,7 @@ async function handleExitApp() {
     if (userUID) {
         // remove user from websockets and log them out of firebase on close
         await api.removeLoggedInUser(auth)
+        await killUdpSocket()
         // mainWindow?.webContents.send('closingApp', { uid: userUID })
     }
     // if (proxyListener) {
