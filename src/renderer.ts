@@ -13,8 +13,8 @@ let isCaller
 let userName = null
 let opponentId = null
 
-const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
-// const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
+// const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
+const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
 
 // handle connection to remote turn server
 const googleStuns = [
