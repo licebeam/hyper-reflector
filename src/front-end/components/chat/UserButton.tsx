@@ -9,10 +9,10 @@ export default function UserButton({ user }) {
     const callData = useMessageStore((state) => state.callData)
     const removeCallData = useMessageStore((state) => state.removeCallData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
+    const setCallData = useMessageStore((state) => state.setCallData)
 
     useEffect(() => {
-        console.log('should reset call', callData)
-
+        console.log('call', callData)
         setIsUserChallenging((prevState) => {
             const found = callData.some((call) => call.callerId === user.uid)
             console.log(found ? 'Found USER in call' : 'Did not find user in call')
@@ -26,7 +26,6 @@ export default function UserButton({ user }) {
         // removeCallData(caller)
         clearCallData()
         console.log('match ended----------------------------')
-
     }
 
     useEffect(() => {
@@ -53,6 +52,7 @@ export default function UserButton({ user }) {
                             user.uid
                         )
                         window.api.callUser({ callerId: userState.uid, calleeId: user.uid })
+                        // setCallData({ callerId: user.uid, type: 'test' })
                     }}
                 >
                     Challenge

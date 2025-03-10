@@ -11,6 +11,7 @@ export default function UsersChat() {
     const removeUser = useMessageStore((state) => state.removeUser)
     const clearUserList = useMessageStore((state) => state.clearUserList)
     const setCallData = useMessageStore((state) => state.setCallData)
+    const callData = useMessageStore((state) => state.callData)
 
     // user has joined lobby
     const handleUserJoinGroup = (users) => {
@@ -32,7 +33,10 @@ export default function UsersChat() {
 
     const handleReceiveCall = (data) => {
         console.log('RECIEVED CALL')
-        setCallData(data)
+        if (!callData.find((c) => c.callerId === data.callerId)) {
+            console.log('no user found, adding to call')
+            setCallData(data)
+        }
     }
 
     // get users from websockets
