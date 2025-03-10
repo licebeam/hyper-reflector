@@ -30,16 +30,35 @@ function sendMessageToS() {
 
 sendMessageToS()
 
-var counter = 0
 function sendMessageToB(address, port) {
-    if (counter == 5) return
-    var message = new Buffer(counter++ + ': Hello B!')
+    var message = new Buffer('message : Hello B!')
     socket.send(message, 0, message.length, port, address, function (err, nrOfBytesSent) {
         if (err) return console.log(err)
         console.log('UDP message sent to B:', address + ':' + port)
-
+        startEmulator(address, port)
+        // This is the keep alive
         setTimeout(function () {
             sendMessageToB(address, port)
         }, 2000)
+    })
+}
+
+
+function startEmulator(address, port){
+    const emu = startPlayingOnline({
+        config,
+        localPort: 7000,
+        remoteIp: address,
+        remotePort: port,
+        player: 0,
+        delay: 0,
+        isTraining: false, // Might be used in the future.
+        callBack: () => {
+            console.log('test')
+            // // attempt to kill the emulator
+            // mainWindow.webContents.send('endMatch', userUID)
+            // console.log('emulator should die')
+            // killUdpSocket()
+        },
     })
 }

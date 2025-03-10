@@ -121,3 +121,7 @@ export function startSoloMode({ config, callBack }: { config: Config; callBack: 
     const directCommand = `${fightcadeCmd(config)} -game sfiii3nr1 ${config.emulator.trainingLuaPath}`
     return launchGGPOSpawn(directCommand, callBack)
 }
+
+module.exports = {
+    startPlayingOnline,
+}
