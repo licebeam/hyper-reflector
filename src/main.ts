@@ -389,19 +389,19 @@ const createWindow = () => {
             // if we don't get a ping we should forward it to the emulator
             // we probably shouldnt do any conversions to save time
             const messageContent = message.toString()
-            if (messageContent === 'ping') {
-                console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
-                try {
-                    publicEndpointB = JSON.parse(message)
-                    sendMessageToB(publicEndpointB.address, publicEndpointB.port)
-                } catch (err) {}
-            } else {
-                // we should forward to the emulator if it's not a ping
-                sendMessageToB(publicEndpointB.address, publicEndpointB.port, message)
-                // socket.send(message, 0, message.length, 7000, '127.0.0.1', (err) => {
-                //     if (err) console.log(`Forwarding error: ${err.message}`)
-                // })
-            }
+            // if (messageContent === 'ping') {
+            // console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
+            try {
+                publicEndpointB = JSON.parse(message)
+                sendMessageToB(publicEndpointB.address, publicEndpointB.port)
+            } catch (err) {}
+            // } else {
+            //     // we should forward to the emulator if it's not a ping
+            //     sendMessageToB(publicEndpointB.address, publicEndpointB.port, message)
+            //     // socket.send(message, 0, message.length, 7000, '127.0.0.1', (err) => {
+            //     //     if (err) console.log(`Forwarding error: ${err.message}`)
+            //     // })
+            // }
         })
 
         // get messages from our local emulator and send it to the other player socket
@@ -438,12 +438,12 @@ const createWindow = () => {
                 isEmuOpen = startEmulator(address, port)
             }
 
-            let message
-            if (!msg.length) {
-                message = new Buffer('ping')
-            } else {
-                message = new Buffer(msg)
-            }
+            let message = new Buffer('sending')
+            // if (!msg.length) {
+            //     message = new Buffer('ping')
+            // } else {
+            //     message = new Buffer(msg)
+            // }
             socket.send(message, 0, message.length, port, address, function (err, nrOfBytesSent) {
                 if (err) return console.log(err)
                 console.log('UDP message sent to B:', address + ':' + port)
