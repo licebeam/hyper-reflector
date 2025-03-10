@@ -94,4 +94,4 @@ out/
 # hyper reflector team projects that are not open source
 private
 backend
-config.txt
+src/config.txt
