@@ -3,7 +3,7 @@
   "keywords": [],
   "author": "Hyper Reflector Team",
   "productName": "hyper-reflector",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "3rd Strike matchmaking and stat tracking application",
   "main": ".vite/build/main.js",
   "repository": {

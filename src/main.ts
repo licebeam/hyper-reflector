@@ -77,7 +77,7 @@ const createWindow = () => {
 
     let config: Config
 
-    function getConfigData(){
+    function getConfigData() {
         try {
             config = getConfig()
             console.log({ config })
@@ -90,7 +90,7 @@ const createWindow = () => {
     getConfigData() // get the config on boot.
 
     // Open the DevTools.
-    mainWindow.webContents.openDevTools()
+    // mainWindow.webContents.openDevTools()
 
     if (!config.app.emuPath) {
         new Notification({
@@ -150,7 +150,7 @@ const createWindow = () => {
 
     const getEmulatorPath = async () => {
         await getConfigData()
-        console.log("EMULATOR PATH = ", config.app.emuPath)
+        console.log('EMULATOR PATH = ', config.app.emuPath)
         mainWindow.webContents.send('emulatorPath', config.app.emuPath)
     }
 
@@ -193,7 +193,7 @@ const createWindow = () => {
 
     const getEmulatorDelay = async () => {
         await getConfigData()
-        console.log("EMULATOR DELAY = ", config.app.emuDelay)
+        console.log('EMULATOR DELAY = ', config.app.emuDelay)
         mainWindow.webContents.send('emulatorDelay', config.app.emuDelay)
     }
 
