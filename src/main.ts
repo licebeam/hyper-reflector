@@ -414,7 +414,6 @@ const createWindow = () => {
                     console.log('emulator should die')
                     killUdpSocket()
                     mainWindow.webContents.send('endMatch', userUID)
-                    mainWindow.webContents.send('endMatchUI', userUID)
                 },
             })
             spawnedEmulator = emu // in the future we can use this to check for online training etc.
@@ -423,6 +422,7 @@ const createWindow = () => {
     })
 
     ipcMain.on('killEmulator', () => {
+        mainWindow.webContents.send('endMatchUI', userUID)
         killUdpSocket()
         mainWindow.webContents.send('message-from-main', 'attempting to gracefully close emu')
         try {
