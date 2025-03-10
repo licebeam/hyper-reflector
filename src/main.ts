@@ -328,11 +328,11 @@ const createWindow = () => {
         //     .catch((err) => console.log('error starting udp socket', err))
         // sendLog(`Starting the hole punching series ${publicPort}`)
         // console.log('about to send stun over socket to renderer --0-0-0-0-0-0-0-0-0')
-        // try {
-        //     await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort })
-        // } catch (error) {
-        //     console.log('couldnt send stun over socket')
-        // }
+        try {
+            await mainWindow.webContents.send('sendStunOverSocket', { publicIp: '', publicPort: '' })
+        } catch (error) {
+            console.log('couldnt send stun over socket')
+        }
         // localStunPort = publicPort
     })
 
@@ -345,6 +345,7 @@ const createWindow = () => {
     emuListener.bind(7001)
 
     ipcMain.on('startGameOnline', async (event, data) => {
+        console.log('STARTIG GAME ONLINE', data)
         if (socket) {
             socket.close()
             socket = dgram.createSocket('udp4')
