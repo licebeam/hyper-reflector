@@ -3,10 +3,10 @@ import BlogPost from '../components/BlogPost'
 
 const blogsArray = [
     {
-        title: 'Update Version 0.1.6a',
+        title: 'Update Version 0.1.7a',
         date: '3/10/2025',
         content:
-            'Update v0.1.6a is here, no longer are we reliant on UPNP to manage connections you can see the full changelog on discord, sorry I will eventually fix up the news page!!',
+            'Update v0.1.7a is here, no longer are we reliant on UPNP to manage connections you can see the full changelog on discord, sorry I will eventually fix up the news page!!',
     },
     {
         title: 'Hyper Reflector Alpha!',
