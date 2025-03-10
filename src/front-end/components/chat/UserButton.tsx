@@ -26,8 +26,9 @@ export default function UserButton({ user }) {
             {/* {user.uid} */}
             {!isUserChallenging() && user.uid !== userState.uid && (
                 <Button
-                    // disabled={isInMatch}
+                    disabled={isInMatch}
                     onClick={() => {
+                        setIsInMatch(true)
                         console.log(
                             'trying to call someone from: ',
                             userState.uid,
@@ -42,12 +43,12 @@ export default function UserButton({ user }) {
             )}
             {isUserChallenging() && (
                 <Button
-                    // disabled={isInMatch}
+                    disabled={isInMatch}
                     onClick={() => {
                         const caller = callData.find((call) => call.callerId === user.uid)
-                        // removeCallData(caller)
                         setIsInMatch(true)
                         window.api.answerCall(caller)
+                        // removeCallData(caller)
                     }}
                 >
                     Accept
