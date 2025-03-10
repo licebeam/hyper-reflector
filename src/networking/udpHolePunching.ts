@@ -1,13 +1,14 @@
 const LOCAL_EMULATOR_PORT = 7000
 const LOCAL_EMULATOR_IP = '127.0.0.1'
 const dgram = require('dgram')
-let udpSocket: null | any = null
-let keepAliveInterval = null
-let holePunchInterval = null
-
 const stun = require('stun')
 
-async function getExternalAddress(udpSocket) {
+let udpSocket: dgram.Socket | null = null
+let keepAliveInterval: NodeJS.Timeout | null = null
+let holePunchInterval: NodeJS.Timeout | null = null
+let localPort = 0
+
+export async function getExternalAddress(udpSocket) {
     const stunServer = 'stun.l.google.com:19302'
     const stunResponse = await stun.request(stunServer, { udpSocket })
 
@@ -15,38 +16,60 @@ async function getExternalAddress(udpSocket) {
         throw new Error('Failed to retrieve public IP and port from STUN')
     }
 
-    // Extract public IP and port
     const { address: publicIp, port: publicPort } = stunResponse.getXorAddress()
-    console.log(`Public IP: ${publicIp}, Public Port: ${publicPort}`)
+    console.log(`STUN Public IP: ${publicIp}, Public Port: ${publicPort}`)
+    return { publicIp, publicPort }
+}
 
+export async function getExternalAddress2() {
+    const stunServer = 'stun.l.google.com:19302'
+    const stunResponse = await stun.request(stunServer)
+
+    if (!stunResponse || !stunResponse.getXorAddress()) {
+        throw new Error('Failed to retrieve public IP and port from STUN')
+    }
+
+    const { address: publicIp, port: publicPort } = stunResponse.getXorAddress()
+    console.log(`STUN Public IP: ${publicIp}, Public Port: ${publicPort}`)
     return { publicIp, publicPort }
 }
 
 export async function udpHolePunch(remoteIp: string, remotePort: number, mainWindow: any) {
-    try {
-        if (udpSocket) {
-            await udpSocket.close()
-        }
-        udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
-    } catch (error) {
-        console.log(error)
+    if (udpSocket) {
+        console.log('Closing existing UDP socket...')
+        udpSocket.close()
     }
 
-    const { publicIp, publicPort } = await getExternalAddress(udpSocket).catch((err) =>
-        console.log("couldn't get public stun address", err)
-    )
+    udpSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
 
-    console.log(publicIp, publicPort)
-    try {
-        udpSocket.bind(publicPort, () => {
-            if (!udpSocket) return
-            const { port } = udpSocket.address() // Get the actual assigned port
-            console.log(`UDP socket bound to ${port}`)
-            mainWindow.webContents.send('message-from-main', `UDP socket bound to ${port}`)
-        })
-    } catch (error) {
-        console.log('failed to bind socket', error)
+    // Get external STUN-discovered IP & port
+    const { publicIp, publicPort } = await getExternalAddress(udpSocket).catch((err) => {
+        console.log("Couldn't get public STUN address", err)
+        return { publicIp: null, publicPort: null }
+    })
+
+    if (!publicIp || !publicPort) {
+        console.log('STUN discovery failed.')
+        return
     }
+
+    udpSocket.bind(() => {
+        if (!udpSocket) return
+
+        localPort = udpSocket.address().port // Get local port assigned by OS
+        console.log(`UDP socket bound locally to port ${localPort}`)
+
+        mainWindow.webContents.send(
+            'message-from-main',
+            `UDP socket bound locally to ${localPort} (STUN mapped to ${publicPort})`
+        )
+
+        // Send initial hole punching message immediately after binding
+        sendHolePunchMessage(remoteIp, remotePort)
+
+        // Start sending periodic hole-punching messages
+        holePunchInterval = setInterval(() => sendHolePunchMessage(remoteIp, remotePort), 1000)
+    })
 
     udpSocket.on('message', (msg, rinfo) => {
         if (!udpSocket) return
@@ -55,81 +78,75 @@ export async function udpHolePunch(remoteIp: string, remotePort: number, mainWin
         const messageContent = msg.toString()
         if (messageContent === 'ping' || messageContent === 'keep-ping') {
             console.log(`Ignoring keep-alive message from ${rinfo.address}:${rinfo.port}`)
-            mainWindow.webContents.send(
-                'message-from-main',
-                `Ignoring keep-alive message from ${rinfo.address}:${rinfo.port}`
-            )
             return
         }
 
-        // If we detect a response, NAT hole is punched.
         mainWindow.webContents.send(
             'message-from-main',
             `Connected with ${rinfo.address}:${rinfo.port}`
         )
 
         // Forward the packet to the emulator
-        forwardPacket(msg, publicPort + 1, LOCAL_EMULATOR_IP)
+        forwardPacket(msg, LOCAL_EMULATOR_PORT, LOCAL_EMULATOR_IP)
     })
 
-    // Handle errors
     udpSocket.on('error', (err) => {
-        if (!udpSocket) return
         console.error('UDP socket error:', err)
-        udpSocket.close()
+        udpSocket?.close()
     })
-
-    function forwardPacket(data, targetPort, targetIP) {
-        if (!udpSocket) return
-        console.log('forwarding message to', targetIP, targetPort)
-        udpSocket.send(data, targetPort, targetIP, (err) => {
-            if (err) console.log(`Proxy forwarding Error: ${err.message}`)
-        })
-    }
 
     return { publicIp, publicPort }
 }
 
+function forwardPacket(data: Buffer, targetPort: number, targetIP: string) {
+    if (!udpSocket) return
+    console.log(`Forwarding message to ${targetIP}:${targetPort}`)
+    udpSocket.send(data, targetPort, targetIP, (err) => {
+        if (err) console.log(`Proxy forwarding Error: ${err.message}`)
+    })
+}
+
+function sendHolePunchMessage(peerIP: string, peerPort: number) {
+    if (!udpSocket) return
+    const message = Buffer.from('hole-punch')
+    udpSocket.send(message, peerPort, peerIP, (err) => {
+        if (err) console.error('Failed to send hole punching message:', err)
+        else console.log(`Sent hole punching message to ${peerIP}:${peerPort}`)
+    })
+}
+
 export function killUdpSocket() {
-    console.log('killing socket')
+    console.log('Killing socket...')
     if (udpSocket) {
         udpSocket.close()
         udpSocket = null
-        clearInterval(holePunchInterval)
-        clearInterval(keepAliveInterval)
-        holePunchInterval = null
-        keepAliveInterval = null
     }
+    clearInterval(holePunchInterval!)
+    clearInterval(keepAliveInterval!)
+    holePunchInterval = null
+    keepAliveInterval = null
 }
 
-// Send periodic keep-alive packets to maintain NAT mapping
-function startKeepAlive(targetIp, targetPort) {
+export function startHolePunching(peerIP: string, peerPort: number) {
+    console.log(`Attempting UDP hole punching with ${peerIP}:${peerPort}`)
+
+    // Send initial hole punching message
+    sendHolePunchMessage(peerIP, peerPort)
+
+    // Start periodic hole-punching messages
+    holePunchInterval = setInterval(() => sendHolePunchMessage(peerIP, peerPort), 1000)
+
+    // Start keep-alive messages
+    startKeepAlive(peerIP, peerPort)
+}
+
+function startKeepAlive(targetIp: string, targetPort: number) {
     if (!udpSocket) return
     keepAliveInterval = setInterval(() => {
-        const message = Buffer.from('ping')
-        udpSocket.send(message, 0, message.length, targetPort, targetIp, (err) => {
+        const message = Buffer.from('keep-alive')
+        udpSocket!.send(message, targetPort, targetIp, (err) => {
             if (err) console.error('Failed to send keep-alive:', err)
         })
         console.log('Sent keep-alive packet.')
     }, 5000)
-}
-
-export function startHolePunching(peerIP, peerPort, mainWindow: any) {
-    console.log(`Attempting UDP hole punching with ${peerIP}:${peerPort}`)
-    mainWindow.webContents.send(
-        'message-from-main',
-        `Attempting UDP hole punching with ${peerIP}:${peerPort}`
-    )
-
-    holePunchInterval = setInterval(() => {
-        if (!udpSocket) return
-        const message = Buffer.from('keep-ping')
-        udpSocket.send(message, 0, message.length, peerPort, peerIP, (err) => {
-            if (err) console.error('Failed to send hole punching message:', err)
-            else console.log(`Sent hole punching message to ${peerIP}:${peerPort}`)
-        })
-    }, 1000)
-
-    // Start keep-alive
-    startKeepAlive(peerIP, peerPort)
 }

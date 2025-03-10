@@ -10,6 +10,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses'
 const config: ForgeConfig = {
     packagerConfig: {
         asar: true,
+        ignore: [/\/\.(?!vite)/],
         extraResource: [
             './src/lua',
             './src/hyper_write_commands.txt',
@@ -18,7 +19,10 @@ const config: ForgeConfig = {
             './src/hyper_track_match.txt',
         ],
     },
-    rebuildConfig: {},
+    rebuildConfig: {
+        force: true,
+        onlyModules: ['stun'],
+    },
     makers: [
         new MakerSquirrel({}),
         new MakerZIP({}, ['darwin']),
