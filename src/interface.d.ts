@@ -32,7 +32,6 @@ export interface IElectronAPI {
     setTargetIp: any
     serveMatch: any
     startGameOnline: any
-    serveMatchOffline: any
     startSoloTraining: any
 
     // ipc call stuff
