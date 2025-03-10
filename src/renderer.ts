@@ -388,7 +388,8 @@ function connectWebSocket(user) {
                 data
             )
             console.log('hole punch data', JSON.stringify(data))
-            window.api.startGameOnline(data.data.publicIp, data.data.publicPort, matchPlayerNum, 0, 7000)
+            //updated for hole punching
+            window.api.startGameOnline(opponentId, matchPlayerNum)
         }
     }
 

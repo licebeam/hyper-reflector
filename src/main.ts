@@ -17,7 +17,6 @@ let opponentPort = 7000 // We change this when we recieve a message from a playe
 // Emulator reference
 let spawnedEmulator = null //used to handle closing the emulator process
 //for testing purposes
-let currentEmuPort = 0
 let currentProxyPort = 0
 //
 
@@ -318,72 +317,156 @@ const createWindow = () => {
         // TODO: add error handling this is an important function.
     })
 
-    let localStunPort = 0
     ipcMain.on('serveMatch', async (event, data) => {
-        // await startUPNP(mainWindow, sendLog)
-        if (!opponentIp) {
-            console.log('hey current target ip was not ready, retry')
-        }
-        mainWindow.webContents.send('message-from-main', 'starting match')
-        const { publicPort, publicIp } = await udpHolePunch(data.ip, data.port, mainWindow)
-            .then()
-            .catch((err) => console.log('error starting udp socket', err))
-        sendLog(`Starting the hole punching series ${publicPort}`)
-        console.log('about to send stun over socket to renderer --0-0-0-0-0-0-0-0-0')
-        try {
-            await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort })
-        } catch (error) {
-            console.log('couldnt send stun over socket')
-        }
-
-        localStunPort = publicPort
+        // // await startUPNP(mainWindow, sendLog)
+        // if (!opponentIp) {
+        //     console.log('hey current target ip was not ready, retry')
+        // }
+        // mainWindow.webContents.send('message-from-main', 'starting match')
+        // const { publicPort, publicIp } = await udpHolePunch(data.ip, data.port, mainWindow)
+        //     .then()
+        //     .catch((err) => console.log('error starting udp socket', err))
+        // sendLog(`Starting the hole punching series ${publicPort}`)
+        // console.log('about to send stun over socket to renderer --0-0-0-0-0-0-0-0-0')
+        // try {
+        //     await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort })
+        // } catch (error) {
+        //     console.log('couldnt send stun over socket')
+        // }
+        // localStunPort = publicPort
     })
 
-    ipcMain.on('startGameOnline', async (event, data) => {
-        console.log(data)
-        //{ ip: undefined, port: undefined, player: 0, delay: 0, myPort: 7000 }
-        // try {
-        //     await startHolePunching(data.ip, data.port, mainWindow)
-        // } catch (error) {
-        //     console.log('error starting hole punch', error)
-        // }
+    var dgram = require('dgram')
+    let localStunPort = 0
+    let publicEndpointB
 
-        const emu = startPlayingOnline({
-            config,
-            localPort: localStunPort || 7000,
-            remoteIp: data.ip || '127.0.0.1',
-            remotePort: 7000,
-            player: data.player || 0,
-            delay: parseInt(config.app.emuDelay) || 0,
-            isTraining: false, // Might be used in the future.
-            callBack: () => {
-                // attempt to kill the emulator
-                mainWindow.webContents.send('endMatch', userUID)
-                console.log('emulator should die')
-                killUdpSocket()
-            },
+    let socket = dgram.createSocket('udp4')
+    let emuListener = dgram.createSocket('udp4')
+    emuListener.bind(7001)
+
+    ipcMain.on('startGameOnline', async (event, data) => {
+        if (socket) {
+            socket.close()
+            socket = dgram.createSocket('udp4')
+        }
+        if (emuListener) {
+            emuListener.close()
+            emuListener = dgram.createSocket('udp4')
+        }
+        socket.on('message', function (message, remote) {
+            console.log(remote.address + ':' + remote.port + ' - ' + message)
+            // if we don't get a ping we should forward it to the emulator
+            // we probably shouldnt do any conversions to save time
+            const messageContent = message.toString()
+            if (messageContent === 'ping' || message.includes('"name"')) {
+                console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
+            } else {
+                //sending message to the emulator
+                console.log('sending this guy to the emulator => ', message)
+                socket.send(message, 0, message.length, 7000, '127.0.0.1')
+            }
+            try {
+                publicEndpointB = JSON.parse(message)
+                sendMessageToB(publicEndpointB.address, publicEndpointB.port)
+            } catch (err) {}
         })
-        spawnedEmulator = emu // in the future we can use this to check for online training etc.
-        currentEmuPort = portForUPNP
-        mainWindow.webContents.send(
-            'message-from-main',
-            `${currentEmuPort} - current emulator listen port before proxy`
-        )
+
+        // get messages from our local emulator and send it to the other player socket
+        emuListener.on('message', function (message, remote) {
+            console.log(remote.address + ':' + remote.port + ' - ' + message)
+            sendMessageToB(publicEndpointB.address, publicEndpointB.port, message)
+        })
+
+        function sendMessageToS() {
+            var serverPort = 33333
+            var serverHost = keys.COTURN_IP
+            // var serverHost = '127.0.0.1'
+
+            var message = new Buffer(JSON.stringify({ uid: userUID, peerUid: data.opponentId }))
+            socket.send(
+                message,
+                0,
+                message.length,
+                serverPort,
+                serverHost,
+                function (err, nrOfBytesSent) {
+                    if (err) return console.log(err)
+                    console.log('UDP message sent to ' + serverHost + ':' + serverPort)
+                }
+            )
+        }
+
+        sendMessageToS()
+
+        let isEmuOpen = false
+        let message: string = ''
+        function sendMessageToB(address, port, msg = '') {
+            if (!isEmuOpen) {
+                isEmuOpen = startEmulator(address, port)
+            }
+
+            if (msg.length >= 1) {
+                message = new Buffer(msg)
+            } else {
+                message = new Buffer('ping')
+            }
+
+            socket.send(message, 0, message.length, port, address, function (err, nrOfBytesSent) {
+                if (err) return console.log(err)
+                console.log('UDP message sent to B:', address + ':' + port)
+            })
+        }
+
+        function startEmulator(address, port) {
+            console.log('EMULATOR SHOULD BE STARTING')
+            console.log('Emulator listener port', emuListener.address().port)
+            // console.log(socket.remoteAddress())
+            const emu = startPlayingOnline({
+                config,
+                localPort: 7000,
+                remoteIp: '127.0.0.1',
+                remotePort: emuListener.address().port,
+                player: data.player,
+                delay: parseInt(config.app.emuDelay),
+                isTraining: false, // Might be used in the future.
+                callBack: () => {
+                    console.log('test')
+                    // // attempt to kill the emulator
+                    // mainWindow.webContents.send('endMatch', userUID)
+                    // console.log('emulator should die')
+                    // killUdpSocket()
+                },
+            })
+            spawnedEmulator = emu // in the future we can use this to check for online training etc.
+            return emu
+        }
+        // const emu = startPlayingOnline({
+        //     config,
+        //     localPort: localStunPort || 7000,
+        //     remoteIp: data.ip || '127.0.0.1',
+        //     remotePort: 7000,
+        //     player: data.player || 0,
+        //     delay: parseInt(config.app.emuDelay) || 0,
+        //     isTraining: false, // Might be used in the future.
+        //     callBack: () => {
+        //         // attempt to kill the emulator
+        //         mainWindow.webContents.send('endMatch', userUID)
+        //         console.log('emulator should die')
+        //         killUdpSocket()
+        //     },
+        // })
+        // spawnedEmulator = emu // in the future we can use this to check for online training etc.
     })
 
     ipcMain.on('serveMatchOffline', async (event, data) => {
-        var dgram = require('dgram')
-        let publicEndpointB
-        // var keys = require('../private/keys')
-
-        // based on http://www.bford.info/pub/net/p2pnat/index.html
-
-        var socket = dgram.createSocket('udp4')
-        var emuListener = dgram.createSocket('udp4')
-        emuListener.bind(7001)
-
-        // console.log(keys.default.COTURN_IP)
-
+        if (socket) {
+            socket.close()
+            socket = dgram.createSocket('udp4')
+        }
+        if (emuListener) {
+            emuListener.close()
+            emuListener = dgram.createSocket('udp4')
+        }
         socket.on('message', function (message, remote) {
             console.log(remote.address + ':' + remote.port + ' - ' + message)
             // if we don't get a ping we should forward it to the emulator
@@ -423,7 +506,6 @@ const createWindow = () => {
                 function (err, nrOfBytesSent) {
                     if (err) return console.log(err)
                     console.log('UDP message sent to ' + serverHost + ':' + serverPort)
-                    // socket.close();
                 }
             )
         }
@@ -431,7 +513,6 @@ const createWindow = () => {
         sendMessageToS()
 
         let isEmuOpen = false
-        let messageCount = 0
         let message: string = ''
         function sendMessageToB(address, port, msg = '') {
             if (!isEmuOpen) {
@@ -447,10 +528,6 @@ const createWindow = () => {
             socket.send(message, 0, message.length, port, address, function (err, nrOfBytesSent) {
                 if (err) return console.log(err)
                 console.log('UDP message sent to B:', address + ':' + port)
-                // This is the keep alive
-                // setTimeout(function () {
-                //     sendMessageToB(address, port)
-                // }, 2000)
             })
         }
 
@@ -463,8 +540,8 @@ const createWindow = () => {
                 localPort: 7000,
                 remoteIp: '127.0.0.1',
                 remotePort: emuListener.address().port,
-                player: 0,
-                delay: 0,
+                player: data.player,
+                delay: parseInt(config.app.emuDelay),
                 isTraining: false, // Might be used in the future.
                 callBack: () => {
                     console.log('test')
@@ -474,6 +551,7 @@ const createWindow = () => {
                     // killUdpSocket()
                 },
             })
+            spawnedEmulator = emu // in the future we can use this to check for online training etc.
             return emu
         }
         // console.log('data------------------------', data)
