@@ -345,7 +345,7 @@ const createWindow = () => {
     emuListener.bind(7001)
 
     ipcMain.on('startGameOnline', async (event, data) => {
-        console.log('STARTIG GAME ONLINE', data)
+        console.log('STARTING GAME ONLINE', data)
         if (socket) {
             socket.close()
             socket = dgram.createSocket('udp4')
@@ -383,7 +383,8 @@ const createWindow = () => {
             var serverHost = keys.COTURN_IP
             // var serverHost = '127.0.0.1'
 
-            var message = new Buffer(JSON.stringify({ uid: userUID, peerUid: data.opponentId }))
+            var message = new Buffer(JSON.stringify({ uid: userUID, peerUid: data.opponenUID }))
+            console.log('user data to user', userUID, data.opponenUID)
             socket.send(
                 message,
                 0,
