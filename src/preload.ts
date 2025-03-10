@@ -26,7 +26,7 @@ contextBridge.exposeInMainWorld('api', {
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
     setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),
-    getEmulatorDelay: () => ipcRenderer.send('getEmulatorDelay'),
+    getEmulatorDelay: (delay: number) => ipcRenderer.send('getEmulatorDelay', delay),
     endMatch: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     endMatchUI: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     killEmulator: () => ipcRenderer.send('killEmulator'),

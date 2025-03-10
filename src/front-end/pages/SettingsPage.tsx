@@ -31,15 +31,12 @@ export default function SettingsPage() {
     }
 
     const handleSetDelay = (delay: string) => {
+        console.log(delay)
         setCurrentDelay(delay)
     }
 
     useEffect(() => {
-        // There is a bug setting delay
-        window.api.setEmulatorDelay(currentDelay)
-    }, [currentDelay])
-
-    useEffect(() => {
+        console.log('re-rendered')
         window.api.getEmulatorDelay()
         window.api.getEmulatorPath()
     }, [])
@@ -83,7 +80,10 @@ export default function SettingsPage() {
                     <SelectRoot
                         collection={delays}
                         value={[currentDelay]}
-                        onValueChange={(e) => setCurrentDelay(e.value[0])}
+                        onValueChange={(e) => {
+                            handleSetDelay(e.value[0])
+                            window.api.setEmulatorDelay(e.value[0])
+                        }}
                     >
                         <SelectTrigger>
                             <SelectValueText placeholder="Select Delay" />

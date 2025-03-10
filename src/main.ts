@@ -77,13 +77,17 @@ const createWindow = () => {
 
     let config: Config
 
-    try {
-        config = getConfig()
-        console.log({ config })
-    } catch (error) {
-        mainWindow.webContents.send('message-from-main', error)
-        console.error('Failed to read file:', error)
+    function getConfigData(){
+        try {
+            config = getConfig()
+            console.log({ config })
+        } catch (error) {
+            mainWindow.webContents.send('message-from-main', error)
+            console.error('Failed to read file:', error)
+        }
     }
+
+    getConfigData() // get the config on boot.
 
     // Open the DevTools.
     mainWindow.webContents.openDevTools()
@@ -101,13 +105,38 @@ const createWindow = () => {
                 .showOpenDialog({ properties: ['openFile', 'openDirectory'] })
                 .then((res) => {
                     try {
-                        // write our file path to the config.txt file
                         const filePath = path.join(filePathBase, 'config.txt')
-                        mainWindow.webContents.send('message-from-main', res)
-                        console.log('CONFIG: writing to: ', res)
-                        fs.writeFileSync(filePath, `emuPath=${res.filePaths[0]}`, {
-                            encoding: 'utf8',
+                        mainWindow.webContents.send(
+                            'message-from-main',
+                            `Set emulator filepath to: ${res.filePaths[0]}`
+                        )
+
+                        // Read the existing file
+                        let fileContent = fs.existsSync(filePath)
+                            ? fs.readFileSync(filePath, 'utf8')
+                            : ''
+
+                        // Split the file into lines
+                        let lines = fileContent.split('\n')
+
+                        // Find and update the delay line
+                        let found = false
+                        lines = lines.map((line: string) => {
+                            if (line.startsWith('emuPath=')) {
+                                found = true
+                                return `emuPath=${res.filePaths[0]}` // Replace the file path line
+                            }
+                            return line // Keep other lines the same
                         })
+
+                        // If no emuPath= line exists, append it
+                        if (!found) {
+                            lines.push(`emuPath=${res.filePaths[0]}`)
+                        }
+
+                        // Write back the modified content
+                        fs.writeFileSync(filePath, lines.join('\n'), 'utf8')
+                        getEmulatorPath()
                     } catch (error) {
                         mainWindow.webContents.send('message-from-main', error)
                         console.error('Failed to write to config file:', error)
@@ -119,7 +148,9 @@ const createWindow = () => {
         }
     }
 
-    const getEmulatorPath = () => {
+    const getEmulatorPath = async () => {
+        await getConfigData()
+        console.log("EMULATOR PATH = ", config.app.emuPath)
         mainWindow.webContents.send('emulatorPath', config.app.emuPath)
     }
 
@@ -160,7 +191,9 @@ const createWindow = () => {
         }
     }
 
-    const getEmulatorDelay = () => {
+    const getEmulatorDelay = async () => {
+        await getConfigData()
+        console.log("EMULATOR DELAY = ", config.app.emuDelay)
         mainWindow.webContents.send('emulatorDelay', config.app.emuDelay)
     }
 
