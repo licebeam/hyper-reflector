@@ -1,233 +1,420 @@
-import keys from "./private/keys"
-import './index.css';
+import keys from './private/keys'
+import './index.css'
 // Load our react app
 import './front-end/app'
 
-let connectPort = 0;
-let connectIp = '0.0.0.0';
+let signalServerSocket: WebSocket = null // socket reference
+let candidateList = []
+let callerIdState = null
+let myUID = null
+let mylocalStunPort = 0 // set this later
+let mylocalRealPort = 0 // set this later
+let userName = null
+let opponentId = null
+let matchPlayerNum = 0
 
-// document.getElementById("sendTextBtn").addEventListener("click", () => {
-//     var text = document.getElementById("inputText").value; // typescript error, works fine
-//     window.api.sendText(text);
-//     startCall()
-// });
-
-// document.getElementById("testBtn").addEventListener("click", () => {
-//     window.api.sendCommand("game_name");
-//     sendGameData('some number etc')
-// });
-
-// document.getElementById("api-serve-btn").addEventListener("click", () => {
-//     var port = document.getElementById("externalPort").value; // typescript error, works fine
-//     var ip = document.getElementById("externalIp").value; // typescript error, works fine
-//     console.log('starting match with: ', connectIp, ":", connectPort)
-//     window.api.serveMatch(connectIp, connectPort);
-// });
-
-// document.getElementById("api-connect-btn").addEventListener("click", () => {
-//     var port = document.getElementById("externalPort").value; // typescript error, works fine
-//     var ip = document.getElementById("externalIp").value; // typescript error, works fine
-//     console.log('starting match with: ', connectIp, ":", connectPort)
-//     window.api.connectMatch(connectIp, connectPort);
-// });
-
-// document.getElementById("start-solo-btn").addEventListener("click", () => {
-//     console.log('starting solo training')
-//     window.api.startSoloTraining();
-// });
-
-let signalServerSocket: WebSocket = null; // WebSocket reference
+// const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
+const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
 
 // handle connection to remote turn server
+const googleStuns = [
+    'stun:stun.l.google.com:19302',
+    'stun:stun.l.google.com:5349',
+    'stun:stun1.l.google.com:3478',
+    'stun:stun1.l.google.com:5349',
+    'stun:stun2.l.google.com:19302',
+    'stun:stun2.l.google.com:5349',
+    'stun:stun3.l.google.com:3478',
+    'stun:stun3.l.google.com:5349',
+    'stun:stun4.l.google.com:19302',
+    'stun:stun4.l.google.com:5349',
+]
 
-const peerConnection = new RTCPeerConnection({
-    iceServers: [
-        {
-            urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
-        },
-        {
-            urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
-            username: "turn",
-            credential: "turn",
-        },
-    ],
-});
+const peerConnections: Record<string, RTCPeerConnection> = {}
 
-let dataChannel; // Will store the game data channel
+async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
+    console.log('trying to create a new peer connection with - ', userUID)
+    const peerConnection = new RTCPeerConnection({
+        iceServers: [
+            {
+                urls: 'stun:stun.l.google.com:19302',
+                // urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+            },
+            {
+                urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
+                username: 'turn',
+                credential: 'turn',
+            },
+        ],
+        iceTransportPolicy: 'all',
+    })
 
-window.api.on('login-success', (user) => {
-    if (user) {
-        console.log("User logged in:", user.email);
-        connectWebSocket(user);
+    let dataChannel // Will store the game data channel
+
+    // create data channel
+    if (isInitiator) {
+        console.log('creating a data channel')
+        // Only the initiator creates a data channel
+        dataChannel = peerConnection.createDataChannel('updForwarding')
+        dataChannel.onopen = () => console.log('Data channel open')
+        dataChannel.onmessage = (event) => console.log('Received:', event.data)
     } else {
-        console.log("User not logged in. WebSocket won't connect.");
-        if (signalServerSocket) {
-            signalServerSocket.close();
-            signalServerSocket = null;
+        // Answerer handles data channel event
+        peerConnection.ondatachannel = (event) => {
+            dataChannel = event.channel
+            dataChannel.onopen = () => console.log('Data channel open')
+            dataChannel.onmessage = (event) => console.log('Received peer:', event.data)
         }
     }
-});
+
+    // send new ice candidates from the coturn server
+    peerConnection.onicecandidate = (event) => {
+        console.log(event)
+        if (event.candidate) {
+            setupLogging(peerConnection, userName, event)
+        } else {
+            console.log('ICE Candidate gathering complete!')
+        }
+    }
+
+    peerConnection.oniceconnectionstatechange = () => {
+        if (peerConnection.iceConnectionState === 'connected') {
+            console.log('Connected! Ready to send data.')
+        } else if (peerConnection.iceConnectionState === 'failed') {
+            console.log('ICE connection failed. Check STUN/TURN settings.')
+        }
+    }
+
+    peerConnection.isInitiator = isInitiator || false // type error but we can fix this later. We'll use this line to make sure we set the correct player number
+    peerConnection.dataChannel = dataChannel
+    peerConnections[userUID] = peerConnection
+
+    return peerConnection
+}
+
+function closePeerConnection(userId: string) {
+    console.log(peerConnections)
+    if (peerConnections[userId]) {
+        console.log(`closing peer connection with ${userId}`)
+        peerConnections[userId].getSenders().forEach((sender) => {
+            peerConnections[userId].removeTrack(sender)
+        })
+        peerConnections[userId].close()
+        delete peerConnections[userId] // delete user from our map
+    }
+}
+
+function resetState() {
+    console.log("resetting renderer state for peer connection")
+    candidateList = []
+    callerIdState = null
+    myUID = null
+    mylocalStunPort = 0 // set this later
+    mylocalRealPort = 0 // set this later
+    userName = null
+    opponentId = null
+    matchPlayerNum = 0
+}
+
+window.api.on('sendUDPMessage', () => {
+    console.log('received a udp message from our emulator')
+    peerConnections[opponentId].dataChannel.send('test')
+})
+
+function setupLogging(peer, userLabel, event) {
+    if (event.candidate) {
+        let candidate = event.candidate.candidate
+
+        if (candidate.includes('srflx')) {
+            console.log(`${userLabel} STUN Candidate (srflx):`, candidate)
+
+            let regex = /([0-9]{1,3}\.){3}[0-9]{1,3} (\d+) typ srflx raddr ([0-9\.]+) rport (\d+)/
+            let matches = candidate.match(regex)
+            if (matches) {
+                let ip = matches[1] // The public IP (e.g., 133.32.4.39)
+                let port = matches[2] // The port (e.g., 50133)
+                let raddr = matches[3] // The private IP address (e.g., 192.168.11.2)
+                let rport = matches[4] // The rport (e.g., 50133)
+                console.log(`${userLabel} External IP: ${ip}, Port: ${port}`)
+                console.log('----------------MATCHES ', matches, rport)
+                mylocalStunPort = port //set the stun port to use in main we need to use the related port.
+                mylocalRealPort = rport
+            }
+            candidateList.push(event.candidate)
+            if (callerIdState) {
+                signalServerSocket.send(
+                    JSON.stringify({
+                        type: 'iceCandidate',
+                        data: {
+                            targetId: callerIdState,
+                            candidate: event.candidate,
+                            callerId: myUID,
+                        },
+                    })
+                )
+            }
+        }
+    }
+}
+
+window.api.on('loginSuccess', (user) => {
+    if (user) {
+        myUID = user.uid
+        console.log('User logged in:', user.email)
+        userName = user.email
+        connectWebSocket(user)
+    } else {
+        console.log("User not logged in. WebSocket won't connect.")
+        if (signalServerSocket) {
+            signalServerSocket.close()
+            signalServerSocket = null
+        }
+    }
+})
 
 window.api.on('login-failed', () => {
     // kill the socket connection
     if (signalServerSocket) {
-        signalServerSocket.close();
-        signalServerSocket = null;
+        signalServerSocket.close()
+        signalServerSocket = null
     }
-});
+})
 
-window.api.on('logged-out', (user) => {
+window.api.on('loggedOutSuccess', async (user) => {
+    console.log('user logged out, kill socket')
     // kill the socket connection
     if (signalServerSocket) {
-        signalServerSocket.send(JSON.stringify({ type: "user-disconnect", user }));
-        signalServerSocket.close();
-        signalServerSocket = null;
+        await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
+        signalServerSocket.close()
+        signalServerSocket = null
     }
-});
+})
 
-window.api.on('closing-app', async (user) => {
-    // kill the socket connection
-    if (signalServerSocket) {
-        console.log('we are killing the socket user')
-        await signalServerSocket.send(JSON.stringify({ type: "user-disconnect", user }));
-        signalServerSocket.close();
-        signalServerSocket = null;
-    }
-});
+// below code causes some app hanging
+// window.api.on('closingApp', async (user) => {
+//     // kill the socket connection
+//     if (signalServerSocket) {
+//         console.log('we are killing the socket user')
+//         await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
+//         signalServerSocket.close()
+//         signalServerSocket = null
+//     }
+// })
 
 function connectWebSocket(user) {
-    if (signalServerSocket) return; // Prevent duplicate ws connections from same client
-    // signalServerSocket = new WebSocket(`ws://127.0.0.1:3000`); // for testing server
-    signalServerSocket = new WebSocket(`ws://${keys.COTURN_IP}:3000`);
+    if (signalServerSocket) return // Prevent duplicate ws connections from same client
+    // signalServerSocket = new WebSocket(`ws://127.0.0.1:3000`) // for testing server
+    signalServerSocket = new WebSocket(SOCKET_ADDRESS)
     signalServerSocket.onopen = () => {
-        signalServerSocket.send(JSON.stringify({ type: "join", user }));
-        console.log("WebSocket connected", user.uid);
-        signalServerSocket.send(JSON.stringify({ type: "user-connect", user }));  
-    };
-
-    signalServerSocket.onclose = async (user) => {
-        if( signalServerSocket ){
-            await signalServerSocket.send(JSON.stringify({ type: "user-disconnect", user }));
-        }
-        console.log("WebSocket disconnected");
-        signalServerSocket = null;
-    };
-
-    signalServerSocket.onerror = (error) => {
-        console.error("WebSocket Error:", error);
-    };
-
-    signalServerSocket.onmessage = async (message) => {
-        const data = await convertBlob(message).then(res => res);
-        if (data.type === "connected-users") {
-            if (data.users.length){
-                console.log('connected users = ', data.users)
-                window.api.addUserGroupToRoom(data.users)
-            }
-        }
-        if (data.type === "user-connect") {
-            signalServerSocket.send(JSON.stringify({ type: "join", user }));
-            // window.api.addUserToRoom(user)
-        }
-        if (data.type === "user-disconnect") {
-            signalServerSocket.send(JSON.stringify({ type: "join", user }));
-            // window.api.removeUserFromRoom(user)
-        }
-        if (data.type === "user-message") {
-            window.api.sendRoomMessage(data)
-        }
-        if (data.type === "offer") {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            signalServerSocket.send(JSON.stringify({ type: "answer", answer }));
-            console.log('hey we got offer')
-        } else if (data.type === "answer") {
-            console.log('hey we got answer')
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        } else if (data.type === "ice-candidate") {
-            console.log('hey we got candidate')
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
-        }
-    };
-
-    //allow users to chat
-    window.api.on('user-message', (text: string) => {
-        // sends a message over to another user
-        console.log('this should get sent to websockets')
-        if(text.length){
-            signalServerSocket.send(JSON.stringify({ type: 'user-message', message: `${text}`, sender: user.name }))
-        }
-    });
-
-
-    // create data channel
-    function createDataChannel() {
-        dataChannel = peerConnection.createDataChannel("game", { reliable: true });
-        dataChannel.onopen = () => console.log("Data Channel Open!");
-        dataChannel.onmessage = (event) => console.log("Received:", event.data);
+        signalServerSocket.send(JSON.stringify({ type: 'join', user }))
+        signalServerSocket.send(JSON.stringify({ type: 'user-connect', user }))
     }
 
-    // handle recieve data from channel
-    peerConnection.ondatachannel = (event) => {
-        dataChannel = event.channel;
-        dataChannel.onopen = () => console.log("Data Channel Open!");
-        dataChannel.onmessage = (event) => console.log("Received:", event.data);
-    };
-
-    // send new ice candidates from the coturn server
-    peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-            signalServerSocket.send(JSON.stringify({ type: "ice-candidate", candidate: event.candidate }));
-            if (event.candidate.type === "srflx" || event.candidate.type === "host") {
-                // if we only require the stun server then we can break out of here.
-                console.log("STUN ICE Candidate:", event.candidate);
-                connectPort = event.candidate.port
-                connectIp = event.candidate.address
-            }
-            // if the below is true it means we've successfully udp tunnelled to the candidate on the turn server
-            if (event.candidate.type === "relay") {
-                // we should be able use the below information on relayed players to connect via fbneo
-                console.log("TURN ICE Candidate:", event.candidate);
-                console.log(event.candidate.address, event.candidate.port)
-                connectPort = event.candidate.port
-                connectIp = event.candidate.address
-                console.log("UDP tunneled through TURN server!");
-            }
+    signalServerSocket.onclose = async (user) => {
+        if (signalServerSocket) {
+            await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
         }
-    };
+        signalServerSocket = null
+    }
 
+    signalServerSocket.onerror = (error) => {
+        console.error('WebSocket Error:', error)
+    }
+
+    // handle matchmaking
+    // handle send call to specific user
+    window.api.on(
+        'callUser',
+        async ({ callerId, calleeId }: { callerId: string; calleeId: string }) => {
+            console.log(calleeId, calleeId)
+            await createNewPeerConnection(calleeId, true).catch((err) => console.log(err))
+            console.log('we are trying to make a call to :', calleeId)
+            const offer = await peerConnections[calleeId].createOffer()
+            await peerConnections[calleeId].setLocalDescription(offer)
+            const localDescription = peerConnections[calleeId].localDescription
+            signalServerSocket.send(
+                JSON.stringify({ type: 'callUser', data: { callerId, calleeId, localDescription } })
+            )
+        }
+    )
+
+    // handle send answer to specific user
+    window.api.on(
+        'answerCall',
+        async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
+            let answer = await peerConnections[callerId].createAnswer()
+            await peerConnections[callerId].setLocalDescription(answer)
+
+            console.log('we should be answering the call')
+            console.log('sending out answer', callerId, answer)
+            signalServerSocket.send(
+                JSON.stringify({
+                    type: 'answerCall',
+                    data: {
+                        callerId,
+                        answer,
+                        answererId,
+                    },
+                })
+            )
+            callerIdState = callerId
+            opponentId = callerId
+        }
+    )
+
+    // allow users to chat
+    window.api.on('sendMessage', (text: string) => {
+        console.log(JSON.stringify(candidateList))
+        // sends a message over to another user
+        if (text.length) {
+            signalServerSocket.send(
+                JSON.stringify({ type: 'sendMessage', message: `${text}`, sender: user.name })
+            )
+        }
+    })
+
+    // This is a function for handling messages from the websocket server
     async function convertBlob(event: any) {
         try {
             // check if event is not JSON but is blob
             if (event.data instanceof Blob) {
-                const text = await event.data.text();
-                const data = JSON.parse(text);
-                console.log(data)
+                const text = await event.data.text()
+                const data = JSON.parse(text)
+                // console.log(data)
                 return data
             } else {
-                const data = JSON.parse(event.data);
+                const data = JSON.parse(event.data)
                 return data
             }
         } catch (error) {
-            console.error("could not convert data:", event.data, error);
+            console.error('could not convert data:', event.data, error)
         }
     }
 
+    signalServerSocket.onmessage = async (message) => {
+        const data = await convertBlob(message).then((res) => res)
+        console.log(data)
+        if (data.type === 'connected-users') {
+            if (data.users.length) {
+                // console.log('connected users = ', data.users)
+                window.api.addUserGroupToRoom(data.users)
+            }
+        }
 
-    // Create an offer and send it to the other peer
-    async function startCall() {
-        createDataChannel()
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        signalServerSocket.send(JSON.stringify({ type: "offer", offer }));
-    }
+        if (data.type === 'user-connect') {
+            signalServerSocket.send(JSON.stringify({ type: 'join', user }))
+            // window.api.addUserToRoom(user)
+        }
 
-    // Send Game Data
-    function sendGameData(data) {
-        console.log('sending data')
-        if (dataChannel && dataChannel.readyState === "open") {
-            dataChannel.send(JSON.stringify(data));
+        if (data.type === 'userDisconnect') {
+            console.log('should DC users?')
+            // Here we want to close the Peer connection if a user leaves if the connection already exists.
+            closePeerConnection(data.userUID)
+        }
+
+        if (data.type === 'matchEndedClose') {
+            //user the userUID and close all matches.
+            console.log('killing emulator and closing peer connection')
+            closePeerConnection(data.userUID)
+            window.api.killEmulator()
+            resetState()
+        }
+
+        if (data.type === 'getRoomMessage') {
+            console.log('received a message ==============================================')
+            window.api.sendRoomMessage(data)
+        }
+
+        if (data.type === 'incomingCall') {
+            console.log('Incoming call from:', data.callerId)
+            console.log(data)
+            await createNewPeerConnection(data.callerId, false)
+            await peerConnections[data.callerId]
+                .setRemoteDescription(new RTCSessionDescription(data.offer))
+                .catch((err) => console.log(err))
+
+            console.log('peer connection set')
+            window.api.receivedCall(data)
+        }
+
+        if (data.type === 'callAnswered') {
+            console.log('Call answered:', data)
+            await peerConnections[data.data.answererId].setRemoteDescription(
+                new RTCSessionDescription(data.data.answer)
+            )
+            opponentId = data.data.answererId // set the current opponent so we can get them from the peer list.
+            console.log(
+                'Answering call, trying to send some data; ',
+                data.data.callerId,
+                candidateList[0]
+            )
+            signalServerSocket.send(
+                JSON.stringify({
+                    type: 'iceCandidate',
+                    data: { targetId: data.data.answererId, candidate: candidateList[0] },
+                })
+            )
+        }
+
+        if (data.type === 'iceCandidate') {
+            // TODO fix this ugly data stuff
+            console.log('Received ICE Candidate from peer:', data.data.candidate.candidate)
+            let matches = data.data.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
+            // console.log('matches', matches)
+            // console.log(data)
+            // console.log(peerConnections[data.data.userUID].isInitiator)
+            if (matches) {
+                let [ip, port] = matches[0].split(' ')
+                // 0 is our delay settings which we'll need to adjust for.
+                //TODO set the player number based on who initialized the peer connections
+                let playerNum
+                if (peerConnections[data.data.userUID]?.isInitiator) {
+                    console.log('I am player 1 ------------------------------------->>>>>>')
+                    playerNum = 0
+                } else {
+                    console.log(
+                        'I should be set to player 2 --------------------------------->>>>>'
+                    )
+                    playerNum = 1
+                }
+                // this should be set by a list of whatever ongoing challenges are running
+                await window.api.updateStun({
+                    ip,
+                    port,
+                    localStunPort: mylocalStunPort,
+                    mylocalRealPort,
+                })
+                console.log(`Connecting to ${ip}, Port: ${port}`)
+                await window.api.setTargetIp(ip)
+                window.api.startGameOnline(opponentId, matchPlayerNum)
+                //TODO fix these references
+                matchPlayerNum = playerNum
+            }
         }
     }
 }
+
+//ends match with any player who has an active connection with you, this should also close the rtc connection
+window.api.on('endMatch', (userUID: string) => {
+    console.log('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ending match', userUID)
+    if (userUID) {
+        console.log('sending socket signal to close')
+        signalServerSocket.send(
+            JSON.stringify({
+                type: 'matchEnd',
+                uid: myUID,
+            })
+        )
+    }
+})
+
+window.api.on('sendStunOverSocket', (data: any) => {
+    console.log('TRYING TO SEND STUN OVER SOCKET! to:', opponentId, ' we are ', myUID)
+    signalServerSocket.send(
+        JSON.stringify({
+            type: 'sendStunOverSocket',
+            opponentId,
+            data,
+        })
+    )
+})

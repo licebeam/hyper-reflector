@@ -94,3 +94,9 @@ out/
 # hyper reflector team projects that are not open source
 private
 backend
+
+# add the text files to the ignore list
+src/config.txt
+src/hyper_track_match.txt
+src/hyper_read_commands.txt
+src/hyper_write_commands.txt

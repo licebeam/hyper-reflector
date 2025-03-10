@@ -1,1 +1,2 @@
-emuPath=/Users/mbp182/Desktop/emulator/fbneo
+emuPath=
+emuDelay=

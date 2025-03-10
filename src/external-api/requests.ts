@@ -7,7 +7,7 @@ function checkCurrentAuthState(auth) {
     if (auth.currentUser != null) {
         return true // user is logged in successfully
     }
-    console.log('Access Denied my dawg')
+    console.log('--- access denied ---')
     return false
 }
 
@@ -57,7 +57,7 @@ async function addLoggedInUser(auth) {
 
 async function getLoggedInUser(userEmail: string) {
     try {
-        console.log('user emai for request', userEmail)
+        console.log('user email making request', userEmail)
         const response = await fetch(`http://${SERVER}:${keys.API_PORT}/get-logged-in`, {
             method: 'POST',
             headers: {
@@ -82,7 +82,9 @@ async function getLoggedInUser(userEmail: string) {
 
 async function removeLoggedInUser(auth) {
     if (checkCurrentAuthState(auth)) {
+        console.log('test')
         const idToken = await auth.currentUser.getIdToken().then((res) => res)
+        console.log(idToken)
         try {
             // ${keys.COTURN_IP}
             // works but maybe we should move to an ssl cert for https
@@ -95,7 +97,7 @@ async function removeLoggedInUser(auth) {
                     idToken: idToken || 'not real',
                     userEmail: auth.currentUser.email,
                 }),
-            })
+            }).catch((err) => console.log('error removing user from service.', err))
         } catch (error) {
             console.log(error)
             console.error(error.message)

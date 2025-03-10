@@ -1,4 +1,16 @@
-import { defineConfig } from 'vite';
+import { defineConfig } from "vite";
+import { builtinModules } from "node:module";
 
-// https://vitejs.dev/config
-export default defineConfig({});
+export default defineConfig({
+  build: {
+    sourcemap: true,
+    // outDir: ".vite/build/", // Output directory set to .vite
+    // lib: {
+    //   entry: "src/main.ts",
+    //   formats: ["cjs"],
+    // },
+    rollupOptions: {
+      external: ["electron", ...builtinModules, "stun"],
+    },
+  },
+});

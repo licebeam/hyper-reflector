@@ -12,7 +12,7 @@ src/main.ts is the main api handling and app runner, this is where the front end
 - everthing else is being messed with in preload.ts , renderer.ts and the main index.html file.
 
 
-within src, there is the main lua script which is being run when we open the fbneo application, readHyperCommands.lua, this handles reading from hyper_write_commands.txt on the frame
+within src, there is the main lua script which is being run when we open the fbneo application, hyper_reflector.lua, this handles reading from hyper_write_commands.txt on the frame
 it also writes to hyper_read_commands.txt which is then sometimes parsed on command by the electron frontend. 
 essentially we are usinga text based file system read/write api. 
 

@@ -1,60 +1,131 @@
-import * as React from 'react'
+import { useEffect, useState } from 'react'
+import { Button, Flex, Stack, Tabs } from '@chakra-ui/react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useLoginStore, useMessageStore } from '../state/store'
 
 export default function Layout({ children }) {
+    const [currentTab, setCurrentTab] = useState<string>('login')
+    const [isLoading, setIsLoading] = useState(false)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const userState = useLoginStore((state) => state.userState)
     const setUserState = useLoginStore((state) => state.setUserState)
     const loggedOut = useLoginStore((state) => state.loggedOut)
     const clearMessageState = useMessageStore((state) => state.clearMessageState)
     const clearUserList = useMessageStore((state) => state.clearUserList)
+
     const navigate = useNavigate()
 
-    React.useEffect(() => {
-        window.api.on('logged-out', (event) => {
+    useEffect(() => {
+        window.api.on('loggedOutSuccess', (event) => {
+            console.log('===============================log out reset state')
             clearUserList()
             clearMessageState()
             setUserState({ email: '' })
             loggedOut()
+            setIsLoading(false)
             navigate({ to: '/' })
             // handle do some funky stateful call for logging in redirect etc
         })
     }, [])
 
+    useEffect(() => {
+        if (isLoggedIn) {
+            // user logged in
+            setCurrentTab('chat')
+        } else {
+            // user logged out
+            setCurrentTab('login')
+        }
+        console.log('----------------------------------------------', currentTab)
+    }, [isLoggedIn])
+
     return (
-        <div>
-            <div>
-                <div>
-                    <Link to="/news" className="[&.active]:font-bold">
-                        News
-                    </Link>
-                    {isLoggedIn && (
-                        <>
-                            <Link to="/chat" className="[&.active]:font-bold">
-                                Chat
-                            </Link>
-                            <Link to="/player" className="[&.active]:font-bold">
-                                Profile
-                            </Link>
-                        </>
-                    )}
-                    <Link to="/offline" className="[&.active]:font-bold">
-                        Offline
-                    </Link>
-                    <Link to="/settings" className="[&.active]:font-bold">
-                        Settings
-                    </Link>
-                    {!isLoggedIn && (
-                        <Link to="/" className="[&.active]:font-bold">
-                            Login
-                        </Link>
-                    )}
-                    {isLoggedIn && <button onClick={() => window.api.logOut()}>Log Out</button>}
-                </div>
-                <hr />
-            </div>
-            {children}
-        </div>
+        <Stack minH={'100vh'} justifyContent={'space-between'}>
+            <Flex>
+                <Tabs.Root variant="plain" value={currentTab}>
+                    <Tabs.List bg="bg.muted" rounded="l3" p="1">
+                        {!isLoggedIn && (
+                            <Tabs.Trigger
+                                value="login"
+                                onClick={() => {
+                                    navigate({ to: '/' })
+                                    setCurrentTab('login')
+                                }}
+                            >
+                                Sign In
+                            </Tabs.Trigger>
+                        )}
+                        <Tabs.Trigger
+                            value="news"
+                            onClick={() => {
+                                navigate({ to: '/news' })
+                                setCurrentTab('news')
+                            }}
+                        >
+                            News
+                        </Tabs.Trigger>
+                        {isLoggedIn && (
+                            <>
+                                <Tabs.Trigger
+                                    value="chat"
+                                    onClick={() => {
+                                        navigate({ to: '/chat' })
+                                        setCurrentTab('chat')
+                                    }}
+                                >
+                                    Chat
+                                </Tabs.Trigger>
+                                <Tabs.Trigger
+                                    value="profile"
+                                    onClick={() => {
+                                        navigate({ to: '/profile' })
+                                        setCurrentTab('profile')
+                                    }}
+                                >
+                                    Profile
+                                </Tabs.Trigger>
+                            </>
+                        )}
+                        <Tabs.Trigger
+                            value="offline"
+                            onClick={() => {
+                                navigate({ to: '/offline' })
+                                setCurrentTab('offline')
+                            }}
+                        >
+                            Play Offline
+                        </Tabs.Trigger>
+                        <Tabs.Trigger
+                            value="settings"
+                            onClick={() => {
+                                navigate({ to: '/settings' })
+                                setCurrentTab('settings')
+                            }}
+                        >
+                            Settings
+                        </Tabs.Trigger>
+                        <Tabs.Indicator rounded="l2" />
+                    </Tabs.List>
+                </Tabs.Root>
+                {isLoggedIn && (
+                    <Button
+                        alignSelf="center"
+                        disabled={isLoading}
+                        onClick={() => {
+                            console.log('trying to log out')
+                            setIsLoading(true)
+                            window.api.logOutUser()
+                        }}
+                    >
+                        Log Out
+                    </Button>
+                )}
+            </Flex>
+            <Stack flex={'auto'} overflowY={'none'}>{children}</Stack>
+            <Flex alignSelf={'flex-end'}>
+                <div>https://discord.gg/T77dSXG7Re</div>
+                <div style={{ fontSize: '0.8rem' }}>Hyper Reflector version 0.1.6a 2025</div>
+            </Flex>
+        </Stack>
     )
 }

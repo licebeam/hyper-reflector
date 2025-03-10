@@ -1,24 +1,46 @@
-// See the Electron documentation for details on how to use preload scripts:
-// https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('api', {
+    // websocket related
+    sendIceCandidate: (data: { targetId: string; candidate: any; callerId: string }) =>
+        ipcRenderer.send('iceCandidate', data),
+    callUser: (data: { callerId: string; calleeId: string }) => ipcRenderer.send('callUser', data),
+    answerCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('answerCall', data),
+    receivedCall: (data: { callerId: string; answer: any }) =>
+        ipcRenderer.send('receivedCall', data),
     // server and online
-    loginUser: (loginObject: { email: string, name: string; pass: string }) =>
-        ipcRenderer.send('login-user', loginObject),
-    logOut: () => ipcRenderer.send('log-out'),
-    getLoggedInUser: (uid: string) => ipcRenderer.send('check-logged-in', uid),
+    loginUser: (loginObject: { email: string; name: string; pass: string }) =>
+        ipcRenderer.send('loginUser', loginObject),
+    createAccount: (accountObject: { email: string; name: string; pass: string }) =>
+        ipcRenderer.send('createAccount', accountObject),
+    logOutUser: () => ipcRenderer.send('logOutUser'),
+    getLoggedInUser: (uid: string) => ipcRenderer.send('getLoggedInUser', uid),
     sendMessage: (text: string) => ipcRenderer.send('sendMessage', text),
-    sendRoomMessage: (text: string) => ipcRenderer.send('roomMessage', text),
+    sendRoomMessage: (text: string) => ipcRenderer.send('sendRoomMessage', text),
     addUserToRoom: (user: any) => ipcRenderer.send('addUserToRoom', user),
     removeUserFromRoom: (user: any) => ipcRenderer.send('removeUserFromRoom', user),
     addUserGroupToRoom: (users: [any]) => ipcRenderer.send('addUserGroupToRoom', users),
-    // sends text to the emulator using the fbneo_commands.txt
+    handShake: (type: string) => ipcRenderer.send('hand-shake-users', type),
+    sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
+    updateStun: (data: any) => ipcRenderer.send('updateStun', data), // will need to add ports back later so we can connect offline users.
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
+    getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
+    setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),
+    getEmulatorDelay: (delay: number) => ipcRenderer.send('getEmulatorDelay', delay),
+    endMatch: (userUID: string) => ipcRenderer.send('endMatch', userUID),
+    endMatchUI: (userUID: string) => ipcRenderer.send('endMatch', userUID),
+    killEmulator: () => ipcRenderer.send('killEmulator'),
+    sendUDPMessage: (data: any) => ipcRenderer.send('sendUDPMessage', data),
+    sendStunOverSocket: (data: { publicIp: string; publicPort: string }) =>
+        ipcRenderer.send('sendStunOverSocket', data),
+    // sends text to the emulator using the fbneo_commands.txt
     sendText: (text: string) => ipcRenderer.send('send-text', text),
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),
-    serveMatch: (ip: string, port: number) => ipcRenderer.send('startP1', { ip, port }),
-    connectMatch: (ip: string, port: number) => ipcRenderer.send('startP2', { ip, port }),
+    setTargetIp: (ip: string) => ipcRenderer.send('setTargetIp', ip),
+    serveMatch: (ip: string, port: number, player: number, delay: number, myPort: number) =>
+        ipcRenderer.send('serveMatch', { ip, port, player, delay, myPort }),
+    startGameOnline: (opponentUID: string, player: number, myId?: string)  =>
+        ipcRenderer.send('startGameOnline', { opponentUID, player, myId }),
     startSoloTraining: () => ipcRenderer.send('start-solo-mode'),
     // ipc call stuff
     on: (channel, callback) => {
@@ -48,11 +70,14 @@ contextBridge.exposeInMainWorld('api', {
     },
 })
 
-// // testing sending messages from ipc main to ipcrenderer
-// ipcRenderer.on('message-from-main', (event, message) => {
-//     console.log('Received:', message);
-// });
+ipcRenderer.on('message-from-main', (event, message) => {
+    console.log('Stats to update the UI with:', message)
+})
 
 ipcRenderer.on('stats-from-main', (event, message) => {
     console.log('Stats to update the UI with:', message)
+})
+
+ipcRenderer.on('send-log', (event, message) => {
+    console.log('-main- ', message)
 })
