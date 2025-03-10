@@ -389,8 +389,9 @@ const createWindow = () => {
             // if we don't get a ping we should forward it to the emulator
             // we probably shouldnt do any conversions to save time
             const messageContent = message.toString()
-            if (messageContent === 'ping') {
+            if (messageContent === 'ping' || message.includes('"name"')) {
                 console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
+            } else {
                 //sending message to the emulator
                 console.log('sending this guy to the emulator => ', message)
                 socket.send(message, 0, message.length, 7000, '127.0.0.1')
