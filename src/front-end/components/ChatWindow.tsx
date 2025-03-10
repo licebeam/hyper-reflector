@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import styled from 'styled-components'
+import { Button, Stack, Input, Flex } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
 
 export default function ChatWindow() {
@@ -19,10 +19,10 @@ export default function ChatWindow() {
 
     // get message from websockets
     useEffect(() => {
-        window.api.removeAllListeners('room-message', handleRoomMessage)
-        window.api.on('room-message', handleRoomMessage)
+        window.api.removeAllListeners('sendRoomMessage', handleRoomMessage)
+        window.api.on('sendRoomMessage', handleRoomMessage)
         return () => {
-            window.api.removeListener('room-message', handleRoomMessage)
+            window.api.removeListener('sendRoomMessage', handleRoomMessage)
         }
     }, [])
 
@@ -49,22 +49,30 @@ export default function ChatWindow() {
             var timestamp = new Date()
             // really simple chat display
             return (
-                <div key={index + timestamp + message.message}>
+                <Flex key={index + timestamp + message.message}>
                     {message.sender}: {message.message}
-                </div>
+                </Flex>
             )
         })
     }
 
     return (
-        <div key={'my-chatroom'} style={{ display: 'flex', flexDirection: 'column' }}>
+        <Stack key={'my-chatroom'}>
             {isLoggedIn && (
-                <div id="chatbox-id" style={{ height: 300, overflowY: 'scroll' }}>
+                <div
+                    id="chatbox-id"
+                    style={{
+                        minHeight: '400px',
+                        maxHeight: '400px',
+                        overflowY: 'scroll',
+                        textWrap: 'wrap',
+                    }}
+                >
                     <p> messages</p>
                     {renderMessages()}
                     <div ref={chatEndRef} />
                 </div>
             )}
-        </div>
+        </Stack>
     )
 }

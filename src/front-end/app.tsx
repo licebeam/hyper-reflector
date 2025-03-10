@@ -1,3 +1,4 @@
+// import { ChakraProvider } from '@chakra-ui/react'
 import { createRoot } from 'react-dom/client'
 import {
     Outlet,
@@ -5,7 +6,9 @@ import {
     createRouter,
     createRoute,
     createRootRoute,
+    createMemoryHistory,
 } from '@tanstack/react-router'
+import { ChakraProvider, defaultConfig, defineConfig, createSystem } from '@chakra-ui/react'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import StartPage from './pages/StartPage'
 import LobbyPage from './pages/LobbyPage'
@@ -13,11 +16,16 @@ import OfflinePage from './pages/OfflinePage'
 import NewsPage from './pages/NewsPage'
 import PlayerProfilePage from './pages/PlayerProfilePage'
 import SettingsPage from './pages/SettingsPage'
+import CreateAccountPage from './pages/CreateAccountPage'
+import ErrorBoundary from './ErrorBoundary'
+import Layout from './layout/Layout'
 
 const rootRoute = createRootRoute({
     component: () => (
         <>
-            <Outlet />
+            <Layout>
+                <Outlet />
+            </Layout>
             <TanStackRouterDevtools />
         </>
     ),
@@ -42,6 +50,18 @@ const newsRoute = createRoute({
         return (
             <div className="p-2">
                 <NewsPage />
+            </div>
+        )
+    },
+})
+
+const createAccountRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/create',
+    component: function News() {
+        return (
+            <div className="p-2">
+                <CreateAccountPage />
             </div>
         )
     },
@@ -73,7 +93,7 @@ const chatRoute = createRoute({
 
 const profileRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '/player',
+    path: '/profile',
     component: function Settings() {
         return (
             <div className="p-2">
@@ -102,9 +122,15 @@ const routeTree = rootRoute.addChildren([
     chatRoute,
     profileRoute,
     settingsRoute,
+    createAccountRoute,
 ])
 
-const router = createRouter({ routeTree })
+// this allows electron to hash the routing
+const memoryHistory = createMemoryHistory({
+    initialEntries: ['/'], // Pass your initial url
+})
+
+const router = createRouter({ routeTree, history: memoryHistory })
 
 declare module '@tanstack/react-router' {
     interface Register {
@@ -112,5 +138,29 @@ declare module '@tanstack/react-router' {
     }
 }
 
+const customConfig = defineConfig({
+    theme: {
+        tokens: {
+            colors: {
+                brand: {
+                    50: { value: '#e6f2ff' },
+                    100: { value: '#e6f2ff' },
+                    200: { value: '#bfdeff' },
+                    300: { value: '#99caff' },
+                    950: { value: '#001a33' },
+                },
+            },
+        },
+    },
+})
+
+export const system = createSystem(defaultConfig, customConfig)
+
 const root = createRoot(document.body)
-root.render(<RouterProvider router={router} />)
+root.render(
+    <ErrorBoundary>
+        <ChakraProvider value={system}>
+            <RouterProvider router={router} />
+        </ChakraProvider>
+    </ErrorBoundary>
+)

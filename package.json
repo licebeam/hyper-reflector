@@ -1,17 +1,28 @@
 {
   "name": "hyper-reflector",
+  "keywords": [],
+  "author": "Hyper Reflector Team",
   "productName": "hyper-reflector",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "description": "3rd Strike matchmaking and stat tracking application",
   "main": ".vite/build/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/licebeam/hyper-reflector.git"
+  },
   "scripts": {
     "start": "electron-forge start",
+    "rebuild": "electron-rebuild",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
-    "lint": "eslint --ext .ts,.tsx ."
+    "lint": "eslint --ext .ts,.tsx .",
+    "updateSub": "git submodule update --remote",
+    "punchA": "node src/networking/punchClientA.js",
+    "punchB": "node src/networking/punchClientB.js"
   },
   "devDependencies": {
+    "@chakra-ui/cli": "^3.8.1",
     "@electron-forge/cli": "^7.6.1",
     "@electron-forge/maker-deb": "^7.6.1",
     "@electron-forge/maker-rpm": "^7.6.1",
@@ -20,7 +31,9 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.6.1",
     "@electron-forge/plugin-fuses": "^7.6.1",
     "@electron-forge/plugin-vite": "^7.6.1",
+    "@electron-forge/publisher-github": "^7.7.0",
     "@electron/fuses": "^1.8.0",
+    "@electron/rebuild": "^3.7.1",
     "@tanstack/router-devtools": "^1.99.13",
     "@tanstack/router-plugin": "^1.99.14",
     "@types/react-dom": "^19.0.3",
@@ -33,18 +46,28 @@
     "typescript": "~4.5.4",
     "vite": "^5.4.14"
   },
-  "keywords": [],
-  "author": "Hyper Reflector Team",
   "dependencies": {
+    "@chakra-ui/react": "^3.8.1",
+    "@emotion/react": "^11.14.0",
     "@tanstack/react-router": "^1.99.9",
     "@types/node": "^22.13.1",
     "@types/react": "^19.0.8",
     "@vitejs/plugin-react": "^4.3.4",
+    "async": "^2.1.5",
+    "axios": "^1.7.9",
+    "dgram": "^1.0.1",
     "electron-squirrel-startup": "^1.0.1",
+    "fast-xml-parser": "^5.0.8",
     "firebase": "^11.2.0",
+    "lucide-react": "^0.477.0",
+    "next-themes": "^0.4.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-icons": "^5.5.0",
+    "request": "^2.79.0",
+    "stun": "^2.1.0",
     "styled-components": "^6.1.15",
+    "update-electron-app": "^3.1.1",
     "zustand": "^5.0.3"
   },
   "build": {
