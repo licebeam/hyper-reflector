@@ -411,9 +411,10 @@ const createWindow = () => {
                 isTraining: false, // Might be used in the future.
                 callBack: () => {
                     // attempt to kill the emulator
-                    mainWindow.webContents.send('endMatch', userUID)
                     console.log('emulator should die')
                     killUdpSocket()
+                    mainWindow.webContents.send('endMatch', userUID)
+                    mainWindow.webContents.send('endMatchUI', userUID)
                 },
             })
             spawnedEmulator = emu // in the future we can use this to check for online training etc.

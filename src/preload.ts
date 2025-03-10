@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
     setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),
     getEmulatorDelay: () => ipcRenderer.send('getEmulatorDelay'),
     endMatch: (userUID: string) => ipcRenderer.send('endMatch', userUID),
+    endMatchUI: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     killEmulator: () => ipcRenderer.send('killEmulator'),
     sendUDPMessage: (data: any) => ipcRenderer.send('sendUDPMessage', data),
     sendStunOverSocket: (data: { publicIp: string; publicPort: string }) =>

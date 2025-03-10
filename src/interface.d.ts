@@ -23,6 +23,7 @@ export interface IElectronAPI {
     setEmulatorDelay: any
     getEmulatorDelay: any
     endMatch: any
+    endMatchUI: any
     killEmulator: any
     sendUDPMessage: any
     sendStunOverSocket: any

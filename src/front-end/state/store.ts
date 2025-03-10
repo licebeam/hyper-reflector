@@ -28,4 +28,5 @@ export const useMessageStore = create((set) => ({
     setCallData: (call) => set((state) => ({ callData: [...state.callData, call] })),
     removeCallData: (caller) =>
         set((state) => ({ callData: [...state.callData.filter((call) => call.callerId !== caller.callerId)] })),
+    clearCallData: (call) => set((state) => ({ callData: [] })),
 }))

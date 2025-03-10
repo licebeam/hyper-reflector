@@ -31,10 +31,10 @@ export default function UsersChat() {
     }
 
     const handleReceiveCall = (data) => {
-        console.log(data)
+        console.log('RECIEVED CALL')
         setCallData(data)
     }
-    
+
     // get users from websockets
     useEffect(() => {
         window.api.removeAllListeners('room-users-add-group', handleUserJoinGroup)
