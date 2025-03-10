@@ -342,24 +342,28 @@ const createWindow = () => {
 
     let socket = dgram.createSocket('udp4')
     let emuListener = dgram.createSocket('udp4')
-    emuListener.bind(7001)
 
     ipcMain.on('startGameOnline', async (event, data) => {
         console.log('STARTING GAME ONLINE', data)
         if (socket) {
-            socket.close()
-            socket = dgram.createSocket('udp4')
+            await socket.close()
+            socket = await dgram.createSocket('udp4')
         }
         if (emuListener) {
-            emuListener.close()
-            emuListener = dgram.createSocket('udp4')
+            await emuListener.close()
+            emuListener = await dgram.createSocket('udp4')
+            emuListener.bind(7001)
         }
         socket.on('message', function (message, remote) {
             console.log(remote.address + ':' + remote.port + ' - ' + message)
             // if we don't get a ping we should forward it to the emulator
             // we probably shouldnt do any conversions to save time
             const messageContent = message.toString()
-            if (messageContent === 'ping' || message.includes('"name"')) {
+            console.log(
+                'should i filter this -----------------------------? ',
+                message.includes('"port"')
+            )
+            if (messageContent === 'ping' || message.includes('"port"')) {
                 console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
             } else {
                 //sending message to the emulator
@@ -421,7 +425,8 @@ const createWindow = () => {
 
         function startEmulator(address, port) {
             console.log('EMULATOR SHOULD BE STARTING')
-            console.log('Emulator listener port', emuListener.address().port)
+            console.log(emuListener)
+            console.log('Emulator listener port', emuListener.address()?.port || 'Binding failed')
             // console.log(socket.remoteAddress())
             const emu = startPlayingOnline({
                 config,
@@ -442,39 +447,28 @@ const createWindow = () => {
             spawnedEmulator = emu // in the future we can use this to check for online training etc.
             return emu
         }
-        // const emu = startPlayingOnline({
-        //     config,
-        //     localPort: localStunPort || 7000,
-        //     remoteIp: data.ip || '127.0.0.1',
-        //     remotePort: 7000,
-        //     player: data.player || 0,
-        //     delay: parseInt(config.app.emuDelay) || 0,
-        //     isTraining: false, // Might be used in the future.
-        //     callBack: () => {
-        //         // attempt to kill the emulator
-        //         mainWindow.webContents.send('endMatch', userUID)
-        //         console.log('emulator should die')
-        //         killUdpSocket()
-        //     },
-        // })
-        // spawnedEmulator = emu // in the future we can use this to check for online training etc.
     })
 
     ipcMain.on('serveMatchOffline', async (event, data) => {
         if (socket) {
-            socket.close()
-            socket = dgram.createSocket('udp4')
+            await socket.close()
+            socket = await dgram.createSocket('udp4')
         }
         if (emuListener) {
-            emuListener.close()
-            emuListener = dgram.createSocket('udp4')
+            await emuListener.close()
+            emuListener = await dgram.createSocket('udp4')
+            emuListener.bind(7001)
         }
         socket.on('message', function (message, remote) {
             console.log(remote.address + ':' + remote.port + ' - ' + message)
             // if we don't get a ping we should forward it to the emulator
             // we probably shouldnt do any conversions to save time
             const messageContent = message.toString()
-            if (messageContent === 'ping' || message.includes('"name"')) {
+            console.log(
+                'should i filter this -----------------------------? ',
+                message.includes('"port"')
+            )
+            if (messageContent === 'ping' || message.includes('"port"')) {
                 console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
             } else {
                 //sending message to the emulator
@@ -535,7 +529,8 @@ const createWindow = () => {
 
         function startEmulator(address, port) {
             console.log('EMULATOR SHOULD BE STARTING')
-            console.log('Emulator listener port', emuListener.address().port)
+            console.log(emuListener)
+            console.log('Emulator listener port', emuListener.address()?.port || 'Binding failed')
             // console.log(socket.remoteAddress())
             const emu = startPlayingOnline({
                 config,
