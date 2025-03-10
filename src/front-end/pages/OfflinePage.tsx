@@ -35,8 +35,8 @@ export default function OfflinePage() {
                     Used for bypassing the online server and playing with someone directly.
                 </Text>
                 <Text textStyle="xs">
-                    If you cannot connect to eachother using port 7000, you may need to forward
-                    ports in your router.
+                    Make sure both players create a long 8 digit code to connect to eachother. This
+                    is an early feature, so there are bound to be issues.
                 </Text>
                 <Flex gap="2">
                     <Field
@@ -60,17 +60,27 @@ export default function OfflinePage() {
                             </SelectContent>
                         </SelectRoot>
                     </Field>
-                    <Field label="Player Code" helperText="Send this to your opponent">
+                    <Field
+                        label="Player Code"
+                        helperText="Send this to your opponent, atleast 8 characters"
+                    >
                         <Input
+                            min={8}
+                            max={16}
                             type="text"
                             value={myPort}
                             onChange={(e) => setMyPort(e.target.value)}
                             placeholder="Bobby789"
                         />
                     </Field>
-                    <Field label="Opponent Code" helperText="The Code of your opponent">
+                    <Field
+                        label="Opponent Code"
+                        helperText="The Code of your opponent, atleast 8 characters"
+                    >
                         <Input
-                            type="tex"
+                            min={8}
+                            max={16}
+                            type="text"
                             value={opponentPort}
                             onChange={(e) => setOpponentPort(e.target.value)}
                             placeholder="Blake123"
@@ -87,7 +97,7 @@ export default function OfflinePage() {
                         />
                     </Field> */}
                     <Button
-                        disabled={!opponentPort || !player || !myPort}
+                        disabled={opponentPort.length < 8 || !player || myPort.length < 8}
                         alignSelf="center"
                         onClick={() => {
                             console.log('starting match offline')
