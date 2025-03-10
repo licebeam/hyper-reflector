@@ -9,7 +9,6 @@ let callerIdState = null
 let myUID = null
 let mylocalStunPort = 0 // set this later
 let mylocalRealPort = 0 // set this later
-let isCaller
 let userName = null
 let opponentId = null
 let matchPlayerNum = 0
@@ -103,6 +102,18 @@ function closePeerConnection(userId: string) {
         peerConnections[userId].close()
         delete peerConnections[userId] // delete user from our map
     }
+}
+
+function resetState() {
+    console.log("resetting renderer state for peer connection")
+    candidateList = []
+    callerIdState = null
+    myUID = null
+    mylocalStunPort = 0 // set this later
+    mylocalRealPort = 0 // set this later
+    userName = null
+    opponentId = null
+    matchPlayerNum = 0
 }
 
 window.api.on('sendUDPMessage', () => {
@@ -303,9 +314,10 @@ function connectWebSocket(user) {
 
         if (data.type === 'matchEndedClose') {
             //user the userUID and close all matches.
+            console.log('killing emulator and closing peer connection')
             closePeerConnection(data.userUID)
-            console.log('killing emulator')
             window.api.killEmulator()
+            resetState()
         }
 
         if (data.type === 'getRoomMessage') {
