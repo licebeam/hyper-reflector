@@ -389,19 +389,14 @@ const createWindow = () => {
             // if we don't get a ping we should forward it to the emulator
             // we probably shouldnt do any conversions to save time
             const messageContent = message.toString()
-            // if (messageContent === 'ping') {
-            // console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
+            if (messageContent === 'ping' || messageContent === 'keep-ping') {
+                console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
+                // return
+            }
             try {
                 publicEndpointB = JSON.parse(message)
                 sendMessageToB(publicEndpointB.address, publicEndpointB.port)
             } catch (err) {}
-            // } else {
-            //     // we should forward to the emulator if it's not a ping
-            //     sendMessageToB(publicEndpointB.address, publicEndpointB.port, message)
-            //     // socket.send(message, 0, message.length, 7000, '127.0.0.1', (err) => {
-            //     //     if (err) console.log(`Forwarding error: ${err.message}`)
-            //     // })
-            // }
         })
 
         // get messages from our local emulator and send it to the other player socket
@@ -433,17 +428,13 @@ const createWindow = () => {
         sendMessageToS()
 
         let isEmuOpen = false
+        let messageCount = 0
         function sendMessageToB(address, port, msg = '') {
             if (!isEmuOpen) {
                 isEmuOpen = startEmulator(address, port)
             }
 
-            let message = new Buffer('sending')
-            // if (!msg.length) {
-            //     message = new Buffer('ping')
-            // } else {
-            //     message = new Buffer(msg)
-            // }
+            var message = new Buffer('ping' + msg)
             socket.send(message, 0, message.length, port, address, function (err, nrOfBytesSent) {
                 if (err) return console.log(err)
                 console.log('UDP message sent to B:', address + ':' + port)
