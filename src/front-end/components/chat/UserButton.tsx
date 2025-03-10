@@ -4,27 +4,44 @@ import { Button, Stack, Input, Flex } from '@chakra-ui/react'
 
 export default function UserButton({ user }) {
     const [isInMatch, setIsInMatch] = useState(false)
+    const [isUserChallenging, setIsUserChallenging] = useState(false)
     const userState = useLoginStore((state) => state.userState)
     const callData = useMessageStore((state) => state.callData)
-    const removeCallData = useMessageStore((state) => state.callData)
-
-    const isUserChallenging = () => {
-        console.log(callData)
-        if (callData.find((call) => call.callerId === user.uid)) {
-            return true
-        }
-        return false
-    }
+    const removeCallData = useMessageStore((state) => state.removeCallData)
+    const clearCallData = useMessageStore((state) => state.clearCallData)
 
     useEffect(() => {
         console.log('should reset call', callData)
-    }, [callData])
+
+        setIsUserChallenging((prevState) => {
+            const found = callData.some((call) => call.callerId === user.uid)
+            console.log(found ? 'Found USER in call' : 'Did not find user in call')
+            return found // This ensures the state is always updated properly
+        })
+    }, [callData, user.uid])
+
+    const handleEndMatch = () => {
+        setIsInMatch(false)
+        // const caller = callData.find((call) => call.callerId === user.uid)
+        // removeCallData(caller)
+        clearCallData()
+        console.log('match ended----------------------------')
+
+    }
+
+    useEffect(() => {
+        window.api.removeAllListeners('endMatchUI', handleEndMatch)
+        window.api.on('endMatchUI', handleEndMatch)
+        return () => {
+            window.api.removeListener('endMatchUI', handleEndMatch)
+        }
+    }, [])
 
     return (
         <div>
             {user.name}
             {/* {user.uid} */}
-            {!isUserChallenging() && user.uid !== userState.uid && (
+            {!isUserChallenging && user.uid !== userState.uid && (
                 <Button
                     disabled={isInMatch}
                     onClick={() => {
@@ -41,14 +58,13 @@ export default function UserButton({ user }) {
                     Challenge
                 </Button>
             )}
-            {isUserChallenging() && (
+            {isUserChallenging && (
                 <Button
                     disabled={isInMatch}
                     onClick={() => {
                         const caller = callData.find((call) => call.callerId === user.uid)
                         setIsInMatch(true)
                         window.api.answerCall(caller)
-                        // removeCallData(caller)
                     }}
                 >
                     Accept
