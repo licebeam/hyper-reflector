@@ -374,23 +374,21 @@ function connectWebSocket(user) {
                 })
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
-                // this automatically serves the match when we get a successful candidate, we should probably hanges this.
-                window.api.serveMatch(ip, 7000, playerNum, 0, 7000)
-
+                window.api.startGameOnline(opponentId, matchPlayerNum)
                 //TODO fix these references
                 matchPlayerNum = playerNum
             }
         }
 
-        if (data.type === 'receiveHolePunchStun') {
-            console.log(
-                '&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& got a hole punch candidate',
-                data
-            )
-            console.log('hole punch data', JSON.stringify(data))
-            //updated for hole punching
-            window.api.startGameOnline(opponentId, matchPlayerNum)
-        }
+        // if (data.type === 'receiveHolePunchStun') {
+        //     console.log(
+        //         '&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& got a hole punch candidate',
+        //         data
+        //     )
+        //     console.log('hole punch data', JSON.stringify(data))
+        //     //updated for hole punching
+
+        // }
     }
 
     // Fix this later, we need to get the actual user IP.
