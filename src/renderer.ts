@@ -105,7 +105,7 @@ function closePeerConnection(userId: string) {
 }
 
 function resetState() {
-    console.log("resetting renderer state for peer connection")
+    console.log('resetting renderer state for peer connection')
     candidateList = []
     callerIdState = null
     myUID = null
@@ -386,7 +386,7 @@ function connectWebSocket(user) {
                 })
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
-                window.api.startGameOnline(opponentId, matchPlayerNum)
+                window.api.startGameOnline(opponentId, playerNum)
                 //TODO fix these references
                 matchPlayerNum = playerNum
             }
