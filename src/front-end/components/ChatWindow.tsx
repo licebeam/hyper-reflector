@@ -59,7 +59,15 @@ export default function ChatWindow() {
     return (
         <Stack key={'my-chatroom'}>
             {isLoggedIn && (
-                <div id="chatbox-id" style={{ height: 300, overflowY: 'scroll' }}>
+                <div
+                    id="chatbox-id"
+                    style={{
+                        minHeight: '400px',
+                        maxHeight: '400px',
+                        overflowY: 'scroll',
+                        textWrap: 'wrap',
+                    }}
+                >
                     <p> messages</p>
                     {renderMessages()}
                     <div ref={chatEndRef} />
