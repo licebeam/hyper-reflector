@@ -397,9 +397,10 @@ const createWindow = () => {
                 } catch (err) {}
             } else {
                 // we should forward to the emulator if it's not a ping
-                socket.send(message, 0, message.length, 7000, '127.0.0.1', (err) => {
-                    if (err) console.log(`Forwarding error: ${err.message}`);
-                });
+                sendMessageToB(publicEndpointB.address, publicEndpointB.port, message)
+                // socket.send(message, 0, message.length, 7000, '127.0.0.1', (err) => {
+                //     if (err) console.log(`Forwarding error: ${err.message}`)
+                // })
             }
         })
 
@@ -438,7 +439,7 @@ const createWindow = () => {
             }
 
             let message
-            if(!msg.length){
+            if (!msg.length) {
                 message = new Buffer('ping')
             } else {
                 message = new Buffer(msg)
@@ -447,9 +448,9 @@ const createWindow = () => {
                 if (err) return console.log(err)
                 console.log('UDP message sent to B:', address + ':' + port)
                 // This is the keep alive
-                // setTimeout(function () {
-                //     sendMessageToB(address, port)
-                // }, 2000)
+                setTimeout(function () {
+                    sendMessageToB(address, port)
+                }, 2000)
             })
         }
 
