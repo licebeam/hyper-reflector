@@ -328,6 +328,7 @@ const createWindow = () => {
         const { publicPort, publicIp } = await udpHolePunch(data.ip, data.port, mainWindow)
             .then()
             .catch((err) => console.log('error starting udp socket', err))
+        sendLog(`Starting the hole punching series ${publicPort}`)
         console.log('about to send stun over socket to renderer --0-0-0-0-0-0-0-0-0')
         try {
             await mainWindow.webContents.send('sendStunOverSocket', { publicIp, publicPort })
@@ -341,17 +342,17 @@ const createWindow = () => {
     ipcMain.on('startGameOnline', async (event, data) => {
         console.log(data)
         //{ ip: undefined, port: undefined, player: 0, delay: 0, myPort: 7000 }
-        try {
-            await startHolePunching(data.ip, data.port, mainWindow)
-        } catch (error) {
-            console.log('error starting hole punch', error)
-        }
+        // try {
+        //     await startHolePunching(data.ip, data.port, mainWindow)
+        // } catch (error) {
+        //     console.log('error starting hole punch', error)
+        // }
 
         const emu = startPlayingOnline({
             config,
             localPort: localStunPort || 7000,
             remoteIp: data.ip || '127.0.0.1',
-            remotePort: data.port || 7001,
+            remotePort: 7000,
             player: data.player || 0,
             delay: parseInt(config.app.emuDelay) || 0,
             isTraining: false, // Might be used in the future.

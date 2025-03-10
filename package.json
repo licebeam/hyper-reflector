@@ -17,7 +17,9 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "updateSub": "git submodule update --remote"
+    "updateSub": "git submodule update --remote",
+    "punchA": "node src/networking/punchClientA.js",
+    "punchB": "node src/networking/punchClientB.js"
   },
   "devDependencies": {
     "@chakra-ui/cli": "^3.8.1",
