@@ -379,32 +379,7 @@ function connectWebSocket(user) {
                 matchPlayerNum = playerNum
             }
         }
-
-        // if (data.type === 'receiveHolePunchStun') {
-        //     console.log(
-        //         '&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& got a hole punch candidate',
-        //         data
-        //     )
-        //     console.log('hole punch data', JSON.stringify(data))
-        //     //updated for hole punching
-
-        // }
     }
-
-    // Fix this later, we need to get the actual user IP.
-    // window.api.on('send-data-channel', async (data: string) => {
-    //     console.log(
-    //         ' PEER STATS ',
-    //         (await peerConnection.getStats()).forEach((r) => {
-    //             if (r.candidateType === 'srflx') {
-    //                 console.log(r)
-    //             }
-    //         })
-    //     )
-    //     if (dataChannel && dataChannel.readyState === 'open') {
-    //         dataChannel.send(JSON.stringify(data))
-    //     }
-    // })
 }
 
 //ends match with any player who has an active connection with you, this should also close the rtc connection

@@ -60,46 +60,39 @@ export default function OfflinePage() {
                             </SelectContent>
                         </SelectRoot>
                     </Field>
-                    <Field
-                        label="Local Port"
-                        helperText="The port you want your opponent to connect to."
-                    >
+                    <Field label="Player Code" helperText="Send this to your opponent">
                         <Input
                             type="text"
                             value={myPort}
                             onChange={(e) => setMyPort(e.target.value)}
-                            placeholder="7000"
+                            placeholder="Bobby789"
                         />
                     </Field>
-                    <Field label="Remote Port" helperText="Your opponent's open port.">
+                    <Field label="Opponent Code" helperText="The Code of your opponent">
                         <Input
                             type="tex"
                             value={opponentPort}
                             onChange={(e) => setOpponentPort(e.target.value)}
-                            placeholder="7000"
+                            placeholder="Blake123"
                         />
                     </Field>
                 </Flex>
                 <Flex gap="8">
-                    <Field label="Remote Port" helperText="Your opponent's public IP address.">
+                    {/* <Field label="Remote Port" helperText="Your opponent's public IP address.">
                         <Input
                             type="text"
                             value={opponentIp}
                             onChange={(e) => setOpponentIp(e.target.value)}
                             placeholder="127.0.0.1"
                         />
-                    </Field>
+                    </Field> */}
                     <Button
+                        disabled={!opponentPort || !player || !myPort}
                         alignSelf="center"
                         onClick={() => {
                             console.log('starting match offline')
-                            window.api.serveMatchOffline(
-                                opponentIp,
-                                opponentPort,
-                                player,
-                                0,
-                                myPort
-                            )
+                            // TODO rename everything
+                            window.api.startGameOnline(opponentPort, player, myPort)
                         }}
                     >
                         Connect
