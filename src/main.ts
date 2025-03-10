@@ -413,7 +413,7 @@ const createWindow = () => {
             var serverHost = keys.COTURN_IP
             // var serverHost = '127.0.0.1'
 
-            var message = new Buffer('A')
+            var message = new Buffer(JSON.stringify({ uid: 'user123', peerUid: 'user456' }))
             socket.send(
                 message,
                 0,
