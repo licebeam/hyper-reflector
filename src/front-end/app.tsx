@@ -9,7 +9,7 @@ import {
     createMemoryHistory,
 } from '@tanstack/react-router'
 import { ChakraProvider, defaultConfig, defineConfig, createSystem } from '@chakra-ui/react'
-import { TanStackRouterDevtools } from '@tanstack/router-devtools'
+// import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import StartPage from './pages/StartPage'
 import LobbyPage from './pages/LobbyPage'
 import OfflinePage from './pages/OfflinePage'
@@ -19,6 +19,7 @@ import SettingsPage from './pages/SettingsPage'
 import CreateAccountPage from './pages/CreateAccountPage'
 import ErrorBoundary from './ErrorBoundary'
 import Layout from './layout/Layout'
+import Autologin from './components/AutoLogin'
 
 const rootRoute = createRootRoute({
     component: () => (
@@ -26,7 +27,7 @@ const rootRoute = createRootRoute({
             <Layout>
                 <Outlet />
             </Layout>
-            <TanStackRouterDevtools />
+            {/* <TanStackRouterDevtools /> */}
         </>
     ),
 })
@@ -38,6 +39,18 @@ const indexRoute = createRoute({
         return (
             <div className="p-2">
                 <StartPage />
+            </div>
+        )
+    },
+})
+
+const autoLogRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/auto-login',
+    component: function Home() {
+        return (
+            <div className="p-2">
+                <Autologin />
             </div>
         )
     },
@@ -117,6 +130,7 @@ const settingsRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
     indexRoute,
+    autoLogRoute,
     newsRoute,
     offlineRoute,
     chatRoute,
@@ -127,7 +141,7 @@ const routeTree = rootRoute.addChildren([
 
 // this allows electron to hash the routing
 const memoryHistory = createMemoryHistory({
-    initialEntries: ['/'], // Pass your initial url
+    initialEntries: ['/auto-login'], // Pass your initial url
 })
 
 const router = createRouter({ routeTree, history: memoryHistory })

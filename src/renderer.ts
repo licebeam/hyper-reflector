@@ -172,6 +172,7 @@ window.api.on('loginSuccess', (user) => {
     }
 })
 
+
 window.api.on('login-failed', () => {
     // kill the socket connection
     if (signalServerSocket) {

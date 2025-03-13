@@ -18,6 +18,7 @@ let opponentPort = 7000 // We change this when we recieve a message from a playe
 let spawnedEmulator = null //used to handle closing the emulator process
 //for testing purposes
 let currentProxyPort = 0
+
 //
 
 // - FIREBASE AUTH CODE - easy peasy
@@ -27,6 +28,7 @@ import {
     signInWithEmailAndPassword,
     signOut,
     createUserWithEmailAndPassword,
+    signInWithCustomToken,
 } from 'firebase/auth'
 import { firebaseConfig } from './private/firebase'
 import { TLogin } from './types'
@@ -45,6 +47,8 @@ const isDev = !app.isPackaged
 
 let userUID: string | null = null
 let filePathBase = process.resourcesPath
+const tokenFilePath = path.join(app.getPath('userData'), 'auth_token.json')
+
 //handle dev mode toggle for file paths.
 if (isDev) {
     filePathBase = path.join(app.getAppPath(), 'src')
@@ -199,10 +203,11 @@ const createWindow = () => {
 
     // firebase login
     async function handleLogin({ email, pass }: TLogin) {
-        mainWindow.webContents.send('logging-in', 'trying to log in')
         try {
             await signInWithEmailAndPassword(auth, email, pass)
-                .then(() => {
+                .then(async (data) => {
+                    console.log('login info', data)
+                    await saveRefreshToken(data.user.refreshToken)
                     return true
                 })
                 .catch((error) => {
@@ -214,6 +219,12 @@ const createWindow = () => {
         } catch (error) {
             console.log(error)
         }
+    }
+
+    async function saveRefreshToken(refreshToken: string) {
+        await fs.writeFileSync(tokenFilePath, JSON.stringify({ refreshToken }), {
+            encoding: 'utf-8',
+        })
     }
 
     async function handleLogOut() {
@@ -445,7 +456,6 @@ const createWindow = () => {
                 callBack: () => {
                     // attempt to kill the emulator
                     console.log('emulator should die')
-                    killUdpSocket()
                     mainWindow.webContents.send('endMatch', userUID)
                 },
             })
@@ -461,9 +471,9 @@ const createWindow = () => {
         mainWindow.webContents.send('message-from-main', 'attempting to gracefully close emu')
         try {
             console.log('trying to close emulator')
-            if (spawnedEmulator) {
+            if (spawnedEmulator !== null) {
                 spawnedEmulator.kill('SIGTERM')
-                spawnedEmulator = null;
+                spawnedEmulator = null
                 mainWindow.webContents.send('message-from-main', 'emulator exists closing')
             }
         } catch {
@@ -631,13 +641,53 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(async () => {
-    // HOW THIS APP NETWORKS
-    // first we set hit the stun server by logging in.
-    // secondly we start listening for messages on port 7000
-    // thirdly a user who wishes to connect upnp maps port 7000 for a networked connection
-    // fourthly we start the emulator and we proxy incoming data from port 7000 to the emulators port of 7001
-    // profit, users should be successfully connecting the emulators together with eachother.
+    mainWindow.webContents.once('did-finish-load', () => {
+        console.log('UI has fully loaded!')
+        mainWindow.webContents.send('autoLoggingIn')
+        // mainWindow.webContents.send('ui-ready'); // You can send an event to renderer if needed
+    })
 
-    // UPNP is working! but we need to fix the upnp library so that we can make a build.
-    ipcMain.on('updateStun', async (event, data) => {})
+    function getRefreshToken() {
+        if (fs.existsSync(tokenFilePath)) {
+            const data = JSON.parse(fs.readFileSync(tokenFilePath, 'utf-8'))
+            return data.refreshToken
+        }
+        return null
+    }
+    async function startAutoLoginProcess() {
+        // lets check if we have a refresh token first, if we do lets auto log in users that are opted in.
+        const token = await getRefreshToken()
+        if (token) {
+            console.log('We should auto log in', token)
+            const loginData = await api.autoLogin(token)
+            const customToken = await api
+                .getCustomToken(loginData.id_token)
+                .then((res) => res)
+                .catch((err) => console.log(err))
+            console.log('auto logged in', customToken)
+            await signInWithCustomToken(auth, customToken)
+            const user = await api
+                .getUserByAuth(auth)
+                .catch((err) => console.log('err getting user by auth'))
+            console.log(user)
+
+            if (user) {
+                console.log('user logged in')
+                // send our user object to the front end
+                mainWindow.webContents.send('loginSuccess', {
+                    name: user.userName,
+                    email: user.userEmail,
+                    uid: user.uid,
+                })
+
+                userUID = user.uid
+                console.log('user is: ', user)
+            }
+        } else {
+            mainWindow.webContents.send('autoLoginFailure')
+            return console.log('User needs to log in.')
+        }
+    }
+
+    startAutoLoginProcess()
 })

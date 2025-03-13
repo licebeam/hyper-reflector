@@ -22,8 +22,11 @@ export default function LoginBlock() {
     const navigate = useNavigate()
 
     const handleIsLoggingIn = () => {
-        console.log('logging in')
         setIsLoading(true)
+    }
+
+    const handleAutoLoginFail = () => {
+        setIsLoading(false)
     }
 
     const handleLogIn = (loginInfo) => {
@@ -44,8 +47,11 @@ export default function LoginBlock() {
 
     useEffect(() => {
         // Listen for updates from Electron
-        window.api.removeExtraListeners('logging-in', handleIsLoggingIn)
-        window.api.on('logging-in', handleIsLoggingIn)
+        window.api.removeExtraListeners('autoLoggingIn', handleIsLoggingIn)
+        window.api.on('autoLoggingIn', handleIsLoggingIn)
+
+        window.api.removeExtraListeners('autoLoginFailure', handleAutoLoginFail)
+        window.api.on('autoLoginFailure', handleAutoLoginFail)
 
         window.api.removeExtraListeners('loginSuccess', handleLogIn)
         window.api.on('loginSuccess', handleLogIn)
@@ -54,7 +60,8 @@ export default function LoginBlock() {
         window.api.on('login-failed', handleLoginFail)
 
         return () => {
-            window.api.removeListener('logging-in', handleIsLoggingIn)
+            window.api.removeListener('autoLoggingIn', handleIsLoggingIn)
+            window.api.removeListener('autoLoginFailure', handleAutoLoginFail)
             window.api.removeListener('loginSuccess', handleLogIn)
             window.api.removeListener('login-failed', handleLoginFail)
         }
