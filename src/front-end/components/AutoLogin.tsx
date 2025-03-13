@@ -18,7 +18,7 @@ export default function Autologin() {
     }
 
     const handleAutoLoginFail = () => {
-        setIsLoading(false)
+        console.log('auto log failed')
         navigate({ to: '/' })
     }
 

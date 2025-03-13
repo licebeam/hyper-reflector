@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Button, Stack, Input, Text, Heading, createListCollection } from '@chakra-ui/react'
+import {
+    Button,
+    Stack,
+    Input,
+    Text,
+    Heading,
+    createListCollection,
+    Box,
+    Flex,
+} from '@chakra-ui/react'
 import {
     SelectContent,
     SelectItem,
@@ -8,8 +17,10 @@ import {
     SelectValueText,
 } from '../components/chakra/ui/select'
 import { Field } from '../components/chakra/ui/field'
+import { useLoginStore } from '../state/store'
 
 export default function SettingsPage() {
+    const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const [currentEmuPath, setCurrentEmuPath] = useState('')
     const [currentDelay, setCurrentDelay] = useState('')
 
@@ -56,9 +67,11 @@ export default function SettingsPage() {
     }, [])
 
     return (
-        <Stack gap={2}>
-            <Heading size="md">Application Settings</Heading>
-            <Stack gap={6}>
+        <Stack height="100px">
+            <Heading flex="1" size="md">
+                Application Settings
+            </Heading>
+            <Stack flex="8">
                 <Text textStyle="xs">
                     This is where we can set our emulator path and other setting
                 </Text>
@@ -70,11 +83,8 @@ export default function SettingsPage() {
                 >
                     Set Emulator Path
                 </Button>
-                <Text textStyle="xs">
-                    You may need to restart the application if the emulator does not open
-                    automatically.
-                </Text>
-
+            </Stack>
+            <Stack flex="1">
                 <Text textStyle="xs">Current delay: {currentDelay}</Text>
                 <Field label="Online Delay" helperText="">
                     <SelectRoot
@@ -97,6 +107,29 @@ export default function SettingsPage() {
                         </SelectContent>
                     </SelectRoot>
                 </Field>
+            </Stack>
+            <Stack>
+                <Box display="flex">
+                    {isLoggedIn && (
+                        <>
+                            <Text textStyle="xs" flex="1">
+                                Log out user, this will also make it so you do not automaitcally log
+                                in on start next time.
+                            </Text>
+                            <Button
+                                colorPalette="red"
+                                flex="1"
+                                alignSelf="center"
+                                onClick={() => {
+                                    console.log('trying to log out')
+                                    window.api.logOutUser()
+                                }}
+                            >
+                                Log Out
+                            </Button>
+                        </>
+                    )}
+                </Box>
             </Stack>
         </Stack>
     )

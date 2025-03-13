@@ -227,11 +227,17 @@ const createWindow = () => {
         })
     }
 
+    async function removeRefreshToken() {
+        await fs.unlinkSync(tokenFilePath, 'auth_token.json')
+        console.log('Refresh token removed.')
+    }
+
     async function handleLogOut() {
         await signOut(auth)
             .then(() => {
                 try {
                     console.log('logout success')
+                    removeRefreshToken()
                     mainWindow.webContents.send('loggedOutSuccess', 'user logged out')
                 } catch (error) {
                     console.log('sending signal to fe to log out')
@@ -644,50 +650,51 @@ app.whenReady().then(async () => {
     mainWindow.webContents.once('did-finish-load', () => {
         console.log('UI has fully loaded!')
         mainWindow.webContents.send('autoLoggingIn')
-        // mainWindow.webContents.send('ui-ready'); // You can send an event to renderer if needed
-    })
-
-    function getRefreshToken() {
-        if (fs.existsSync(tokenFilePath)) {
-            const data = JSON.parse(fs.readFileSync(tokenFilePath, 'utf-8'))
-            return data.refreshToken
-        }
-        return null
-    }
-    async function startAutoLoginProcess() {
-        // lets check if we have a refresh token first, if we do lets auto log in users that are opted in.
-        const token = await getRefreshToken()
-        if (token) {
-            console.log('We should auto log in', token)
-            const loginData = await api.autoLogin(token)
-            const customToken = await api
-                .getCustomToken(loginData.id_token)
-                .then((res) => res)
-                .catch((err) => console.log(err))
-            console.log('auto logged in', customToken)
-            await signInWithCustomToken(auth, customToken)
-            const user = await api
-                .getUserByAuth(auth)
-                .catch((err) => console.log('err getting user by auth'))
-            console.log(user)
-
-            if (user) {
-                console.log('user logged in')
-                // send our user object to the front end
-                mainWindow.webContents.send('loginSuccess', {
-                    name: user.userName,
-                    email: user.userEmail,
-                    uid: user.uid,
-                })
-
-                userUID = user.uid
-                console.log('user is: ', user)
+        function getRefreshToken() {
+            if (fs.existsSync(tokenFilePath)) {
+                const data = JSON.parse(fs.readFileSync(tokenFilePath, 'utf-8'))
+                return data.refreshToken
             }
-        } else {
+            console.log('failed to get refresh token')
             mainWindow.webContents.send('autoLoginFailure')
-            return console.log('User needs to log in.')
+            return null
         }
-    }
+        // mainWindow.webContents.send('ui-ready'); // You can send an event to renderer if needed
+        async function startAutoLoginProcess() {
+            // lets check if we have a refresh token first, if we do lets auto log in users that are opted in.
+            const token = await getRefreshToken()
+            if (token) {
+                // console.log('We should auto log in', token)
+                const loginData = await api.autoLogin(token)
+                const customToken = await api
+                    .getCustomToken(loginData.id_token)
+                    .then((res) => res)
+                    .catch((err) => console.log(err))
+                // console.log('auto logged in', customToken)
+                await signInWithCustomToken(auth, customToken)
+                const user = await api
+                    .getUserByAuth(auth)
+                    .catch((err) => console.log('err getting user by auth'))
+                console.log(user)
 
-    startAutoLoginProcess()
+                if (user) {
+                    console.log('user logged in')
+                    // send our user object to the front end
+                    mainWindow.webContents.send('loginSuccess', {
+                        name: user.userName,
+                        email: user.userEmail,
+                        uid: user.uid,
+                    })
+
+                    userUID = user.uid
+                    console.log('user is: ', user)
+                }
+            } else {
+                mainWindow.webContents.send('autoLoginFailure')
+                return console.log('User needs to log in.')
+            }
+        }
+
+        startAutoLoginProcess()
+    })
 })

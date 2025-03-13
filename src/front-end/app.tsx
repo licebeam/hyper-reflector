@@ -36,11 +36,7 @@ const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/',
     component: function Home() {
-        return (
-            <div className="p-2">
-                <StartPage />
-            </div>
-        )
+        return <StartPage />
     },
 })
 
@@ -48,11 +44,7 @@ const autoLogRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/auto-login',
     component: function Home() {
-        return (
-            <div className="p-2">
-                <Autologin />
-            </div>
-        )
+        return <Autologin />
     },
 })
 
@@ -60,11 +52,7 @@ const newsRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/news',
     component: function News() {
-        return (
-            <div className="p-2">
-                <NewsPage />
-            </div>
-        )
+        return <NewsPage />
     },
 })
 
@@ -72,11 +60,7 @@ const createAccountRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/create',
     component: function News() {
-        return (
-            <div className="p-2">
-                <CreateAccountPage />
-            </div>
-        )
+        return <CreateAccountPage />
     },
 })
 
@@ -84,11 +68,7 @@ const offlineRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/offline',
     component: function Offline() {
-        return (
-            <div className="p-2">
-                <OfflinePage />
-            </div>
-        )
+        return <OfflinePage />
     },
 })
 
@@ -96,11 +76,7 @@ const chatRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/chat',
     component: function Chat() {
-        return (
-            <div className="p-2">
-                <LobbyPage />
-            </div>
-        )
+        return <LobbyPage />
     },
 })
 
@@ -108,11 +84,7 @@ const profileRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/profile',
     component: function Settings() {
-        return (
-            <div className="p-2">
-                <PlayerProfilePage />
-            </div>
-        )
+        return <PlayerProfilePage />
     },
 })
 
@@ -120,11 +92,7 @@ const settingsRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/settings',
     component: function Settings() {
-        return (
-            <div className="p-2">
-                <SettingsPage />
-            </div>
-        )
+        return <SettingsPage />
     },
 })
 

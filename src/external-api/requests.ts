@@ -207,8 +207,7 @@ async function autoLogin(refreshToken: string) {
     }
 }
 
-async function getCustomToken(idToken: string){
-    console.log('attempting to gather custom token')
+async function getCustomToken(idToken: string) {
     try {
         const response = await fetch(`http://${SERVER}:${keys.API_PORT}/get-custom-token`, {
             method: 'POST',
