@@ -70,7 +70,7 @@ const sendLog = (text: string) => {
 const createWindow = () => {
     // Create the browser window.
     mainWindow = new BrowserWindow({
-        width: 1200,
+        width: 1100,
         height: 700,
         webPreferences: {
             nodeIntegration: true,
