@@ -16,8 +16,9 @@ export default function ChatBar() {
     return (
         <Stack>
             {isLoggedIn && (
-                <Flex>
+                <Flex gap="12px" padding='8px'>
                     <Input
+                        maxW='300px'
                         autoFocus
                         onChange={(e) => setMessage(e.target.value)}
                         type="text"

@@ -67,11 +67,11 @@ export default function SettingsPage() {
     }, [])
 
     return (
-        <Stack height="100px">
-            <Heading flex="1" size="md">
+        <Stack minH="100%">
+            <Heading flex="0" size="md">
                 Application Settings
             </Heading>
-            <Stack flex="8">
+            <Stack flex="1">
                 <Text textStyle="xs">
                     This is where we can set our emulator path and other setting
                 </Text>
@@ -108,7 +108,7 @@ export default function SettingsPage() {
                     </SelectRoot>
                 </Field>
             </Stack>
-            <Stack>
+            <Stack flex="1" justifyContent='flex-end'>
                 <Box display="flex">
                     {isLoggedIn && (
                         <>
