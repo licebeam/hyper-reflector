@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
 import started from 'electron-squirrel-startup'
-import { sendCommand, readCommand, readStatFile } from './sendHyperCommands'
+import { sendCommand, readCommand, readStatFile, clearStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
 import { getConfig, type Config } from './config'
 // updating automatically
@@ -455,13 +455,15 @@ const createWindow = () => {
     })
 
     ipcMain.on('killEmulator', () => {
+        clearStatFile()
         mainWindow.webContents.send('endMatchUI', userUID)
         killUdpSocket()
         mainWindow.webContents.send('message-from-main', 'attempting to gracefully close emu')
         try {
             console.log('trying to close emulator')
-            if (spawnedEmulator !== null) {
+            if (spawnedEmulator) {
                 spawnedEmulator.kill('SIGTERM')
+                spawnedEmulator = null;
                 mainWindow.webContents.send('message-from-main', 'emulator exists closing')
             }
         } catch {
