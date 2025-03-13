@@ -1,43 +1,54 @@
-import { app } from 'electron';
-const fs = require("fs");
-const path = require("path");
+import { app } from 'electron'
+const fs = require('fs')
+const path = require('path')
 
-const isDev = !app.isPackaged;
+const isDev = !app.isPackaged
 
-let filePathBase = process.resourcesPath;
+let filePathBase = process.resourcesPath
 //handle dev mode toggle for file paths.
 if (isDev) {
-    filePathBase = path.join(app.getAppPath(), "src");
+    filePathBase = path.join(app.getAppPath(), 'src')
 }
 
-export function sendCommand(command: string = "dummy") {
+export function sendCommand(command: string = 'dummy') {
     try {
-        const filePath = path.join(filePathBase, 'hyper_write_commands.txt');
+        const filePath = path.join(filePathBase, 'hyper_write_commands.txt')
         console.log('writing to: ', filePath)
-        fs.writeFileSync(filePath, command, { encoding: 'utf8' });
-        console.log(`Command written: ${command}`);
+        fs.writeFileSync(filePath, command, { encoding: 'utf8' })
+        console.log(`Command written: ${command}`)
     } catch (error) {
-        console.error("Failed to write file:", error);
+        console.error('Failed to write file:', error)
     }
 }
 
 export function readCommand() {
     try {
-        const filePath = path.join(filePathBase, 'hyper_read_commands.txt');
-        const data = fs.readFileSync(filePath, { encoding: 'utf8' });
-        console.log('file read ', data);
+        const filePath = path.join(filePathBase, 'hyper_read_commands.txt')
+        const data = fs.readFileSync(filePath, { encoding: 'utf8' })
+        console.log('file read ', data)
     } catch (error) {
-        console.error("Failed to read file:", error);
+        console.error('Failed to read file:', error)
     }
 }
 
 export function readStatFile(mainWindow) {
     try {
-        const filePath = path.join(filePathBase, 'hyper_track_match.txt');
-        const data = fs.readFileSync(filePath, { encoding: 'utf8' });
-        console.log('file read ', data);
-        mainWindow.webContents.send('stats-from-main', data);
+        const filePath = path.join(filePathBase, 'hyper_track_match.txt')
+        const data = fs.readFileSync(filePath, { encoding: 'utf8' })
+        console.log('file read ', data)
+        mainWindow.webContents.send('stats-from-main', data)
     } catch (error) {
-        console.error("Failed to read file:", error);
+        console.error('Failed to read file:', error)
+    }
+}
+
+// We can use this function to clear the stat file after a match
+// Before we clear stats we should send this off to the backend for testing
+export function clearStatFile() {
+    try {
+        const filePath = path.join(filePathBase, 'hyper_track_match.txt')
+        fs.writeFileSync(filePath, '', { encoding: 'utf8' })
+    } catch (error) {
+        console.error('Failed to clear file:', error)
     }
 }

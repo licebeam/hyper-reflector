@@ -48,9 +48,9 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
             }
 
             if (code !== null) {
-                console.log(`Fightcade-FBNeo exited with code ${code}`)
+                console.log(`FBNeo exited with code ${code}`)
             } else {
-                console.log(`Fightcade-FBNeo terminated by signal ${signal}`)
+                console.log(`FBNeo terminated by signal ${signal}`)
             }
         })
 
@@ -109,7 +109,8 @@ export function startPlayingOnline({
     const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`
     switch (process.platform) {
         case 'darwin':
-            return launchGGPOSpawn(directCommand, () => {})
+            return launchGGPOSpawn(directCommand, callBack)
+            // return launchGGPOSpawn(directCommand, () => {})
         case 'linux':
             return launchGGPOSpawn(directCommand, callBack)
         default:
