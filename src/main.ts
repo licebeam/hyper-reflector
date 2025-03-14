@@ -415,6 +415,7 @@ const createWindow = () => {
 
         if (socket && emuListener) {
             console.log('STARTING GAME ONLINE', data)
+
             socket.on('message', function (message, remote) {
                 const messageContent = message.toString()
                 if (messageContent === 'ping' || message.includes('"port"')) {
@@ -434,13 +435,13 @@ const createWindow = () => {
                 sendMessageToB(opponentEndpoint.address, opponentEndpoint.port, message)
             })
 
-            function sendMessageToS() {
-                var serverPort = 33333
-                var serverHost = keys.COTURN_IP
+            function sendMessageToS(kill: boolean) {
+                const serverPort = 33333
+                const serverHost = keys.COTURN_IP
                 // var serverHost = '127.0.0.1'
                 console.log(userUID)
-                var message = new Buffer(
-                    JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID })
+                const message = new Buffer(
+                    JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
                 )
                 socket.send(
                     message,
@@ -450,12 +451,12 @@ const createWindow = () => {
                     serverHost,
                     function (err, nrOfBytesSent) {
                         if (err) return console.log(err)
-                        console.log('UDP message sent to ' + serverHost + ':' + serverPort)
+                        console.log('UDP message sent Server ' + serverHost + ':' + serverPort)
                     }
                 )
             }
 
-            sendMessageToS()
+            sendMessageToS(false)
 
             let message: string = ''
             async function sendMessageToB(address, port, msg = '') {
@@ -496,12 +497,24 @@ const createWindow = () => {
                         // attempt to kill the emulator
                         console.log('emulator should die')
                         mainWindow.webContents.send('endMatch', userUID)
+                        // get user out of challenge pool
+                        sendMessageToS(true)
                     },
                 })
                 return emu
             }
         }
     })
+
+    function killProcessByName(processName) {
+        exec(`taskkill /F /IM ${processName}`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Failed to kill ${processName}: ${error.message}`)
+                return
+            }
+            console.log(`${processName} killed successfully:\n${stdout}`)
+        })
+    }
 
     ipcMain.on('killEmulator', async () => {
         await mainWindow.webContents.send(
@@ -515,6 +528,10 @@ const createWindow = () => {
 
                 // Try SIGTERM first
                 spawnedEmulator.kill('SIGTERM')
+                // if we are on windows we also need to kill the process
+                if (process.platform === 'win32') {
+                    killProcessByName('fcadefbneo.exe')
+                }
 
                 // Listen for the process to close
                 spawnedEmulator.on('close', (code, signal) => {
