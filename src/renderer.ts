@@ -8,7 +8,7 @@ let candidateList = []
 let callerIdState = null
 let userName: string | null = null
 let myUID: string | null = null
-let opponentId: string | null = null
+let opponentUID: string | null = null
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
 const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
@@ -107,7 +107,8 @@ function resetState() {
     callerIdState = null
     myUID = null
     userName = null
-    opponentId = null
+    opponentUID = null
+    console.log('opponentUID reset =  ', opponentUID)
 }
 
 function setupLogging(peer, userLabel, event) {
@@ -245,7 +246,7 @@ function connectWebSocket(user) {
                 })
             )
             callerIdState = callerId
-            opponentId = callerId
+            opponentUID = callerId
         }
     )
 
@@ -329,7 +330,8 @@ function connectWebSocket(user) {
             await peerConnections[data.data.answererId].setRemoteDescription(
                 new RTCSessionDescription(data.data.answer)
             )
-            opponentId = data.data.answererId // set the current opponent so we can get them from the peer list.
+            opponentUID = data.data.answererId // set the current opponent so we can get them from the peer list.
+            console.log('just set opponent ui to - ', opponentUID)
             console.log(
                 'Answering call, trying to send some data; ',
                 data.data.callerId,
@@ -366,7 +368,8 @@ function connectWebSocket(user) {
                 }
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
-                window.api.startGameOnline(opponentId, playerNum)
+                console.log('opponentUID start match =  ', opponentUID)
+                window.api.startGameOnline(opponentUID, playerNum)
             }
         }
     }
