@@ -5,14 +5,7 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
     try {
         const [cmd, ...args] = command.split(' ')
         let child
-        switch (process.platform) {
-            case 'darwin':
-                child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
-            case 'linux':
-                child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
-            default:
-                child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
-        }
+        child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
 
         // Capture stdout (logs from emulator)
         child.stdout.on('data', (data) => {
