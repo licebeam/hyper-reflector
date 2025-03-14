@@ -357,14 +357,6 @@ const createWindow = () => {
         api.externalApiDoSomething(auth)
     })
 
-    ipcMain.on('setTargetIp', (event, ip) => {
-        // This data comes from renderer when we successfully use stun with another person.
-        if (ip) {
-            console.log('the current target IP = ', ip)
-        }
-        // TODO: add error handling this is an important function.
-    })
-
     ipcMain.on('serveMatch', async (event, data) => {})
 
     let keepAliveInterval = null

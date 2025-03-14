@@ -9,6 +9,7 @@ let callerIdState = null
 let userName: string | null = null
 let myUID: string | null = null
 let opponentUID: string | null = null
+let playerNum: number | null = null
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
 const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
@@ -248,6 +249,9 @@ function connectWebSocket(user) {
             callerIdState = callerId
             opponentUID = callerId
             console.log('answer call opponentUID set to =  ', opponentUID)
+            console.log('opponentUID start match =  ', opponentUID)
+            playerNum = 1 // if we answer a call we are always player 1
+            window.api.startGameOnline(opponentUID, playerNum)
         }
     )
 
@@ -357,7 +361,7 @@ function connectWebSocket(user) {
                 let [ip, port] = matches[0].split(' ')
                 // 0 is our delay settings which we'll need to adjust for.
                 //TODO set the player number based on who initialized the peer connections
-                let playerNum
+
                 if (peerConnections[data.data.userUID]?.isInitiator) {
                     console.log('I am player 1 ------------------------------------->>>>>>')
                     playerNum = 0
@@ -368,9 +372,6 @@ function connectWebSocket(user) {
                     playerNum = 1
                 }
                 console.log(`Connecting to ${ip}, Port: ${port}`)
-                await window.api.setTargetIp(ip)
-                console.log('opponentUID start match =  ', opponentUID)
-                window.api.startGameOnline(opponentUID, playerNum)
             }
         }
     }
