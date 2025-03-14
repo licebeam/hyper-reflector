@@ -24,7 +24,6 @@ contextBridge.exposeInMainWorld('api', {
     handShake: (type: string) => ipcRenderer.send('hand-shake-users', type),
     sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
     // match
-    updateStun: (data: any) => ipcRenderer.send('updateStun', data), // will need to add ports back later so we can connect offline users.
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
     setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),
@@ -32,9 +31,6 @@ contextBridge.exposeInMainWorld('api', {
     endMatch: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     endMatchUI: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     killEmulator: () => ipcRenderer.send('killEmulator'),
-    sendUDPMessage: (data: any) => ipcRenderer.send('sendUDPMessage', data),
-    sendStunOverSocket: (data: { publicIp: string; publicPort: string }) =>
-        ipcRenderer.send('sendStunOverSocket', data),
     // sends text to the emulator using the fbneo_commands.txt
     sendText: (text: string) => ipcRenderer.send('send-text', text),
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),

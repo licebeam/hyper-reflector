@@ -78,8 +78,6 @@ export function startPlayingOnline({
     isTraining: boolean
     callBack: () => any
 }) {
-    // console.log('starting EMULATOR FOR ===>>>', localPort, remoteIp, remotePort)
-    // console.log('emulator target might be listening on', remotePort + 1)
     let luaPath = config.emulator.luaPath
     if (isTraining) {
         luaPath = config.emulator.trainingLuaPath

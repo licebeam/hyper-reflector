@@ -6,12 +6,9 @@ import './front-end/app'
 let signalServerSocket: WebSocket = null // socket reference
 let candidateList = []
 let callerIdState = null
-let myUID = null
-let mylocalStunPort = 0 // set this later
-let mylocalRealPort = 0 // set this later
-let userName = null
-let opponentId = null
-let matchPlayerNum = 0
+let userName: string | null = null
+let myUID: string | null = null
+let opponentId: string | null = null
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
 const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
@@ -109,17 +106,9 @@ function resetState() {
     candidateList = []
     callerIdState = null
     myUID = null
-    mylocalStunPort = 0 // set this later
-    mylocalRealPort = 0 // set this later
     userName = null
     opponentId = null
-    matchPlayerNum = 0
 }
-
-window.api.on('sendUDPMessage', () => {
-    console.log('received a udp message from our emulator')
-    peerConnections[opponentId].dataChannel.send('test')
-})
 
 function setupLogging(peer, userLabel, event) {
     if (event.candidate) {
@@ -137,8 +126,6 @@ function setupLogging(peer, userLabel, event) {
                 let rport = matches[4] // The rport (e.g., 50133)
                 console.log(`${userLabel} External IP: ${ip}, Port: ${port}`)
                 console.log('----------------MATCHES ', matches, rport)
-                mylocalStunPort = port //set the stun port to use in main we need to use the related port.
-                mylocalRealPort = rport
             }
             candidateList.push(event.candidate)
             if (callerIdState) {
@@ -377,18 +364,9 @@ function connectWebSocket(user) {
                     )
                     playerNum = 1
                 }
-                // this should be set by a list of whatever ongoing challenges are running
-                await window.api.updateStun({
-                    ip,
-                    port,
-                    localStunPort: mylocalStunPort,
-                    mylocalRealPort,
-                })
                 console.log(`Connecting to ${ip}, Port: ${port}`)
                 await window.api.setTargetIp(ip)
                 window.api.startGameOnline(opponentId, playerNum)
-                //TODO fix these references
-                matchPlayerNum = playerNum
             }
         }
     }
@@ -407,15 +385,4 @@ window.api.on('endMatch', (userUID: string) => {
         )
     }
     resetState()
-})
-
-window.api.on('sendStunOverSocket', (data: any) => {
-    console.log('TRYING TO SEND STUN OVER SOCKET! to:', opponentId, ' we are ', myUID)
-    signalServerSocket.send(
-        JSON.stringify({
-            type: 'sendStunOverSocket',
-            opponentId,
-            data,
-        })
-    )
 })

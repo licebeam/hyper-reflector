@@ -368,7 +368,7 @@ const createWindow = () => {
     ipcMain.on('serveMatch', async (event, data) => {})
 
     let keepAliveInterval = null
-    
+
     ipcMain.on('startGameOnline', async (event, data) => {
         if (socket) {
             console.log('killing socket', socket)
@@ -465,6 +465,10 @@ const createWindow = () => {
                 const message = new Buffer(
                     JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
                 )
+                console.log(
+                    'sending this message to server',
+                    JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
+                )
                 try {
                     socket.send(
                         message,
@@ -479,6 +483,7 @@ const createWindow = () => {
                     )
                 } catch (error) {
                     console.log('could not send message to server')
+                    mainWindow.webContents.send('endMatch', userUID)
                 }
             }
 
