@@ -368,6 +368,7 @@ const createWindow = () => {
     ipcMain.on('serveMatch', async (event, data) => {})
 
     let keepAliveInterval = null
+    
     ipcMain.on('startGameOnline', async (event, data) => {
         if (socket) {
             console.log('killing socket', socket)

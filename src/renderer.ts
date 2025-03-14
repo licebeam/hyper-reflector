@@ -172,7 +172,6 @@ window.api.on('loginSuccess', (user) => {
     }
 })
 
-
 window.api.on('login-failed', () => {
     // kill the socket connection
     if (signalServerSocket) {
@@ -407,6 +406,7 @@ window.api.on('endMatch', (userUID: string) => {
             })
         )
     }
+    resetState()
 })
 
 window.api.on('sendStunOverSocket', (data: any) => {
