@@ -532,9 +532,6 @@ const createWindow = () => {
                 // Try SIGTERM first
                 spawnedEmulator.kill('SIGTERM')
                 // if we are on windows we also need to kill the process
-                if (process.platform === 'win32') {
-                    killProcessByName('fcadefbneo.exe')
-                }
 
                 // Listen for the process to close
                 spawnedEmulator.on('close', (code, signal) => {
@@ -549,6 +546,11 @@ const createWindow = () => {
                         spawnedEmulator.kill('SIGKILL')
                     }
                 }, 2000)
+
+                if (process.platform === 'win32') {
+                    killProcessByName('fcadefbneo.exe')
+                    spawnedEmulator = null
+                }
 
                 mainWindow.webContents.send('message-from-main', 'Emulator exists, closing')
             }
@@ -585,12 +587,15 @@ const createWindow = () => {
         // Cleanup
         clearStatFile()
 
-        if (socket && emuListener) {
+        try {
             socket.close()
             emuListener.close()
             socket = null
             emuListener = null
+        } catch (error) {
+            console.log('could not close sockets used by emulator')
         }
+        
         mainWindow.webContents.send('endMatchUI', userUID)
     })
 
