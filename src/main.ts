@@ -463,7 +463,7 @@ const createWindow = () => {
                 if (!spawnedEmulator) {
                     console.log('Starting emulator...')
                     spawnedEmulator = await startEmulator(address, port)
-                    console.log('Emulator started', spawnedEmulator)
+                    console.log('Emulator started')
                 } else {
                     console.log('Emulator already running')
                 }
@@ -488,7 +488,7 @@ const createWindow = () => {
             }
 
             async function startEmulator(address, port) {
-                console.log('Starting emulator for player:', address, port);
+                console.log('Starting emulator for player:', address, port)
                 return await startPlayingOnline({
                     config,
                     localPort: 7000,
