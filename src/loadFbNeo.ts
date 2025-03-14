@@ -5,7 +5,7 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
     try {
         const [cmd, ...args] = command.split(' ')
 
-        const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] }) // Redirect stdout and stderr
+        const child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] }) // Redirect stdout and stderr
 
         // Capture stdout (logs from emulator)
         child.stdout.on('data', (data) => {
