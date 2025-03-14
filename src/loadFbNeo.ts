@@ -1,30 +1,11 @@
-const { exec, spawn } = require('child_process')
+const { spawn } = require('child_process')
 import { Config } from './config'
-
-export default function launchGGPO(command, callBack: () => any) {
-    try {
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error starting Fightcade-FBNeo: ${error.message}`)
-                return
-            }
-            if (stderr) {
-                console.error(`stderr: ${stderr}`)
-                return
-            }
-            console.log(`stdout: ${stdout}`)
-        })
-        return true
-    } catch (error) {
-        console.log(error)
-    }
-}
 
 export function launchGGPOSpawn(command: string, callBack: () => any) {
     try {
         const [cmd, ...args] = command.split(' ')
 
-        const child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] }) // Redirect stdout and stderr
+        const child = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] }) // Redirect stdout and stderr
 
         // Capture stdout (logs from emulator)
         child.stdout.on('data', (data) => {
@@ -34,10 +15,6 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
         // Capture stderr (errors)
         child.stderr.on('data', (data) => {
             console.error(`[Fightcade-FBNeo Error]: ${data.toString()}`)
-            // call the kill code
-            if (callBack) {
-                callBack()
-            }
         })
 
         // Listen for process exit
@@ -111,7 +88,7 @@ export function startPlayingOnline({
     switch (process.platform) {
         case 'darwin':
             return launchGGPOSpawn(directCommand, callBack)
-            // return launchGGPOSpawn(directCommand, () => {})
+        // return launchGGPOSpawn(directCommand, () => {})
         case 'linux':
             return launchGGPOSpawn(directCommand, callBack)
         default:

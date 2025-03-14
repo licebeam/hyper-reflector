@@ -385,9 +385,6 @@ const createWindow = () => {
             }
         }
 
-        console.log('Socket status:', socket ? 'Exists' : 'Not found')
-        console.log('Emu listener status:', emuListener ? 'Exists' : 'Not found')
-
         if (!socket) {
             console.log('opening socket')
             try {
@@ -400,6 +397,8 @@ const createWindow = () => {
             }
         }
 
+        console.log('did this ever finish?')
+        
         if (!emuListener) {
             console.log('opening emu listener')
             try {
@@ -411,6 +410,8 @@ const createWindow = () => {
                 console.error('Error opening emu listener:', error)
             }
         }
+
+        console.log('did it ever finish the socket bind?', socket.address, emuListener.address)
 
         if (socket && emuListener) {
             console.log('STARTING GAME ONLINE', data)
