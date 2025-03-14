@@ -7,9 +7,7 @@ export default function UserButton({ user }) {
     const [isUserChallenging, setIsUserChallenging] = useState(false)
     const userState = useLoginStore((state) => state.userState)
     const callData = useMessageStore((state) => state.callData)
-    const removeCallData = useMessageStore((state) => state.removeCallData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
-    const setCallData = useMessageStore((state) => state.setCallData)
 
     useEffect(() => {
         console.log('call', callData)
@@ -21,9 +19,11 @@ export default function UserButton({ user }) {
     }, [callData, user.uid])
 
     const handleEndMatch = () => {
-        setIsInMatch(false)
-        clearCallData()
-        console.log('match ended----------------------------')
+        setTimeout(() => {
+            setIsInMatch(false)
+            clearCallData()
+            console.log('match ended----------------------------')
+        }, 2000)
     }
 
     useEffect(() => {

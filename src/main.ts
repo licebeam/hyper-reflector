@@ -367,6 +367,7 @@ const createWindow = () => {
 
     ipcMain.on('serveMatch', async (event, data) => {})
 
+    let keepAliveInterval = null
     ipcMain.on('startGameOnline', async (event, data) => {
         if (socket) {
             console.log('killing socket', socket)
@@ -420,6 +421,16 @@ const createWindow = () => {
                 socket.on('message', function (message, remote) {
                     const messageContent = message.toString()
                     if (messageContent === 'ping' || message.includes('"port"')) {
+                        if (message.includes('"port"') && !keepAliveInterval) {
+                            keepAliveInterval = setInterval(() => {
+                                console.log('sending keep alive to B')
+                                sendMessageToB(
+                                    opponentEndpoint.address,
+                                    opponentEndpoint.port,
+                                    'ping'
+                                )
+                            }, 1000)
+                        }
                         console.log(
                             `Ignoring keep-alive message from ${remote.address}:${remote.port}`
                         )
@@ -449,7 +460,7 @@ const createWindow = () => {
                 const serverPort = 33333
                 const serverHost = keys.COTURN_IP
                 // var serverHost = '127.0.0.1'
-                console.log(userUID)
+                console.log(userUID, '- is kill? ' + kill)
                 const message = new Buffer(
                     JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
                 )
@@ -515,11 +526,11 @@ const createWindow = () => {
                     delay: parseInt(config.app.emuDelay),
                     isTraining: false, // Might be used in the future.
                     callBack: () => {
+                        sendMessageToS(true)
                         // attempt to kill the emulator
                         console.log('emulator should die')
                         mainWindow.webContents.send('endMatch', userUID)
                         // get user out of challenge pool
-                        sendMessageToS(true)
                     },
                 })
             }
@@ -537,6 +548,8 @@ const createWindow = () => {
     }
 
     ipcMain.on('killEmulator', async () => {
+        clearInterval(keepAliveInterval)
+        keepAliveInterval = null
         try {
             socket.close()
             emuListener.close()
