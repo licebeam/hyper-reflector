@@ -128,7 +128,7 @@ export default function Layout({ children }) {
                 flexShrink={0}
             >
                 <div style={{ fontSize: '0.8rem' }}>https://discord.gg/T77dSXG7Re</div>
-                <div style={{ fontSize: '0.8rem' }}>Hyper Reflector version 0.1.7 7a 2025</div>
+                <div style={{ fontSize: '0.8rem' }}>Hyper Reflector version 0.1.8a 2025</div>
             </Box>
         </Stack>
     )

@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
+const { exec } = require('child_process')
 import started from 'electron-squirrel-startup'
 import { sendCommand, readCommand, readStatFile, clearStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
@@ -370,7 +371,6 @@ const createWindow = () => {
     ipcMain.on('serveMatch', async (event, data) => {})
 
     var dgram = require('dgram')
-    let localStunPort = 0
     let publicEndpointB
 
     let socket = dgram.createSocket('udp4')
@@ -431,11 +431,11 @@ const createWindow = () => {
 
         sendMessageToS()
 
-        let isEmuOpen = false
         let message: string = ''
-        function sendMessageToB(address, port, msg = '') {
-            if (!isEmuOpen) {
-                isEmuOpen = startEmulator(address, port)
+        async function sendMessageToB(address, port, msg = '') {
+            if (!spawnedEmulator) {
+                spawnedEmulator = await startEmulator(address, port)
+                console.log('emulator check', spawnedEmulator)
             }
 
             if (msg.length >= 1) {
@@ -450,8 +450,8 @@ const createWindow = () => {
             })
         }
 
-        function startEmulator(address, port) {
-            const emu = startPlayingOnline({
+        async function startEmulator(address, port) {
+            const emu = await startPlayingOnline({
                 config,
                 localPort: 7000,
                 remoteIp: '127.0.0.1',
@@ -465,28 +465,104 @@ const createWindow = () => {
                     mainWindow.webContents.send('endMatch', userUID)
                 },
             })
-            spawnedEmulator = emu // in the future we can use this to check for online training etc.
             return emu
         }
     })
 
-    ipcMain.on('killEmulator', () => {
-        clearStatFile()
-        mainWindow.webContents.send('endMatchUI', userUID)
-        killUdpSocket()
-        mainWindow.webContents.send('message-from-main', 'attempting to gracefully close emu')
+    ipcMain.on('killEmulator', async () => {
+        await mainWindow.webContents.send(
+            'message-from-main',
+            'Attempting to gracefully close emulator'
+        )
+
         try {
-            console.log('trying to close emulator')
-            if (spawnedEmulator !== null) {
+            if (spawnedEmulator) {
+                console.log('Trying to close emulator', spawnedEmulator.pid)
+
+                // Try SIGTERM first
                 spawnedEmulator.kill('SIGTERM')
-                spawnedEmulator = null
-                mainWindow.webContents.send('message-from-main', 'emulator exists closing')
+
+                // Listen for the process to close
+                spawnedEmulator.on('close', (code, signal) => {
+                    console.log(`Emulator exited with code ${code} and signal ${signal}`)
+                    spawnedEmulator = null
+                })
+
+                // After 2 seconds, force kill if it's still running
+                setTimeout(() => {
+                    if (spawnedEmulator && !spawnedEmulator.killed) {
+                        console.log('Force killing emulator')
+                        spawnedEmulator.kill('SIGKILL')
+                    }
+                }, 2000)
+
+                mainWindow.webContents.send('message-from-main', 'Emulator exists, closing')
             }
-        } catch {
-            mainWindow.webContents.send('message-from-main', 'could not close emu')
-            console.log('failed to close emulator')
+        } catch (err) {
+            mainWindow.webContents.send('message-from-main', 'Could not close emulator')
+            console.error('Failed to close emulator:', err)
         }
+
+        // Check if process is still alive before calling taskkill
+        if (spawnedEmulator) {
+            const pid = spawnedEmulator.pid
+
+            // Debug: Check if process is still running
+            exec(`tasklist /FI "PID eq ${pid}"`, (err, stdout, stderr) => {
+                if (!stdout.includes(pid)) {
+                    console.log(`Process ${pid} is already gone.`)
+                    return
+                }
+
+                console.log(`Process ${pid} is still running. Attempting to force kill...`)
+
+                if (process.platform === 'win32') {
+                    exec(`taskkill /PID ${pid} /F`, (err, stdout, stderr) => {
+                        if (err) console.error('taskkill failed:', err)
+                    })
+                } else {
+                    exec(`pkill -P ${pid}`, (err, stdout, stderr) => {
+                        if (err) console.error('pkill failed:', err)
+                    })
+                }
+            })
+        }
+
+        // Cleanup
+        clearStatFile()
+
+        if (socket && emuListener) {
+            socket.close()
+            emuListener.close()
+            socket = null
+            emuListener = null
+        }
+        mainWindow.webContents.send('endMatchUI', userUID)
     })
+    // ipcMain.on('killEmulator', async () => {
+    //     await mainWindow.webContents.send('message-from-main', 'attempting to gracefully close emu')
+    //     try {
+    //         if (spawnedEmulator !== null) {
+    //             console.log('trying to close emulator', spawnedEmulator)
+    //             console.log('what is the emulator', spawnedEmulator)
+    //             spawnedEmulator.kill()
+    //             spawnedEmulator = null
+    //             mainWindow.webContents.send('message-from-main', 'emulator exists closing')
+    //         }
+    //     } catch {
+    //         mainWindow.webContents.send('message-from-main', 'could not close emu')
+    //         console.log('failed to close emulator')
+    //     }
+    //     clearStatFile()
+
+    //     if (socket && emuListener) {
+    //         socket.close()
+    //         emuListener.close()
+    //         socket = null
+    //         emuListener = null
+    //     }
+    //     mainWindow.webContents.send('endMatchUI', userUID)
+    // })
 
     // ipcMain.on('sendUDPMessage', () => {
     //     console.log('test')

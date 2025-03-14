@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLoginStore } from '../state/store'
 import { Button, Stack, Input, Flex } from '@chakra-ui/react'
+import { Send } from 'lucide-react'
 
 export default function ChatBar() {
     const [message, setMessage] = useState('')
@@ -16,9 +17,10 @@ export default function ChatBar() {
     return (
         <Stack>
             {isLoggedIn && (
-                <Flex gap="12px" padding='8px'>
+                <Flex gap="12px" padding="8px">
                     <Input
-                        maxW='300px'
+                        placeholder="Type a message!"
+                        maxW="300px"
                         autoFocus
                         onChange={(e) => setMessage(e.target.value)}
                         type="text"
@@ -30,7 +32,7 @@ export default function ChatBar() {
                         }}
                     />
                     <Button id="message-send-btn" onClick={sendMessage}>
-                        send message
+                        <Send />
                     </Button>
                 </Flex>
             )}

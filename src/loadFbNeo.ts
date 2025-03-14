@@ -44,6 +44,7 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
         child.on('exit', (code, signal) => {
             // call the kill code
             if (callBack) {
+                console.log('emulator callback', callBack)
                 callBack()
             }
 

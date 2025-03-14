@@ -22,8 +22,6 @@ export default function UserButton({ user }) {
 
     const handleEndMatch = () => {
         setIsInMatch(false)
-        // const caller = callData.find((call) => call.callerId === user.uid)
-        // removeCallData(caller)
         clearCallData()
         console.log('match ended----------------------------')
     }

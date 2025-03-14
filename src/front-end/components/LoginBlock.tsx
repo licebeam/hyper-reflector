@@ -77,6 +77,12 @@ export default function LoginBlock() {
                                     }
                                     type="text"
                                     value={login.email}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && login.email && login.pass) {
+                                            setIsLoading(true)
+                                            window.api.loginUser(login)
+                                        }
+                                    }}
                                 />
                             </Field>
                             <Field label="Password" required>
@@ -92,6 +98,12 @@ export default function LoginBlock() {
                                     }
                                     type="password"
                                     value={login.pass}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && login.email && login.pass) {
+                                            setIsLoading(true)
+                                            window.api.loginUser(login)
+                                        }
+                                    }}
                                 />
                             </Field>
                             <Stack>
