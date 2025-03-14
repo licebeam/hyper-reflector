@@ -247,6 +247,7 @@ function connectWebSocket(user) {
             )
             callerIdState = callerId
             opponentUID = callerId
+            console.log('answer call opponentUID set to =  ', opponentUID)
         }
     )
 
@@ -331,7 +332,7 @@ function connectWebSocket(user) {
                 new RTCSessionDescription(data.data.answer)
             )
             opponentUID = data.data.answererId // set the current opponent so we can get them from the peer list.
-            console.log('just set opponent ui to - ', opponentUID)
+            console.log('someone answered our call, opponentUID set to =  ', opponentUID)
             console.log(
                 'Answering call, trying to send some data; ',
                 data.data.callerId,
@@ -377,7 +378,7 @@ function connectWebSocket(user) {
 
 //ends match with any player who has an active connection with you, this should also close the rtc connection
 window.api.on('endMatch', (userUID: string) => {
-    console.log('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ending match', userUID)
+    console.log('ending match as - ', userUID)
     if (userUID) {
         console.log('sending socket signal to close')
         signalServerSocket.send(
