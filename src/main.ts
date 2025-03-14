@@ -416,24 +416,34 @@ const createWindow = () => {
         if (socket && emuListener) {
             console.log('STARTING GAME ONLINE', data)
 
-            socket.on('message', function (message, remote) {
-                const messageContent = message.toString()
-                if (messageContent === 'ping' || message.includes('"port"')) {
-                    console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
-                    console.log(remote.address + ':' + remote.port + ' - ' + message)
-                } else {
-                    socket.send(message, 0, message.length, 7000, '127.0.0.1')
-                }
-                try {
-                    opponentEndpoint = JSON.parse(message)
-                    sendMessageToB(opponentEndpoint.address, opponentEndpoint.port)
-                } catch (err) {}
-            })
+            try {
+                socket.on('message', function (message, remote) {
+                    const messageContent = message.toString()
+                    if (messageContent === 'ping' || message.includes('"port"')) {
+                        console.log(
+                            `Ignoring keep-alive message from ${remote.address}:${remote.port}`
+                        )
+                        console.log(remote.address + ':' + remote.port + ' - ' + message)
+                    } else {
+                        socket.send(message, 0, message.length, 7000, '127.0.0.1')
+                    }
+                    try {
+                        opponentEndpoint = JSON.parse(message)
+                        sendMessageToB(opponentEndpoint.address, opponentEndpoint.port)
+                    } catch (err) {}
+                })
+            } catch (error) {
+                console.log('error in socket', error)
+            }
 
-            // get messages from our local emulator and send it to the other player socket
-            emuListener.on('message', function (message, remote) {
-                sendMessageToB(opponentEndpoint.address, opponentEndpoint.port, message)
-            })
+            try {
+                // get messages from our local emulator and send it to the other player socket
+                emuListener.on('message', function (message, remote) {
+                    sendMessageToB(opponentEndpoint.address, opponentEndpoint.port, message)
+                })
+            } catch (error) {
+                console.log('error in emu scket', error)
+            }
 
             function sendMessageToS(kill: boolean) {
                 const serverPort = 33333
@@ -443,17 +453,21 @@ const createWindow = () => {
                 const message = new Buffer(
                     JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
                 )
-                socket.send(
-                    message,
-                    0,
-                    message.length,
-                    serverPort,
-                    serverHost,
-                    function (err, nrOfBytesSent) {
-                        if (err) return console.log(err)
-                        console.log('UDP message sent Server ' + serverHost + ':' + serverPort)
-                    }
-                )
+                try {
+                    socket.send(
+                        message,
+                        0,
+                        message.length,
+                        serverPort,
+                        serverHost,
+                        function (err, nrOfBytesSent) {
+                            if (err) return console.log(err)
+                            console.log('UDP message sent Server ' + serverHost + ':' + serverPort)
+                        }
+                    )
+                } catch (error) {
+                    console.log('could not send message to server')
+                }
             }
 
             sendMessageToS(false)
@@ -473,18 +487,21 @@ const createWindow = () => {
                 } else {
                     message = new Buffer('ping')
                 }
-
-                socket.send(
-                    message,
-                    0,
-                    message.length,
-                    port,
-                    address,
-                    function (err, nrOfBytesSent) {
-                        if (err) return console.log(err)
-                        // console.log('UDP message sent to B:', address + ':' + port)
-                    }
-                )
+                try {
+                    socket.send(
+                        message,
+                        0,
+                        message.length,
+                        port,
+                        address,
+                        function (err, nrOfBytesSent) {
+                            if (err) return console.log(err)
+                            // console.log('UDP message sent to B:', address + ':' + port)
+                        }
+                    )
+                } catch (error) {
+                    console.log('could not send message user B')
+                }
             }
 
             async function startEmulator(address, port) {
@@ -520,6 +537,15 @@ const createWindow = () => {
     }
 
     ipcMain.on('killEmulator', async () => {
+        try {
+            socket.close()
+            emuListener.close()
+            socket = null
+            emuListener = null
+        } catch (error) {
+            console.log('could not close sockets used by emulator')
+        }
+
         await mainWindow.webContents.send(
             'message-from-main',
             'Attempting to gracefully close emulator'
@@ -586,16 +612,6 @@ const createWindow = () => {
 
         // Cleanup
         clearStatFile()
-
-        try {
-            socket.close()
-            emuListener.close()
-            socket = null
-            emuListener = null
-        } catch (error) {
-            console.log('could not close sockets used by emulator')
-        }
-        
         mainWindow.webContents.send('endMatchUI', userUID)
     })
 
