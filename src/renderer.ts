@@ -348,31 +348,14 @@ function connectWebSocket(user) {
                     data: { targetId: data.data.answererId, candidate: candidateList[0] },
                 })
             )
+            playerNum = 0 // if our call is answered we are always player 0
+            window.api.startGameOnline(opponentUID, playerNum)
         }
 
         if (data.type === 'iceCandidate') {
-            // TODO fix this ugly data stuff
-            console.log('Received ICE Candidate from peer:', data.data.candidate.candidate)
-            let matches = data.data.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
-            // console.log('matches', matches)
-            // console.log(data)
-            // console.log(peerConnections[data.data.userUID].isInitiator)
-            if (matches) {
-                let [ip, port] = matches[0].split(' ')
-                // 0 is our delay settings which we'll need to adjust for.
-                //TODO set the player number based on who initialized the peer connections
-
-                if (peerConnections[data.data.userUID]?.isInitiator) {
-                    console.log('I am player 1 ------------------------------------->>>>>>')
-                    playerNum = 0
-                } else {
-                    console.log(
-                        'I should be set to player 2 --------------------------------->>>>>'
-                    )
-                    playerNum = 1
-                }
-                console.log(`Connecting to ${ip}, Port: ${port}`)
-            }
+            console.log(
+                'made a connection with someone, probably need to initialize some data channel stuff'
+            )
         }
     }
 }
