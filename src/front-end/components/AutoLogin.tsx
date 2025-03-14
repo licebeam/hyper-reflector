@@ -71,7 +71,7 @@ export default function Autologin() {
             )}
             <Stack justifySelf="center">
                 <Box>
-                    <Text textStyle="4xl">Auto Logging</Text>
+                    <Text textStyle="4xl">Logging you in!</Text>
                 </Box>
             </Stack>
         </>

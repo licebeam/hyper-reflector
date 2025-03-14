@@ -487,8 +487,6 @@ const createWindow = () => {
                     console.log('Starting emulator...')
                     spawnedEmulator = await startEmulator(address, port)
                     console.log('Emulator started')
-                } else {
-                    console.log('Emulator already running')
                 }
 
                 if (msg.length >= 1) {
