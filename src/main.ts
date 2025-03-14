@@ -11,14 +11,12 @@ import keys from './private/keys'
 // external api
 import api from './external-api/requests'
 // p2p networking
-import { udpHolePunch, killUdpSocket, startHolePunching } from './networking/udpHolePunching'
-import { startUPNP, portForUPNP } from './networking/upnpRunner'
-let opponentIp = '127.0.0.1' // We change this if we get a message from player and try to target that ip.
-let opponentPort = 7000 // We change this when we recieve a message from a player on a different port, this means one is not using upnp.
+var dgram = require('dgram')
 // Emulator reference
 let spawnedEmulator = null //used to handle closing the emulator process
-//for testing purposes
-let currentProxyPort = 0
+let opponentEndpoint
+let socket = null
+let emuListener = null
 
 //
 
@@ -363,109 +361,144 @@ const createWindow = () => {
         // This data comes from renderer when we successfully use stun with another person.
         if (ip) {
             console.log('the current target IP = ', ip)
-            opponentIp = ip
         }
         // TODO: add error handling this is an important function.
     })
 
     ipcMain.on('serveMatch', async (event, data) => {})
 
-    var dgram = require('dgram')
-    let publicEndpointB
-
-    let socket = dgram.createSocket('udp4')
-    let emuListener = dgram.createSocket('udp4')
-
     ipcMain.on('startGameOnline', async (event, data) => {
-        console.log('STARTING GAME ONLINE', data)
         if (socket) {
-            await socket.close()
-            socket = await dgram.createSocket('udp4')
+            console.log('killing socket', socket)
+            try {
+                await socket.close()
+            } catch (error) {
+                console.error('Error closing socket:', error)
+            }
         }
         if (emuListener) {
-            await emuListener.close()
-            emuListener = await dgram.createSocket('udp4')
-            emuListener.bind(7001)
-        }
-        socket.on('message', function (message, remote) {
-            const messageContent = message.toString()
-            if (messageContent === 'ping' || message.includes('"port"')) {
-                console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
-                console.log(remote.address + ':' + remote.port + ' - ' + message)
-            } else {
-                //sending message to the emulator
-                //console.log('sending this guy to the emulator => ', message)
-                socket.send(message, 0, message.length, 7000, '127.0.0.1')
-            }
+            console.log('killing emu listener', emuListener)
             try {
-                publicEndpointB = JSON.parse(message)
-                sendMessageToB(publicEndpointB.address, publicEndpointB.port)
-            } catch (err) {}
-        })
+                await emuListener.close()
+            } catch (error) {
+                console.error('Error closing emu listener:', error)
+            }
+        }
 
-        // get messages from our local emulator and send it to the other player socket
-        emuListener.on('message', function (message, remote) {
-            sendMessageToB(publicEndpointB.address, publicEndpointB.port, message)
-        })
+        console.log('Socket status:', socket ? 'Exists' : 'Not found')
+        console.log('Emu listener status:', emuListener ? 'Exists' : 'Not found')
 
-        function sendMessageToS() {
-            var serverPort = 33333
-            var serverHost = keys.COTURN_IP
-            // var serverHost = '127.0.0.1'
-            console.log(userUID)
-            var message = new Buffer(
-                JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID })
-            )
-            socket.send(
-                message,
-                0,
-                message.length,
-                serverPort,
-                serverHost,
-                function (err, nrOfBytesSent) {
-                    if (err) return console.log(err)
-                    console.log('UDP message sent to ' + serverHost + ':' + serverPort)
+        if (!socket) {
+            console.log('opening socket')
+            try {
+                socket = dgram.createSocket('udp4')
+                socket.bind(() => {
+                    console.log('Socket bound to random port:', socket.address())
+                })
+            } catch (error) {
+                console.error('Error opening socket:', error)
+            }
+        }
+
+        if (!emuListener) {
+            console.log('opening emu listener')
+            try {
+                emuListener = dgram.createSocket('udp4')
+                emuListener.bind(7001, () => {
+                    console.log('Emu listener bound to port 7001')
+                })
+            } catch (error) {
+                console.error('Error opening emu listener:', error)
+            }
+        }
+
+        if (socket && emuListener) {
+            console.log('STARTING GAME ONLINE', data)
+            socket.on('message', function (message, remote) {
+                const messageContent = message.toString()
+                if (messageContent === 'ping' || message.includes('"port"')) {
+                    console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
+                    console.log(remote.address + ':' + remote.port + ' - ' + message)
+                } else {
+                    socket.send(message, 0, message.length, 7000, '127.0.0.1')
                 }
-            )
-        }
+                try {
+                    opponentEndpoint = JSON.parse(message)
+                    sendMessageToB(opponentEndpoint.address, opponentEndpoint.port)
+                } catch (err) {}
+            })
 
-        sendMessageToS()
+            // get messages from our local emulator and send it to the other player socket
+            emuListener.on('message', function (message, remote) {
+                sendMessageToB(opponentEndpoint.address, opponentEndpoint.port, message)
+            })
 
-        let message: string = ''
-        async function sendMessageToB(address, port, msg = '') {
-            if (!spawnedEmulator) {
-                spawnedEmulator = await startEmulator(address, port)
-                console.log('emulator check', spawnedEmulator)
+            function sendMessageToS() {
+                var serverPort = 33333
+                var serverHost = keys.COTURN_IP
+                // var serverHost = '127.0.0.1'
+                console.log(userUID)
+                var message = new Buffer(
+                    JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID })
+                )
+                socket.send(
+                    message,
+                    0,
+                    message.length,
+                    serverPort,
+                    serverHost,
+                    function (err, nrOfBytesSent) {
+                        if (err) return console.log(err)
+                        console.log('UDP message sent to ' + serverHost + ':' + serverPort)
+                    }
+                )
             }
 
-            if (msg.length >= 1) {
-                message = new Buffer(msg)
-            } else {
-                message = new Buffer('ping')
+            sendMessageToS()
+
+            let message: string = ''
+            async function sendMessageToB(address, port, msg = '') {
+                if (!spawnedEmulator) {
+                    spawnedEmulator = await startEmulator(address, port)
+                    console.log('emulator check', spawnedEmulator)
+                }
+
+                if (msg.length >= 1) {
+                    message = new Buffer(msg)
+                } else {
+                    message = new Buffer('ping')
+                }
+
+                socket.send(
+                    message,
+                    0,
+                    message.length,
+                    port,
+                    address,
+                    function (err, nrOfBytesSent) {
+                        if (err) return console.log(err)
+                        // console.log('UDP message sent to B:', address + ':' + port)
+                    }
+                )
             }
 
-            socket.send(message, 0, message.length, port, address, function (err, nrOfBytesSent) {
-                if (err) return console.log(err)
-                // console.log('UDP message sent to B:', address + ':' + port)
-            })
-        }
-
-        async function startEmulator(address, port) {
-            const emu = await startPlayingOnline({
-                config,
-                localPort: 7000,
-                remoteIp: '127.0.0.1',
-                remotePort: emuListener.address().port,
-                player: data.player,
-                delay: parseInt(config.app.emuDelay),
-                isTraining: false, // Might be used in the future.
-                callBack: () => {
-                    // attempt to kill the emulator
-                    console.log('emulator should die')
-                    mainWindow.webContents.send('endMatch', userUID)
-                },
-            })
-            return emu
+            async function startEmulator(address, port) {
+                const emu = await startPlayingOnline({
+                    config,
+                    localPort: 7000,
+                    remoteIp: '127.0.0.1',
+                    remotePort: emuListener.address().port,
+                    player: data.player,
+                    delay: parseInt(config.app.emuDelay),
+                    isTraining: false, // Might be used in the future.
+                    callBack: () => {
+                        // attempt to kill the emulator
+                        console.log('emulator should die')
+                        mainWindow.webContents.send('endMatch', userUID)
+                    },
+                })
+                return emu
+            }
         }
     })
 
@@ -531,14 +564,15 @@ const createWindow = () => {
         // Cleanup
         clearStatFile()
 
-        if (socket && emuListener) {
-            socket.close()
-            emuListener.close()
-            socket = null
-            emuListener = null
-        }
-        mainWindow.webContents.send('endMatchUI', userUID)
+        // if (socket && emuListener) {
+        //     socket.close()
+        //     emuListener.close()
+        //     socket = null
+        //     emuListener = null
+        // }
+        // mainWindow.webContents.send('endMatchUI', userUID)
     })
+
     // ipcMain.on('killEmulator', async () => {
     //     await mainWindow.webContents.send('message-from-main', 'attempting to gracefully close emu')
     //     try {
