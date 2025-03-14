@@ -398,7 +398,7 @@ const createWindow = () => {
         }
 
         console.log('did this ever finish?')
-        
+
         if (!emuListener) {
             console.log('opening emu listener')
             try {
@@ -565,13 +565,13 @@ const createWindow = () => {
         // Cleanup
         clearStatFile()
 
-        // if (socket && emuListener) {
-        //     socket.close()
-        //     emuListener.close()
-        //     socket = null
-        //     emuListener = null
-        // }
-        // mainWindow.webContents.send('endMatchUI', userUID)
+        if (socket && emuListener) {
+            socket.close()
+            emuListener.close()
+            socket = null
+            emuListener = null
+        }
+        mainWindow.webContents.send('endMatchUI', userUID)
     })
 
     // ipcMain.on('killEmulator', async () => {
