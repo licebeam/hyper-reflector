@@ -415,6 +415,7 @@ const createWindow = () => {
 
         if (socket && emuListener) {
             console.log('STARTING GAME ONLINE', data)
+
             socket.on('message', function (message, remote) {
                 const messageContent = message.toString()
                 if (messageContent === 'ping' || message.includes('"port"')) {
@@ -434,13 +435,13 @@ const createWindow = () => {
                 sendMessageToB(opponentEndpoint.address, opponentEndpoint.port, message)
             })
 
-            function sendMessageToS() {
-                var serverPort = 33333
-                var serverHost = keys.COTURN_IP
+            function sendMessageToS(kill: boolean) {
+                const serverPort = 33333
+                const serverHost = keys.COTURN_IP
                 // var serverHost = '127.0.0.1'
                 console.log(userUID)
-                var message = new Buffer(
-                    JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID })
+                const message = new Buffer(
+                    JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
                 )
                 socket.send(
                     message,
@@ -450,18 +451,21 @@ const createWindow = () => {
                     serverHost,
                     function (err, nrOfBytesSent) {
                         if (err) return console.log(err)
-                        console.log('UDP message sent to ' + serverHost + ':' + serverPort)
+                        console.log('UDP message sent Server ' + serverHost + ':' + serverPort)
                     }
                 )
             }
 
-            sendMessageToS()
+            sendMessageToS(false)
 
             let message: string = ''
             async function sendMessageToB(address, port, msg = '') {
                 if (!spawnedEmulator) {
+                    console.log('Starting emulator...')
                     spawnedEmulator = await startEmulator(address, port)
-                    console.log('emulator check', spawnedEmulator)
+                    console.log('Emulator started', spawnedEmulator)
+                } else {
+                    console.log('Emulator already running')
                 }
 
                 if (msg.length >= 1) {
@@ -484,7 +488,8 @@ const createWindow = () => {
             }
 
             async function startEmulator(address, port) {
-                const emu = await startPlayingOnline({
+                console.log('Starting emulator for player:', address, port);
+                return await startPlayingOnline({
                     config,
                     localPort: 7000,
                     remoteIp: '127.0.0.1',
@@ -496,12 +501,23 @@ const createWindow = () => {
                         // attempt to kill the emulator
                         console.log('emulator should die')
                         mainWindow.webContents.send('endMatch', userUID)
+                        // get user out of challenge pool
+                        sendMessageToS(true)
                     },
                 })
-                return emu
             }
         }
     })
+
+    function killProcessByName(processName) {
+        exec(`taskkill /F /IM ${processName}`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Failed to kill ${processName}: ${error.message}`)
+                return
+            }
+            console.log(`${processName} killed successfully:\n${stdout}`)
+        })
+    }
 
     ipcMain.on('killEmulator', async () => {
         await mainWindow.webContents.send(
@@ -515,6 +531,10 @@ const createWindow = () => {
 
                 // Try SIGTERM first
                 spawnedEmulator.kill('SIGTERM')
+                // if we are on windows we also need to kill the process
+                if (process.platform === 'win32') {
+                    killProcessByName('fcadefbneo.exe')
+                }
 
                 // Listen for the process to close
                 spawnedEmulator.on('close', (code, signal) => {
@@ -573,36 +593,6 @@ const createWindow = () => {
         }
         mainWindow.webContents.send('endMatchUI', userUID)
     })
-
-    // ipcMain.on('killEmulator', async () => {
-    //     await mainWindow.webContents.send('message-from-main', 'attempting to gracefully close emu')
-    //     try {
-    //         if (spawnedEmulator !== null) {
-    //             console.log('trying to close emulator', spawnedEmulator)
-    //             console.log('what is the emulator', spawnedEmulator)
-    //             spawnedEmulator.kill()
-    //             spawnedEmulator = null
-    //             mainWindow.webContents.send('message-from-main', 'emulator exists closing')
-    //         }
-    //     } catch {
-    //         mainWindow.webContents.send('message-from-main', 'could not close emu')
-    //         console.log('failed to close emulator')
-    //     }
-    //     clearStatFile()
-
-    //     if (socket && emuListener) {
-    //         socket.close()
-    //         emuListener.close()
-    //         socket = null
-    //         emuListener = null
-    //     }
-    //     mainWindow.webContents.send('endMatchUI', userUID)
-    // })
-
-    // ipcMain.on('sendUDPMessage', () => {
-    //     console.log('test')
-    //     mainWindow.webContents.send('sendUDPMessage', 'this is a udp message')
-    // })
 
     ipcMain.on('start-solo-mode', (event) => {
         startSoloMode({ config })
@@ -674,7 +664,7 @@ async function handleExitApp() {
     if (userUID) {
         // remove user from websockets and log them out of firebase on close
         await api.removeLoggedInUser(auth)
-        await killUdpSocket()
+        // await killUdpSocket()
         // mainWindow?.webContents.send('closingApp', { uid: userUID })
     }
     // if (proxyListener) {
