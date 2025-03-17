@@ -231,6 +231,58 @@ async function getCustomToken(idToken: string) {
     }
 }
 
+// match related
+async function uploadMatchData(auth, matchData) {
+    if (checkCurrentAuthState(auth)) {
+        const idToken = await auth.currentUser.getIdToken().then((res) => res)
+        try {
+            fetch(`http://${SERVER}:${keys.API_PORT}/upload-match`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken,
+                    matchId: 'test-id',
+                    player1: matchData.player1,
+                    player2: matchData.player2,
+                    matchData: matchData.matchData, // this is the entirety of the stat-tracking-file
+                }),
+            })
+        } catch (error) {
+            console.log(error)
+            console.error(error.message)
+        }
+    }
+}
+
+async function getUserMatches(auth) {
+    if (checkCurrentAuthState(auth)) {
+        const idToken = await auth.currentUser.getIdToken().then((res) => res)
+        try {
+            const response = await fetch(`http://${SERVER}:${keys.API_PORT}/get-user-matches`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken: idToken || 'not real',
+                }),
+            })
+
+            if (!response.ok) {
+                return false
+            }
+
+            const data = await response.json()
+            return data
+        } catch (error) {
+            console.log(error)
+            console.error(error.message)
+        }
+    }
+}
+
 export default {
     externalApiDoSomething,
     addLoggedInUser,
@@ -242,4 +294,7 @@ export default {
     changeUserName,
     createAccount,
     getUserByAuth,
+    //matches
+    uploadMatchData,
+    getUserMatches,
 }

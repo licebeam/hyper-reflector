@@ -17,6 +17,7 @@ let spawnedEmulator = null //used to handle closing the emulator process
 let opponentEndpoint
 let socket = null
 let emuListener = null
+let opponentUID = null
 
 //
 
@@ -346,13 +347,11 @@ const createWindow = () => {
     ipcMain.on('send-text', (event, text: string) => {
         sendCommand(`textinput:${text}`)
         // test functions
-        readCommand()
         readStatFile(mainWindow)
     })
 
     ipcMain.on('send-command', (event, command) => {
         sendCommand(command)
-        readCommand()
         // external api testing delete me later
         api.externalApiDoSomething(auth)
     })
@@ -457,6 +456,7 @@ const createWindow = () => {
                 const message = new Buffer(
                     JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
                 )
+                opponentUID = data.opponentUID
                 console.log(
                     'sending this message to server',
                     JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
@@ -636,7 +636,7 @@ const createWindow = () => {
     })
 
     // this is used by websockets to populate our chat room with other peoples messages
-    ipcMain.on('sendRoomMessage', (event, messageObject) => {
+    ipcMain.on('sendRoomMessage', async (event, messageObject) => {
         mainWindow.webContents.send('sendRoomMessage', messageObject)
     })
 
@@ -658,6 +658,11 @@ const createWindow = () => {
     ipcMain.on('changeUserName', async (event, name) => {
         const complete = await api.changeUserName(auth, name).catch((err) => console.log(err))
         mainWindow.webContents.send('user-name-changed', complete)
+    })
+
+    ipcMain.on('getUserMatches', async (event, name) => {
+        const userMatches = await api.getUserMatches(auth).catch((err) => console.log(err))
+        mainWindow.webContents.send('getUserMatches', userMatches)
     })
 
     // matchmaking
@@ -725,10 +730,23 @@ ipcMain.on('request-data', (event) => {
 })
 
 // read files
-const readInterval = setInterval(() => {
+const readInterval = setInterval(async () => {
     // currently we aren't really using this polling, but we will eventually need something like this
     // we also need to set this up so it only works in a match.
-    // readCommand()
+    const data = await readCommand()
+    if (data && data.length) {
+        //send match data to back end
+        // console.log('data', data)
+        const matchData = {
+            matchData: {
+                raw: data,
+            },
+            matchId: 'test-id', // we should generate this on the BE
+            player1: userUID,
+            player2: opponentUID || 'fake-user',
+        }
+        api.uploadMatchData(auth, matchData)
+    }
 }, 1000) // read from reflector.text every 1000 ms
 
 // This method will be called when Electron has finished

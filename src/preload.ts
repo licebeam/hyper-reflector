@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('api', {
     addUserGroupToRoom: (users: [any]) => ipcRenderer.send('addUserGroupToRoom', users),
     handShake: (type: string) => ipcRenderer.send('hand-shake-users', type),
     sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
+    // user profile
+    getUserMatches: (matches: any) => ipcRenderer.send('getUserMatches', matches),
     // match
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
