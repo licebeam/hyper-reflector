@@ -18,6 +18,7 @@ let opponentEndpoint
 let socket = null
 let emuListener = null
 let opponentUID = null
+let lastKnownPlayerSlot = 0 // this is the player 1 or player 2 reference, used for tracking matches.
 
 //
 
@@ -513,6 +514,7 @@ const createWindow = () => {
 
             async function startEmulator(address, port) {
                 console.log('Starting emulator for player:', address, port)
+                lastKnownPlayerSlot = data.player // set the last know player slot for sending to the BE to record matches
                 return await startPlayingOnline({
                     config,
                     localPort: 7000,
@@ -742,8 +744,8 @@ const readInterval = setInterval(async () => {
                 raw: data,
             },
             matchId: 'test-id', // we should generate this on the BE
-            player1: userUID,
-            player2: opponentUID || 'fake-user',
+            player1: lastKnownPlayerSlot == 0 ? userUID : opponentUID || 'fake-user',
+            player2: lastKnownPlayerSlot == 1 ? userUID : opponentUID || 'fake-user',
         }
         api.uploadMatchData(auth, matchData)
     }
