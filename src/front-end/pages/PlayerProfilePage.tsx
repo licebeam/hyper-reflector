@@ -97,48 +97,58 @@ export default function PlayerProfilePage() {
             <Heading flex="0" size="md">
                 User Profile
             </Heading>
+            <div>Current Username: {userState.name}</div>
             <Stack>
-                <div>Current Username: {userState.name}</div>
-                <div>Recent Matches</div>
+                <Heading flex="0" size="md">
+                    User Profile
+                </Heading>
                 <Stack>
                     {recentMatches &&
-                    // TODO need to add match timestamp on BE
-                        recentMatches.sort((a, b) => a - b).map((match) => {
-                            return (
-                                    <Card.Root variant='elevated'>
+                        // TODO need to add match timestamp on BE
+                        recentMatches
+                            .sort((a, b) => a - b)
+                            .map((match) => {
+                                return (
+                                    <Card.Root variant="elevated">
                                         <Card.Header />
-                                        <Card.Body>
+                                        <Card.Body flex="1">
                                             {/* {match.matchId} */}
                                             <Flex>
-                                            <Stack gap="0px">
-                                                <Text textStyle="md" padding="8px">
-                                                    {match.player1Name}
-                                                </Text>
-                                                <Text textStyle="xs" padding="8px">
-                                                    {match.player1Char}
-                                                </Text>
-                                                <RenderSuperArt code={match.player1Super} />
-                                            </Stack>
-                                            <div>
-                                                <Text textStyle="md" padding="8px">
-                                                    VS
-                                                </Text>
-                                            </div>
-                                            <Stack gap="0px">
-                                                <Text textStyle="md" padding="8px">
-                                                    {match.player2Name || 'Unknown User'}
-                                                </Text>
-                                                <Text textStyle="xs" padding="8px">
-                                                    {match.player2Char}
-                                                </Text>
-                                                <RenderSuperArt code={match.player2Super} />
-                                            </Stack>
+                                                <Stack gap="0px" flex="1" alignItems="center">
+                                                    <Text textStyle="md" padding="8px">
+                                                        {match.player1Name}
+                                                    </Text>
+                                                    <Text textStyle="xs" padding="8px">
+                                                        {match.player1Char}
+                                                    </Text>
+                                                    <RenderSuperArt code={match.player1Super} />
+                                                </Stack>
+                                                <Flex flex="1" justifyContent="center">
+                                                    <Text textStyle="md" padding="8px">
+                                                        {match.results === '1' ? 1 : 0}
+                                                    </Text>
+                                                    <Text textStyle="md" padding="8px">
+                                                        VS
+                                                    </Text>
+                                                    <Text textStyle="md" padding="8px">
+                                                        {match.results === '2' ? 1 : 0}
+                                                    </Text>
+                                                </Flex>
+                                                <Stack gap="0px" flex="1" alignItems="center">
+                                                    <Text textStyle="md" padding="8px">
+                                                        {match.player2Name || 'Unknown User'}
+                                                    </Text>
+                                                    <Text textStyle="xs" padding="8px">
+                                                        {match.player2Char}
+                                                    </Text>
+                                                    <RenderSuperArt code={match.player2Super} />
+                                                </Stack>
                                             </Flex>
                                         </Card.Body>
                                         <Card.Footer />
                                     </Card.Root>
-                            )
-                        })}
+                                )
+                            })}
                 </Stack>
                 {/* <input placeholder="User name" type="text" />
             <div> Here you can set your favorite character and see stats from matches </div>
