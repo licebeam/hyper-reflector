@@ -21,22 +21,37 @@ export function sendCommand(command: string = 'dummy') {
     }
 }
 
-export function readCommand() {
+export async function readCommand() {
     try {
         const filePath = path.join(filePathBase, 'hyper_read_commands.txt')
         const data = fs.readFileSync(filePath, { encoding: 'utf8' })
-        console.log('file read ', data)
+        if (data.length) {
+            console.log('file read ', data)
+            // if its for uploading stats then we clear the stat file
+            if (data === 'read-tracking-file') {
+                const matchData = await readStatFile(null)
+                    .then()
+                    .catch((err) => console.log(err))
+                clearStatFile()
+                clearReadCommandFile()
+                return matchData
+            }
+        }
+        clearReadCommandFile()
     } catch (error) {
         console.error('Failed to read file:', error)
     }
 }
 
-export function readStatFile(mainWindow) {
+export async function readStatFile(mainWindow: any) {
     try {
         const filePath = path.join(filePathBase, 'hyper_track_match.txt')
-        const data = fs.readFileSync(filePath, { encoding: 'utf8' })
+        const data = await fs.readFileSync(filePath, { encoding: 'utf8' })
         console.log('file read ', data)
-        mainWindow.webContents.send('stats-from-main', data)
+        if (mainWindow) {
+            mainWindow.webContents.send('stats-from-main', data)
+        }
+        return data
     } catch (error) {
         console.error('Failed to read file:', error)
     }
@@ -47,6 +62,15 @@ export function readStatFile(mainWindow) {
 export function clearStatFile() {
     try {
         const filePath = path.join(filePathBase, 'hyper_track_match.txt')
+        fs.writeFileSync(filePath, '', { encoding: 'utf8' })
+    } catch (error) {
+        console.error('Failed to clear file:', error)
+    }
+}
+
+export function clearReadCommandFile() {
+    try {
+        const filePath = path.join(filePathBase, 'hyper_read_commands.txt')
         fs.writeFileSync(filePath, '', { encoding: 'utf8' })
     } catch (error) {
         console.error('Failed to clear file:', error)

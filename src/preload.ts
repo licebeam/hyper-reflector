@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.send('createAccount', accountObject),
     logOutUser: () => ipcRenderer.send('logOutUser'),
     getLoggedInUser: (uid: string) => ipcRenderer.send('getLoggedInUser', uid),
+    // room related
     sendMessage: (text: string) => ipcRenderer.send('sendMessage', text),
     sendRoomMessage: (text: string) => ipcRenderer.send('sendRoomMessage', text),
     addUserToRoom: (user: any) => ipcRenderer.send('addUserToRoom', user),
@@ -22,7 +23,9 @@ contextBridge.exposeInMainWorld('api', {
     addUserGroupToRoom: (users: [any]) => ipcRenderer.send('addUserGroupToRoom', users),
     handShake: (type: string) => ipcRenderer.send('hand-shake-users', type),
     sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
-    updateStun: (data: any) => ipcRenderer.send('updateStun', data), // will need to add ports back later so we can connect offline users.
+    // user profile
+    getUserMatches: (matches: any) => ipcRenderer.send('getUserMatches', matches),
+    // match
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
     setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),
@@ -30,16 +33,12 @@ contextBridge.exposeInMainWorld('api', {
     endMatch: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     endMatchUI: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     killEmulator: () => ipcRenderer.send('killEmulator'),
-    sendUDPMessage: (data: any) => ipcRenderer.send('sendUDPMessage', data),
-    sendStunOverSocket: (data: { publicIp: string; publicPort: string }) =>
-        ipcRenderer.send('sendStunOverSocket', data),
     // sends text to the emulator using the fbneo_commands.txt
     sendText: (text: string) => ipcRenderer.send('send-text', text),
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),
-    setTargetIp: (ip: string) => ipcRenderer.send('setTargetIp', ip),
     serveMatch: (ip: string, port: number, player: number, delay: number, myPort: number) =>
         ipcRenderer.send('serveMatch', { ip, port, player, delay, myPort }),
-    startGameOnline: (opponentUID: string, player: number, myId?: string)  =>
+    startGameOnline: (opponentUID: string, player: number, myId?: string) =>
         ipcRenderer.send('startGameOnline', { opponentUID, player, myId }),
     startSoloTraining: () => ipcRenderer.send('start-solo-mode'),
     // ipc call stuff

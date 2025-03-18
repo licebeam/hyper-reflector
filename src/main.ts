@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
+const { exec } = require('child_process')
 import started from 'electron-squirrel-startup'
 import { sendCommand, readCommand, readStatFile, clearStatFile } from './sendHyperCommands'
 import { startPlayingOnline, startSoloMode } from './loadFbNeo'
@@ -10,14 +11,15 @@ import keys from './private/keys'
 // external api
 import api from './external-api/requests'
 // p2p networking
-import { udpHolePunch, killUdpSocket, startHolePunching } from './networking/udpHolePunching'
-import { startUPNP, portForUPNP } from './networking/upnpRunner'
-let opponentIp = '127.0.0.1' // We change this if we get a message from player and try to target that ip.
-let opponentPort = 7000 // We change this when we recieve a message from a player on a different port, this means one is not using upnp.
+var dgram = require('dgram')
 // Emulator reference
 let spawnedEmulator = null //used to handle closing the emulator process
-//for testing purposes
-let currentProxyPort = 0
+let opponentEndpoint
+let socket = null
+let emuListener = null
+let opponentUID = null
+let lastKnownPlayerSlot = 0 // this is the player 1 or player 2 reference, used for tracking matches.
+
 //
 
 // - FIREBASE AUTH CODE - easy peasy
@@ -27,6 +29,7 @@ import {
     signInWithEmailAndPassword,
     signOut,
     createUserWithEmailAndPassword,
+    signInWithCustomToken,
 } from 'firebase/auth'
 import { firebaseConfig } from './private/firebase'
 import { TLogin } from './types'
@@ -45,6 +48,8 @@ const isDev = !app.isPackaged
 
 let userUID: string | null = null
 let filePathBase = process.resourcesPath
+const tokenFilePath = path.join(app.getPath('userData'), 'auth_token.json')
+
 //handle dev mode toggle for file paths.
 if (isDev) {
     filePathBase = path.join(app.getAppPath(), 'src')
@@ -66,7 +71,7 @@ const sendLog = (text: string) => {
 const createWindow = () => {
     // Create the browser window.
     mainWindow = new BrowserWindow({
-        width: 1200,
+        width: 1100,
         height: 700,
         webPreferences: {
             nodeIntegration: true,
@@ -199,10 +204,11 @@ const createWindow = () => {
 
     // firebase login
     async function handleLogin({ email, pass }: TLogin) {
-        mainWindow.webContents.send('logging-in', 'trying to log in')
         try {
             await signInWithEmailAndPassword(auth, email, pass)
-                .then(() => {
+                .then(async (data) => {
+                    console.log('login info', data)
+                    await saveRefreshToken(data.user.refreshToken)
                     return true
                 })
                 .catch((error) => {
@@ -216,11 +222,23 @@ const createWindow = () => {
         }
     }
 
+    async function saveRefreshToken(refreshToken: string) {
+        await fs.writeFileSync(tokenFilePath, JSON.stringify({ refreshToken }), {
+            encoding: 'utf-8',
+        })
+    }
+
+    async function removeRefreshToken() {
+        await fs.unlinkSync(tokenFilePath, 'auth_token.json')
+        console.log('Refresh token removed.')
+    }
+
     async function handleLogOut() {
         await signOut(auth)
             .then(() => {
                 try {
                     console.log('logout success')
+                    removeRefreshToken()
                     mainWindow.webContents.send('loggedOutSuccess', 'user logged out')
                 } catch (error) {
                     console.log('sending signal to fe to log out')
@@ -330,152 +348,283 @@ const createWindow = () => {
     ipcMain.on('send-text', (event, text: string) => {
         sendCommand(`textinput:${text}`)
         // test functions
-        readCommand()
         readStatFile(mainWindow)
     })
 
     ipcMain.on('send-command', (event, command) => {
         sendCommand(command)
-        readCommand()
         // external api testing delete me later
         api.externalApiDoSomething(auth)
     })
 
-    ipcMain.on('setTargetIp', (event, ip) => {
-        // This data comes from renderer when we successfully use stun with another person.
-        if (ip) {
-            console.log('the current target IP = ', ip)
-            opponentIp = ip
-        }
-        // TODO: add error handling this is an important function.
-    })
-
     ipcMain.on('serveMatch', async (event, data) => {})
 
-    var dgram = require('dgram')
-    let localStunPort = 0
-    let publicEndpointB
-
-    let socket = dgram.createSocket('udp4')
-    let emuListener = dgram.createSocket('udp4')
+    let keepAliveInterval = null
 
     ipcMain.on('startGameOnline', async (event, data) => {
-        console.log('STARTING GAME ONLINE', data)
         if (socket) {
-            await socket.close()
-            socket = await dgram.createSocket('udp4')
+            console.log('killing socket', socket)
+            try {
+                await socket.close()
+            } catch (error) {
+                console.error('Error closing socket:', error)
+            }
         }
         if (emuListener) {
-            await emuListener.close()
-            emuListener = await dgram.createSocket('udp4')
-            emuListener.bind(7001)
-        }
-        socket.on('message', function (message, remote) {
-            const messageContent = message.toString()
-            if (messageContent === 'ping' || message.includes('"port"')) {
-                console.log(`Ignoring keep-alive message from ${remote.address}:${remote.port}`)
-                console.log(remote.address + ':' + remote.port + ' - ' + message)
-            } else {
-                //sending message to the emulator
-                //console.log('sending this guy to the emulator => ', message)
-                socket.send(message, 0, message.length, 7000, '127.0.0.1')
-            }
+            console.log('killing emu listener', emuListener)
             try {
-                publicEndpointB = JSON.parse(message)
-                sendMessageToB(publicEndpointB.address, publicEndpointB.port)
-            } catch (err) {}
-        })
-
-        // get messages from our local emulator and send it to the other player socket
-        emuListener.on('message', function (message, remote) {
-            sendMessageToB(publicEndpointB.address, publicEndpointB.port, message)
-        })
-
-        function sendMessageToS() {
-            var serverPort = 33333
-            var serverHost = keys.COTURN_IP
-            // var serverHost = '127.0.0.1'
-            console.log(userUID)
-            var message = new Buffer(
-                JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID })
-            )
-            socket.send(
-                message,
-                0,
-                message.length,
-                serverPort,
-                serverHost,
-                function (err, nrOfBytesSent) {
-                    if (err) return console.log(err)
-                    console.log('UDP message sent to ' + serverHost + ':' + serverPort)
-                }
-            )
+                await emuListener.close()
+            } catch (error) {
+                console.error('Error closing emu listener:', error)
+            }
         }
 
-        sendMessageToS()
-
-        let isEmuOpen = false
-        let message: string = ''
-        function sendMessageToB(address, port, msg = '') {
-            if (!isEmuOpen) {
-                isEmuOpen = startEmulator(address, port)
+        if (!socket) {
+            console.log('opening socket')
+            try {
+                socket = dgram.createSocket('udp4')
+                socket.bind(() => {
+                    console.log('Socket bound to random port:', socket.address())
+                })
+            } catch (error) {
+                console.error('Error opening socket:', error)
             }
-
-            if (msg.length >= 1) {
-                message = new Buffer(msg)
-            } else {
-                message = new Buffer('ping')
-            }
-
-            socket.send(message, 0, message.length, port, address, function (err, nrOfBytesSent) {
-                if (err) return console.log(err)
-                // console.log('UDP message sent to B:', address + ':' + port)
-            })
         }
 
-        function startEmulator(address, port) {
-            const emu = startPlayingOnline({
-                config,
-                localPort: 7000,
-                remoteIp: '127.0.0.1',
-                remotePort: emuListener.address().port,
-                player: data.player,
-                delay: parseInt(config.app.emuDelay),
-                isTraining: false, // Might be used in the future.
-                callBack: () => {
-                    // attempt to kill the emulator
-                    console.log('emulator should die')
-                    killUdpSocket()
+        console.log('did this ever finish?')
+
+        if (!emuListener) {
+            console.log('opening emu listener')
+            try {
+                emuListener = dgram.createSocket('udp4')
+                emuListener.bind(7001, () => {
+                    console.log('Emu listener bound to port 7001')
+                })
+            } catch (error) {
+                console.error('Error opening emu listener:', error)
+            }
+        }
+
+        console.log('did it ever finish the socket bind?', socket.address, emuListener.address)
+
+        if (socket && emuListener) {
+            console.log('STARTING GAME ONLINE', data)
+
+            try {
+                socket.on('message', function (message, remote) {
+                    const messageContent = message.toString()
+                    if (messageContent === 'ping' || message.includes('"port"')) {
+                        if (message.includes('"port"') && !keepAliveInterval) {
+                            keepAliveInterval = setInterval(() => {
+                                console.log('sending keep alive to B')
+                                sendMessageToB(
+                                    opponentEndpoint.address,
+                                    opponentEndpoint.port,
+                                    'ping'
+                                )
+                            }, 1000)
+                        }
+                        console.log(
+                            `Ignoring keep-alive message from ${remote.address}:${remote.port}`
+                        )
+                        console.log(remote.address + ':' + remote.port + ' - ' + message)
+                    } else {
+                        socket.send(message, 0, message.length, 7000, '127.0.0.1')
+                    }
+                    try {
+                        opponentEndpoint = JSON.parse(message)
+                        sendMessageToB(opponentEndpoint.address, opponentEndpoint.port)
+                    } catch (err) {}
+                })
+            } catch (error) {
+                console.log('error in socket', error)
+            }
+
+            try {
+                // get messages from our local emulator and send it to the other player socket
+                emuListener.on('message', function (message, remote) {
+                    sendMessageToB(opponentEndpoint.address, opponentEndpoint.port, message)
+                })
+            } catch (error) {
+                console.log('error in emu scket', error)
+            }
+
+            function sendMessageToS(kill: boolean) {
+                const serverPort = 33333
+                const serverHost = keys.COTURN_IP
+                // var serverHost = '127.0.0.1'
+                console.log(userUID, '- is kill? ' + kill)
+                const message = new Buffer(
+                    JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
+                )
+                opponentUID = data.opponentUID
+                console.log(
+                    'sending this message to server',
+                    JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
+                )
+                try {
+                    socket.send(
+                        message,
+                        0,
+                        message.length,
+                        serverPort,
+                        serverHost,
+                        function (err, nrOfBytesSent) {
+                            if (err) return console.log(err)
+                            console.log('UDP message sent Server ' + serverHost + ':' + serverPort)
+                        }
+                    )
+                } catch (error) {
+                    console.log('could not send message to server')
                     mainWindow.webContents.send('endMatch', userUID)
-                },
-            })
-            spawnedEmulator = emu // in the future we can use this to check for online training etc.
-            return emu
+                }
+            }
+
+            sendMessageToS(false)
+
+            let message: string = ''
+            async function sendMessageToB(address, port, msg = '') {
+                if (!spawnedEmulator) {
+                    console.log('Starting emulator...')
+                    spawnedEmulator = await startEmulator(address, port)
+                    console.log('Emulator started')
+                }
+
+                if (msg.length >= 1) {
+                    message = new Buffer(msg)
+                } else {
+                    message = new Buffer('ping')
+                }
+                try {
+                    socket.send(
+                        message,
+                        0,
+                        message.length,
+                        port,
+                        address,
+                        function (err, nrOfBytesSent) {
+                            if (err) return console.log(err)
+                            // console.log('UDP message sent to B:', address + ':' + port)
+                        }
+                    )
+                } catch (error) {
+                    console.log('could not send message user B')
+                }
+            }
+
+            async function startEmulator(address, port) {
+                console.log('Starting emulator for player:', address, port)
+                lastKnownPlayerSlot = data.player // set the last know player slot for sending to the BE to record matches
+                return await startPlayingOnline({
+                    config,
+                    localPort: 7000,
+                    remoteIp: '127.0.0.1',
+                    remotePort: emuListener.address().port,
+                    player: data.player,
+                    delay: parseInt(config.app.emuDelay),
+                    isTraining: false, // Might be used in the future.
+                    callBack: () => {
+                        sendMessageToS(true)
+                        // attempt to kill the emulator
+                        console.log('emulator should die')
+                        mainWindow.webContents.send('endMatch', userUID)
+                        // get user out of challenge pool
+                    },
+                })
+            }
         }
     })
 
-    ipcMain.on('killEmulator', () => {
+    function killProcessByName(processName) {
+        exec(`taskkill /F /IM ${processName}`, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Failed to kill ${processName}: ${error.message}`)
+                return
+            }
+            console.log(`${processName} killed successfully:\n${stdout}`)
+        })
+    }
+
+    ipcMain.on('killEmulator', async () => {
+        clearInterval(keepAliveInterval)
+        keepAliveInterval = null
+        try {
+            socket.close()
+            emuListener.close()
+            socket = null
+            emuListener = null
+        } catch (error) {
+            console.log('could not close sockets used by emulator')
+        }
+
+        await mainWindow.webContents.send(
+            'message-from-main',
+            'Attempting to gracefully close emulator'
+        )
+
+        try {
+            if (spawnedEmulator) {
+                console.log('Trying to close emulator', spawnedEmulator.pid)
+
+                // Try SIGTERM first
+                spawnedEmulator.kill('SIGTERM')
+                // if we are on windows we also need to kill the process
+
+                // Listen for the process to close
+                spawnedEmulator.on('close', (code, signal) => {
+                    console.log(`Emulator exited with code ${code} and signal ${signal}`)
+                    spawnedEmulator = null
+                })
+
+                // After 2 seconds, force kill if it's still running
+                setTimeout(() => {
+                    if (spawnedEmulator && !spawnedEmulator.killed) {
+                        console.log('Force killing emulator')
+                        spawnedEmulator.kill('SIGKILL')
+                    }
+                }, 2000)
+
+                if (process.platform === 'win32') {
+                    killProcessByName('fcadefbneo.exe')
+                    spawnedEmulator = null
+                }
+
+                mainWindow.webContents.send('message-from-main', 'Emulator exists, closing')
+            }
+        } catch (err) {
+            mainWindow.webContents.send('message-from-main', 'Could not close emulator')
+            console.error('Failed to close emulator:', err)
+        }
+
+        // Check if process is still alive before calling taskkill
+        if (spawnedEmulator) {
+            const pid = spawnedEmulator.pid
+
+            // Debug: Check if process is still running
+            exec(`tasklist /FI "PID eq ${pid}"`, (err, stdout, stderr) => {
+                if (!stdout.includes(pid)) {
+                    console.log(`Process ${pid} is already gone.`)
+                    return
+                }
+
+                console.log(`Process ${pid} is still running. Attempting to force kill...`)
+
+                if (process.platform === 'win32') {
+                    exec(`taskkill /PID ${pid} /F`, (err, stdout, stderr) => {
+                        if (err) console.error('taskkill failed:', err)
+                    })
+                } else {
+                    exec(`pkill -P ${pid}`, (err, stdout, stderr) => {
+                        if (err) console.error('pkill failed:', err)
+                    })
+                }
+            })
+        }
+
+        // Cleanup
         clearStatFile()
         mainWindow.webContents.send('endMatchUI', userUID)
-        killUdpSocket()
-        mainWindow.webContents.send('message-from-main', 'attempting to gracefully close emu')
-        try {
-            console.log('trying to close emulator')
-            if (spawnedEmulator) {
-                spawnedEmulator.kill('SIGTERM')
-                spawnedEmulator = null;
-                mainWindow.webContents.send('message-from-main', 'emulator exists closing')
-            }
-        } catch {
-            mainWindow.webContents.send('message-from-main', 'could not close emu')
-            console.log('failed to close emulator')
-        }
     })
-
-    // ipcMain.on('sendUDPMessage', () => {
-    //     console.log('test')
-    //     mainWindow.webContents.send('sendUDPMessage', 'this is a udp message')
-    // })
 
     ipcMain.on('start-solo-mode', (event) => {
         startSoloMode({ config })
@@ -489,7 +638,7 @@ const createWindow = () => {
     })
 
     // this is used by websockets to populate our chat room with other peoples messages
-    ipcMain.on('sendRoomMessage', (event, messageObject) => {
+    ipcMain.on('sendRoomMessage', async (event, messageObject) => {
         mainWindow.webContents.send('sendRoomMessage', messageObject)
     })
 
@@ -511,6 +660,11 @@ const createWindow = () => {
     ipcMain.on('changeUserName', async (event, name) => {
         const complete = await api.changeUserName(auth, name).catch((err) => console.log(err))
         mainWindow.webContents.send('user-name-changed', complete)
+    })
+
+    ipcMain.on('getUserMatches', async (event, name) => {
+        const userMatches = await api.getUserMatches(auth).catch((err) => console.log(err))
+        mainWindow.webContents.send('getUserMatches', userMatches)
     })
 
     // matchmaking
@@ -547,7 +701,7 @@ async function handleExitApp() {
     if (userUID) {
         // remove user from websockets and log them out of firebase on close
         await api.removeLoggedInUser(auth)
-        await killUdpSocket()
+        // await killUdpSocket()
         // mainWindow?.webContents.send('closingApp', { uid: userUID })
     }
     // if (proxyListener) {
@@ -578,10 +732,23 @@ ipcMain.on('request-data', (event) => {
 })
 
 // read files
-const readInterval = setInterval(() => {
+const readInterval = setInterval(async () => {
     // currently we aren't really using this polling, but we will eventually need something like this
     // we also need to set this up so it only works in a match.
-    // readCommand()
+    const data = await readCommand()
+    if (data && data.length) {
+        //send match data to back end
+        // console.log('data', data)
+        const matchData = {
+            matchData: {
+                raw: data,
+            },
+            matchId: 'test-id', // we should generate this on the BE
+            player1: lastKnownPlayerSlot == 0 ? userUID : opponentUID || 'fake-user',
+            player2: lastKnownPlayerSlot == 1 ? userUID : opponentUID || 'fake-user',
+        }
+        api.uploadMatchData(auth, matchData)
+    }
 }, 1000) // read from reflector.text every 1000 ms
 
 // This method will be called when Electron has finished
@@ -631,13 +798,54 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(async () => {
-    // HOW THIS APP NETWORKS
-    // first we set hit the stun server by logging in.
-    // secondly we start listening for messages on port 7000
-    // thirdly a user who wishes to connect upnp maps port 7000 for a networked connection
-    // fourthly we start the emulator and we proxy incoming data from port 7000 to the emulators port of 7001
-    // profit, users should be successfully connecting the emulators together with eachother.
+    mainWindow.webContents.once('did-finish-load', () => {
+        console.log('UI has fully loaded!')
+        mainWindow.webContents.send('autoLoggingIn')
+        function getRefreshToken() {
+            if (fs.existsSync(tokenFilePath)) {
+                const data = JSON.parse(fs.readFileSync(tokenFilePath, 'utf-8'))
+                return data.refreshToken
+            }
+            console.log('failed to get refresh token')
+            mainWindow.webContents.send('autoLoginFailure')
+            return null
+        }
+        // mainWindow.webContents.send('ui-ready'); // You can send an event to renderer if needed
+        async function startAutoLoginProcess() {
+            // lets check if we have a refresh token first, if we do lets auto log in users that are opted in.
+            const token = await getRefreshToken()
+            if (token) {
+                // console.log('We should auto log in', token)
+                const loginData = await api.autoLogin(token)
+                const customToken = await api
+                    .getCustomToken(loginData.id_token)
+                    .then((res) => res)
+                    .catch((err) => console.log(err))
+                // console.log('auto logged in', customToken)
+                await signInWithCustomToken(auth, customToken)
+                const user = await api
+                    .getUserByAuth(auth)
+                    .catch((err) => console.log('err getting user by auth'))
+                console.log(user)
 
-    // UPNP is working! but we need to fix the upnp library so that we can make a build.
-    ipcMain.on('updateStun', async (event, data) => {})
+                if (user) {
+                    console.log('user logged in')
+                    // send our user object to the front end
+                    mainWindow.webContents.send('loginSuccess', {
+                        name: user.userName,
+                        email: user.userEmail,
+                        uid: user.uid,
+                    })
+
+                    userUID = user.uid
+                    console.log('user is: ', user)
+                }
+            } else {
+                mainWindow.webContents.send('autoLoginFailure')
+                return console.log('User needs to log in.')
+            }
+        }
+
+        startAutoLoginProcess()
+    })
 })

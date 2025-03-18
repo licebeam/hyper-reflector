@@ -9,7 +9,7 @@ import {
     createMemoryHistory,
 } from '@tanstack/react-router'
 import { ChakraProvider, defaultConfig, defineConfig, createSystem } from '@chakra-ui/react'
-import { TanStackRouterDevtools } from '@tanstack/router-devtools'
+// import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import StartPage from './pages/StartPage'
 import LobbyPage from './pages/LobbyPage'
 import OfflinePage from './pages/OfflinePage'
@@ -19,6 +19,7 @@ import SettingsPage from './pages/SettingsPage'
 import CreateAccountPage from './pages/CreateAccountPage'
 import ErrorBoundary from './ErrorBoundary'
 import Layout from './layout/Layout'
+import Autologin from './components/AutoLogin'
 
 const rootRoute = createRootRoute({
     component: () => (
@@ -26,7 +27,7 @@ const rootRoute = createRootRoute({
             <Layout>
                 <Outlet />
             </Layout>
-            <TanStackRouterDevtools />
+            {/* <TanStackRouterDevtools /> */}
         </>
     ),
 })
@@ -35,11 +36,15 @@ const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/',
     component: function Home() {
-        return (
-            <div className="p-2">
-                <StartPage />
-            </div>
-        )
+        return <StartPage />
+    },
+})
+
+const autoLogRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/auto-login',
+    component: function Home() {
+        return <Autologin />
     },
 })
 
@@ -47,11 +52,7 @@ const newsRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/news',
     component: function News() {
-        return (
-            <div className="p-2">
-                <NewsPage />
-            </div>
-        )
+        return <NewsPage />
     },
 })
 
@@ -59,11 +60,7 @@ const createAccountRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/create',
     component: function News() {
-        return (
-            <div className="p-2">
-                <CreateAccountPage />
-            </div>
-        )
+        return <CreateAccountPage />
     },
 })
 
@@ -71,11 +68,7 @@ const offlineRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/offline',
     component: function Offline() {
-        return (
-            <div className="p-2">
-                <OfflinePage />
-            </div>
-        )
+        return <OfflinePage />
     },
 })
 
@@ -83,11 +76,7 @@ const chatRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/chat',
     component: function Chat() {
-        return (
-            <div className="p-2">
-                <LobbyPage />
-            </div>
-        )
+        return <LobbyPage />
     },
 })
 
@@ -95,11 +84,7 @@ const profileRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/profile',
     component: function Settings() {
-        return (
-            <div className="p-2">
-                <PlayerProfilePage />
-            </div>
-        )
+        return <PlayerProfilePage />
     },
 })
 
@@ -107,16 +92,13 @@ const settingsRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/settings',
     component: function Settings() {
-        return (
-            <div className="p-2">
-                <SettingsPage />
-            </div>
-        )
+        return <SettingsPage />
     },
 })
 
 const routeTree = rootRoute.addChildren([
     indexRoute,
+    autoLogRoute,
     newsRoute,
     offlineRoute,
     chatRoute,
@@ -127,7 +109,7 @@ const routeTree = rootRoute.addChildren([
 
 // this allows electron to hash the routing
 const memoryHistory = createMemoryHistory({
-    initialEntries: ['/'], // Pass your initial url
+    initialEntries: ['/auto-login'], // Pass your initial url
 })
 
 const router = createRouter({ routeTree, history: memoryHistory })

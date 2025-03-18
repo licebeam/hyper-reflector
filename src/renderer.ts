@@ -6,12 +6,10 @@ import './front-end/app'
 let signalServerSocket: WebSocket = null // socket reference
 let candidateList = []
 let callerIdState = null
-let myUID = null
-let mylocalStunPort = 0 // set this later
-let mylocalRealPort = 0 // set this later
-let userName = null
-let opponentId = null
-let matchPlayerNum = 0
+let userName: string | null = null
+let myUID: string | null = null
+let opponentUID: string | null = null
+let playerNum: number | null = null
 
 // const SOCKET_ADDRESS = `ws://127.0.0.1:3000` // debug
 const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3000` // live
@@ -109,17 +107,10 @@ function resetState() {
     candidateList = []
     callerIdState = null
     myUID = null
-    mylocalStunPort = 0 // set this later
-    mylocalRealPort = 0 // set this later
     userName = null
-    opponentId = null
-    matchPlayerNum = 0
+    opponentUID = null
+    console.log('opponentUID reset =  ', opponentUID)
 }
-
-window.api.on('sendUDPMessage', () => {
-    console.log('received a udp message from our emulator')
-    peerConnections[opponentId].dataChannel.send('test')
-})
 
 function setupLogging(peer, userLabel, event) {
     if (event.candidate) {
@@ -137,8 +128,6 @@ function setupLogging(peer, userLabel, event) {
                 let rport = matches[4] // The rport (e.g., 50133)
                 console.log(`${userLabel} External IP: ${ip}, Port: ${port}`)
                 console.log('----------------MATCHES ', matches, rport)
-                mylocalStunPort = port //set the stun port to use in main we need to use the related port.
-                mylocalRealPort = rport
             }
             candidateList.push(event.candidate)
             if (callerIdState) {
@@ -258,7 +247,11 @@ function connectWebSocket(user) {
                 })
             )
             callerIdState = callerId
-            opponentId = callerId
+            opponentUID = callerId
+            console.log('answer call opponentUID set to =  ', opponentUID)
+            console.log('opponentUID start match =  ', opponentUID)
+            playerNum = 1 // if we answer a call we are always player 1
+            window.api.startGameOnline(opponentUID, playerNum)
         }
     )
 
@@ -342,7 +335,8 @@ function connectWebSocket(user) {
             await peerConnections[data.data.answererId].setRemoteDescription(
                 new RTCSessionDescription(data.data.answer)
             )
-            opponentId = data.data.answererId // set the current opponent so we can get them from the peer list.
+            opponentUID = data.data.answererId // set the current opponent so we can get them from the peer list.
+            console.log('someone answered our call, opponentUID set to =  ', opponentUID)
             console.log(
                 'Answering call, trying to send some data; ',
                 data.data.callerId,
@@ -354,49 +348,21 @@ function connectWebSocket(user) {
                     data: { targetId: data.data.answererId, candidate: candidateList[0] },
                 })
             )
+            playerNum = 0 // if our call is answered we are always player 0
+            window.api.startGameOnline(opponentUID, playerNum)
         }
 
         if (data.type === 'iceCandidate') {
-            // TODO fix this ugly data stuff
-            console.log('Received ICE Candidate from peer:', data.data.candidate.candidate)
-            let matches = data.data.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3} [0-9]+/)
-            // console.log('matches', matches)
-            // console.log(data)
-            // console.log(peerConnections[data.data.userUID].isInitiator)
-            if (matches) {
-                let [ip, port] = matches[0].split(' ')
-                // 0 is our delay settings which we'll need to adjust for.
-                //TODO set the player number based on who initialized the peer connections
-                let playerNum
-                if (peerConnections[data.data.userUID]?.isInitiator) {
-                    console.log('I am player 1 ------------------------------------->>>>>>')
-                    playerNum = 0
-                } else {
-                    console.log(
-                        'I should be set to player 2 --------------------------------->>>>>'
-                    )
-                    playerNum = 1
-                }
-                // this should be set by a list of whatever ongoing challenges are running
-                await window.api.updateStun({
-                    ip,
-                    port,
-                    localStunPort: mylocalStunPort,
-                    mylocalRealPort,
-                })
-                console.log(`Connecting to ${ip}, Port: ${port}`)
-                await window.api.setTargetIp(ip)
-                window.api.startGameOnline(opponentId, playerNum)
-                //TODO fix these references
-                matchPlayerNum = playerNum
-            }
+            console.log(
+                'made a connection with someone, probably need to initialize some data channel stuff'
+            )
         }
     }
 }
 
 //ends match with any player who has an active connection with you, this should also close the rtc connection
 window.api.on('endMatch', (userUID: string) => {
-    console.log('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ending match', userUID)
+    console.log('ending match as - ', userUID)
     if (userUID) {
         console.log('sending socket signal to close')
         signalServerSocket.send(
@@ -406,15 +372,5 @@ window.api.on('endMatch', (userUID: string) => {
             })
         )
     }
-})
-
-window.api.on('sendStunOverSocket', (data: any) => {
-    console.log('TRYING TO SEND STUN OVER SOCKET! to:', opponentId, ' we are ', myUID)
-    signalServerSocket.send(
-        JSON.stringify({
-            type: 'sendStunOverSocket',
-            opponentId,
-            data,
-        })
-    )
+    resetState()
 })

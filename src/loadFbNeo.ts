@@ -1,30 +1,11 @@
-const { exec, spawn } = require('child_process')
+const { spawn } = require('child_process')
 import { Config } from './config'
-
-export default function launchGGPO(command, callBack: () => any) {
-    try {
-        exec(command, (error, stdout, stderr) => {
-            if (error) {
-                console.error(`Error starting Fightcade-FBNeo: ${error.message}`)
-                return
-            }
-            if (stderr) {
-                console.error(`stderr: ${stderr}`)
-                return
-            }
-            console.log(`stdout: ${stdout}`)
-        })
-        return true
-    } catch (error) {
-        console.log(error)
-    }
-}
 
 export function launchGGPOSpawn(command: string, callBack: () => any) {
     try {
         const [cmd, ...args] = command.split(' ')
-
-        const child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] }) // Redirect stdout and stderr
+        let child
+        child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
 
         // Capture stdout (logs from emulator)
         child.stdout.on('data', (data) => {
@@ -34,16 +15,13 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
         // Capture stderr (errors)
         child.stderr.on('data', (data) => {
             console.error(`[Fightcade-FBNeo Error]: ${data.toString()}`)
-            // call the kill code
-            if (callBack) {
-                callBack()
-            }
         })
 
         // Listen for process exit
         child.on('exit', (code, signal) => {
             // call the kill code
             if (callBack) {
+                console.log('emulator callback', callBack)
                 callBack()
             }
 
@@ -100,8 +78,6 @@ export function startPlayingOnline({
     isTraining: boolean
     callBack: () => any
 }) {
-    console.log('starting EMULATOR FOR ===>>>', localPort, remoteIp, remotePort)
-    console.log('emulator target might be listening on', remotePort + 1)
     let luaPath = config.emulator.luaPath
     if (isTraining) {
         luaPath = config.emulator.trainingLuaPath
@@ -110,7 +86,7 @@ export function startPlayingOnline({
     switch (process.platform) {
         case 'darwin':
             return launchGGPOSpawn(directCommand, callBack)
-            // return launchGGPOSpawn(directCommand, () => {})
+        // return launchGGPOSpawn(directCommand, () => {})
         case 'linux':
             return launchGGPOSpawn(directCommand, callBack)
         default:

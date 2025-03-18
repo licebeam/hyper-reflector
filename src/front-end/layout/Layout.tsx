@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Button, Flex, Stack, Tabs } from '@chakra-ui/react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Flex, Stack, Tabs, Box } from '@chakra-ui/react'
+import { useNavigate } from '@tanstack/react-router'
 import { useLoginStore, useMessageStore } from '../state/store'
 
 export default function Layout({ children }) {
     const [currentTab, setCurrentTab] = useState<string>('login')
     const [isLoading, setIsLoading] = useState(false)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
-    const userState = useLoginStore((state) => state.userState)
     const setUserState = useLoginStore((state) => state.setUserState)
     const loggedOut = useLoginStore((state) => state.loggedOut)
     const clearMessageState = useMessageStore((state) => state.clearMessageState)
@@ -17,7 +16,6 @@ export default function Layout({ children }) {
 
     useEffect(() => {
         window.api.on('loggedOutSuccess', (event) => {
-            console.log('===============================log out reset state')
             clearUserList()
             clearMessageState()
             setUserState({ email: '' })
@@ -36,12 +34,19 @@ export default function Layout({ children }) {
             // user logged out
             setCurrentTab('login')
         }
-        console.log('----------------------------------------------', currentTab)
     }, [isLoggedIn])
 
     return (
-        <Stack minH={'100vh'} justifyContent={'space-between'}>
-            <Flex>
+        <Stack minH="100vh" height="100vh">
+            <Box
+                h="60px"
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                bg="gray.200"
+                px="4"
+                flexShrink={0}
+            >
                 <Tabs.Root variant="plain" value={currentTab}>
                     <Tabs.List bg="bg.muted" rounded="l3" p="1">
                         {!isLoggedIn && (
@@ -107,26 +112,24 @@ export default function Layout({ children }) {
                         <Tabs.Indicator rounded="l2" />
                     </Tabs.List>
                 </Tabs.Root>
-                {isLoggedIn && (
-                    <Button
-                        alignSelf="center"
-                        disabled={isLoading}
-                        onClick={() => {
-                            console.log('trying to log out')
-                            setIsLoading(true)
-                            window.api.logOutUser()
-                        }}
-                    >
-                        Log Out
-                    </Button>
-                )}
-            </Flex>
-            <Stack flex={'auto'} overflowY={'none'}>{children}</Stack>
-            <Flex alignSelf={'flex-end'}>
-                <div>https://discord.gg/T77dSXG7Re</div>
-                <div style={{ fontSize: '0.8rem' }}>Hyper Reflector version 0.1.7
-                7a 2025</div>
-            </Flex>
+            </Box>
+            <Box flex="1" display="flex" flexDirection="column" height="calc(100vh - 120px)">
+                <Box flex="1" overflowY="auto" p="4">
+                    {children}
+                </Box>
+            </Box>
+            <Box
+                h="40px"
+                display="flex"
+                justifyContent="space-between"
+                alignItems="center"
+                bg="gray.200"
+                px="4"
+                flexShrink={0}
+            >
+                <div style={{ fontSize: '0.8rem' }}>https://discord.gg/T77dSXG7Re</div>
+                <div style={{ fontSize: '0.8rem' }}>Hyper Reflector version 0.1.8a 2025</div>
+            </Box>
         </Stack>
     )
 }

@@ -3,6 +3,12 @@ import BlogPost from '../components/BlogPost'
 
 const blogsArray = [
     {
+        title: 'Update Version 0.1.8a',
+        date: '3/18/2025',
+        content:
+            'Took me a minute but, here we are with update 0.1.8 alpha! This adds the precurser to match stat tracking and many features, some updated ui, like profile an chat. As well as changes to our stat tracking lua, enjoy. Full release notes on discord.',
+    },
+    {
         title: 'Update Version 0.1.7a',
         date: '3/10/2025',
         content:
