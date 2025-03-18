@@ -21,11 +21,6 @@ export default function LoginBlock() {
     })
     const navigate = useNavigate()
 
-    const handleIsLoggingIn = () => {
-        console.log('logging in')
-        setIsLoading(true)
-    }
-
     const handleLogIn = (loginInfo) => {
         setUserState(loginInfo)
         addUser(loginInfo)
@@ -43,10 +38,6 @@ export default function LoginBlock() {
     }
 
     useEffect(() => {
-        // Listen for updates from Electron
-        window.api.removeExtraListeners('logging-in', handleIsLoggingIn)
-        window.api.on('logging-in', handleIsLoggingIn)
-
         window.api.removeExtraListeners('loginSuccess', handleLogIn)
         window.api.on('loginSuccess', handleLogIn)
 
@@ -54,7 +45,6 @@ export default function LoginBlock() {
         window.api.on('login-failed', handleLoginFail)
 
         return () => {
-            window.api.removeListener('logging-in', handleIsLoggingIn)
             window.api.removeListener('loginSuccess', handleLogIn)
             window.api.removeListener('login-failed', handleLoginFail)
         }
@@ -87,6 +77,12 @@ export default function LoginBlock() {
                                     }
                                     type="text"
                                     value={login.email}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && login.email && login.pass) {
+                                            setIsLoading(true)
+                                            window.api.loginUser(login)
+                                        }
+                                    }}
                                 />
                             </Field>
                             <Field label="Password" required>
@@ -102,6 +98,12 @@ export default function LoginBlock() {
                                     }
                                     type="password"
                                     value={login.pass}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && login.email && login.pass) {
+                                            setIsLoading(true)
+                                            window.api.loginUser(login)
+                                        }
+                                    }}
                                 />
                             </Field>
                             <Stack>

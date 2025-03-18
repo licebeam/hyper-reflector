@@ -17,7 +17,6 @@ export interface IElectronAPI {
     addUserGroupToRoom: any
     handShake: any
     sendDataChannel: any
-    updateStun: any
     setEmulatorPath: any
     getEmulatorPath: any
     setEmulatorDelay: any
@@ -25,12 +24,9 @@ export interface IElectronAPI {
     endMatch: any
     endMatchUI: any
     killEmulator: any
-    sendUDPMessage: any
-    sendStunOverSocket: any
     // sends text to the emulator using the fbneo_commands.txt
     sendText: any
     sendCommand: any
-    setTargetIp: any
     serveMatch: any
     startGameOnline: any
     startSoloTraining: any
