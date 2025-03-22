@@ -106,7 +106,7 @@ async function removeLoggedInUser(auth) {
     }
 }
 
-async function changeUserName(auth, name) {
+async function updateUserData(auth, name) {
     if (checkCurrentAuthState(auth)) {
         const idToken = await auth.currentUser.getIdToken().then((res) => res)
         try {
@@ -120,6 +120,34 @@ async function changeUserName(auth, name) {
                     userName: name,
                 }),
             })
+        } catch (error) {
+            console.log(error)
+            console.error(error.message)
+        }
+    }
+}
+
+async function getUserData(auth, userId) {
+    if (checkCurrentAuthState(auth)) {
+        const idToken = await auth.currentUser.getIdToken().then((res) => res)
+        try {
+            const response = await fetch(`http://${SERVER}:${keys.API_PORT}/get-user-data`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken: idToken || 'not real',
+                    userUID: userId,
+                }),
+            })
+
+            if (!response.ok) {
+                return false
+            }
+
+            const data = await response.json()
+            return data
         } catch (error) {
             console.log(error)
             console.error(error.message)
@@ -256,7 +284,8 @@ async function uploadMatchData(auth, matchData) {
     }
 }
 
-async function getUserMatches(auth, userId) {
+async function getUserMatches(auth, userId, lastMatchId = null) {
+    console.log('last match', lastMatchId)
     if (checkCurrentAuthState(auth)) {
         const idToken = await auth.currentUser.getIdToken().then((res) => res)
         try {
@@ -267,7 +296,8 @@ async function getUserMatches(auth, userId) {
                 },
                 body: JSON.stringify({
                     idToken: idToken || 'not real',
-                    userId: userId,
+                    lastMatchId,
+                    userUID: userId,
                 }),
             })
 
@@ -292,9 +322,10 @@ export default {
     autoLogin,
     getCustomToken,
     //profile
-    changeUserName,
+    updateUserData,
     createAccount,
     getUserByAuth,
+    getUserData,
     //matches
     uploadMatchData,
     getUserMatches,

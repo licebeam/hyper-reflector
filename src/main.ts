@@ -664,14 +664,23 @@ const createWindow = () => {
     })
 
     // PROFILE RELATED IPC CALLS
-    ipcMain.on('changeUserName', async (event, name) => {
-        const complete = await api.changeUserName(auth, name).catch((err) => console.log(err))
-        mainWindow.webContents.send('user-name-changed', complete)
+    ipcMain.on('changeUserData', async (event, name) => {
+        const complete = await api.updateUserData(auth, name).catch((err) => console.log(err))
+        mainWindow.webContents.send('user-account-changed', complete)
     })
 
-    ipcMain.on('getUserMatches', async (event, userId) => {
-        const userMatches = await api.getUserMatches(auth, userId).catch((err) => console.log(err))
-        mainWindow.webContents.send('getUserMatches', userMatches)
+    ipcMain.on('getUserMatches', async (event, { userId, lastMatchId }) => {
+        const setOfMatchesPaginated = await api
+            .getUserMatches(auth, userId, lastMatchId)
+            .catch((err) => console.log(err))
+
+        mainWindow.webContents.send('getUserMatches', setOfMatchesPaginated)
+    })
+
+    ipcMain.on('getUserData', async (event, userId) => {
+        const userData = await api.getUserData(auth, userId).catch((err) => console.log(err))
+        console.log('user data', userData)
+        mainWindow.webContents.send('getUserData', userData)
     })
 
     // matchmaking
@@ -738,17 +747,14 @@ ipcMain.on('request-data', (event) => {
     })
 })
 
-// read files
-const readInterval = setInterval(async () => {
-    // currently we aren't really using this polling, but we will eventually need something like this
-    // we also need to set this up so it only works in a match.
+async function handleReadAndUploadMatch() {
     const data = await readCommand()
     if (data && data.length) {
         //send match data to back end
         // console.log('data', data)
         const matchData = {
             matchData: {
-                raw: data,
+                raw: 'data', // uncomment me
             },
             matchId: 'test-id', // we should generate this on the BE
             player1: lastKnownPlayerSlot == 0 ? userUID : opponentUID || 'fake-user',
@@ -756,6 +762,13 @@ const readInterval = setInterval(async () => {
         }
         api.uploadMatchData(auth, matchData)
     }
+}
+
+// read files
+const readInterval = setInterval(async () => {
+    // currently we aren't really using this polling, but we will eventually need something like this
+    // we also need to set this up so it only works in a match.
+    handleReadAndUploadMatch()
 }, 1000) // read from reflector.text every 1000 ms
 
 // This method will be called when Electron has finished

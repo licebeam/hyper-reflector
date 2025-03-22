@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from '@tanstack/react-router';
+import { useParams } from '@tanstack/react-router'
 import {
     Button,
     Stack,
@@ -29,15 +29,27 @@ export default function PlayerProfilePage() {
     const userState = useLoginStore((state) => state.userState)
     const [isLoading, setIsLoading] = useState(true)
     const [recentMatches, setRecentMatches] = useState([])
+    const [userData, setUserData] = useState([])
+    const [lastMatch, setLastMatch] = useState(null)
+    const [pageNumber, setPageNumber] = useState(null)
 
-    const handleSetRecentMatches = (matches) => {
-        setRecentMatches(matches.recentMatches)
+    const handleSetRecentMatches = (matchData) => {
+        console.log("setting match data on front end")
+        const { matches, lastVisible } = matchData
+        setLastMatch(lastVisible)
+        setRecentMatches(matches)
         setIsLoading(false)
+    }
+
+    const handleSetUserData = (data) => {
+        console.log('USER DATA-------------', data)
+        setUserData(data)
     }
 
     useEffect(() => {
         //TODO sometimes this fails to get match data
-        window.api.getUserMatches(userId)
+        window.api.getUserData(userId)
+        window.api.getUserMatches({ userId, lastMatchId: lastMatch })
         // temp
         setTimeout(() => {
             setIsLoading(false)
@@ -45,12 +57,19 @@ export default function PlayerProfilePage() {
     }, [])
 
     useEffect(() => {
-        // Listen for updates from Electron
-        window.api.removeExtraListeners('getUserMatches', handleSetRecentMatches)
+        window.api.getUserMatches({ userId, lastMatchId: lastMatch })
+    }, [pageNumber])
+
+    useEffect(() => {
+        window.api.removeExtraListeners('getUserData', handleSetUserData)
+        window.api.on('getUserData', handleSetUserData)
+
+        // window.api.removeExtraListeners('getUserMatches', handleSetRecentMatches)
         window.api.on('getUserMatches', handleSetRecentMatches)
 
         return () => {
-            window.api.removeListener('getUserMatches', handleSetRecentMatches)
+            window.api.removeListener('getUserData', handleSetUserData)
+            // window.api.removeListener('getUserMatches', handleSetRecentMatches)
         }
     }, [])
 
@@ -106,6 +125,7 @@ export default function PlayerProfilePage() {
                 <Heading flex="0" size="md">
                     User Profile
                 </Heading>
+                <Button onClick={() => setPageNumber(pageNumber + 1)}> Next Page</Button>
                 <Stack>
                     {recentMatches &&
                         // TODO need to add match timestamp on BE

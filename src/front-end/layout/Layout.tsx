@@ -8,6 +8,7 @@ export default function Layout({ children }) {
     const [isLoading, setIsLoading] = useState(false)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const setUserState = useLoginStore((state) => state.setUserState)
+    const user = useLoginStore((state) => state.userState)
     const loggedOut = useLoginStore((state) => state.loggedOut)
     const clearMessageState = useMessageStore((state) => state.clearMessageState)
     const clearUserList = useMessageStore((state) => state.clearUserList)
@@ -83,7 +84,7 @@ export default function Layout({ children }) {
                                 <Tabs.Trigger
                                     value="profile"
                                     onClick={() => {
-                                        navigate({ to: '/profile' })
+                                        navigate({ to: `/profile/${user.uid}` })
                                         setCurrentTab('profile')
                                     }}
                                 >
