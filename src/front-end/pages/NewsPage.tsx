@@ -3,6 +3,12 @@ import BlogPost from '../components/BlogPost'
 
 const blogsArray = [
     {
+        title: 'Update Version 0.1.9a',
+        date: '3/23/2025',
+        content:
+            'Thanks again for another successful week testing, in this update I add some quality of life improvements for the chat and player profiles, as well as some match bug fixes, please check the release notes on discord. =)',
+    },
+    {
         title: 'Update Version 0.1.8a',
         date: '3/18/2025',
         content:

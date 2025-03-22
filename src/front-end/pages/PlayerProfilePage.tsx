@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useParams } from '@tanstack/react-router';
 import {
     Button,
     Stack,
@@ -23,6 +24,8 @@ import { Field } from '../components/chakra/ui/field'
 import { useLoginStore } from '../state/store'
 
 export default function PlayerProfilePage() {
+    const { userId } = useParams({ strict: false })
+    console.log('got user id, ', userId)
     const userState = useLoginStore((state) => state.userState)
     const [isLoading, setIsLoading] = useState(true)
     const [recentMatches, setRecentMatches] = useState([])
@@ -34,7 +37,7 @@ export default function PlayerProfilePage() {
 
     useEffect(() => {
         //TODO sometimes this fails to get match data
-        window.api.getUserMatches()
+        window.api.getUserMatches(userId)
         // temp
         setTimeout(() => {
             setIsLoading(false)
@@ -98,6 +101,7 @@ export default function PlayerProfilePage() {
                 User Profile
             </Heading>
             <div>Current Username: {userState.name}</div>
+            <Box>{userId}</Box>
             <Stack>
                 <Heading flex="0" size="md">
                     User Profile

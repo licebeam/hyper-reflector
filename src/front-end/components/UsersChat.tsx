@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { Button, Stack, Input, Flex, Box, Avatar, AvatarGroup, Card } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
 import UserButton from './chat/UserButton'
+import UserCard from './users/UserCard'
 
 export default function UsersChat() {
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
@@ -80,13 +82,14 @@ export default function UsersChat() {
     const renderUsers = () => {
         return userList.map((user, index) => {
             var timestamp = new Date()
-            return <UserButton key={index + timestamp + user.uid} user={user} />
+            return <UserCard key={index + timestamp + user.uid} user={user} />
+            // return <UserButton key={index + timestamp + user.uid} user={user} />
         })
     }
 
     return (
-        <div style={{ display: 'flex', overflowY: 'auto' }}>
-            {isLoggedIn && <div>{renderUsers()}</div>}
-        </div>
+        <>
+            {isLoggedIn && <Stack gap='8px'>{renderUsers()}</Stack>}
+        </>
     )
 }

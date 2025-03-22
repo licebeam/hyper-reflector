@@ -20,8 +20,6 @@ let emuListener = null
 let opponentUID = null
 let lastKnownPlayerSlot = 0 // this is the player 1 or player 2 reference, used for tracking matches.
 
-//
-
 // - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from 'firebase/app'
 import {
@@ -49,6 +47,19 @@ const isDev = !app.isPackaged
 let userUID: string | null = null
 let filePathBase = process.resourcesPath
 const tokenFilePath = path.join(app.getPath('userData'), 'auth_token.json')
+
+const getLoginObject = (user: any) => {
+    // TODO make a
+    console.log(user)
+    return {
+        name: user.userName,
+        email: user.userEmail,
+        uid: user.uid,
+        elo: user.accountELO || 0,
+        profilePicture: user.profilePicture || 'test',
+        userTitle: user.userTitle || null,
+    }
+}
 
 //handle dev mode toggle for file paths.
 if (isDev) {
@@ -271,11 +282,7 @@ const createWindow = () => {
             .catch((err) => console.log('err getting user by auth'))
         if (user) {
             // send our user object to the front end
-            mainWindow.webContents.send('loginSuccess', {
-                name: user.userName,
-                email: user.userEmail,
-                uid: user.uid,
-            })
+            mainWindow.webContents.send('loginSuccess', getLoginObject(user))
             userUID = user.uid
             console.log('user is: ', user)
         }
@@ -662,8 +669,8 @@ const createWindow = () => {
         mainWindow.webContents.send('user-name-changed', complete)
     })
 
-    ipcMain.on('getUserMatches', async (event, name) => {
-        const userMatches = await api.getUserMatches(auth).catch((err) => console.log(err))
+    ipcMain.on('getUserMatches', async (event, userId) => {
+        const userMatches = await api.getUserMatches(auth, userId).catch((err) => console.log(err))
         mainWindow.webContents.send('getUserMatches', userMatches)
     })
 
@@ -831,11 +838,7 @@ app.whenReady().then(async () => {
                 if (user) {
                     console.log('user logged in')
                     // send our user object to the front end
-                    mainWindow.webContents.send('loginSuccess', {
-                        name: user.userName,
-                        email: user.userEmail,
-                        uid: user.uid,
-                    })
+                    mainWindow.webContents.send('loginSuccess', getLoginObject(user))
 
                     userUID = user.uid
                     console.log('user is: ', user)
