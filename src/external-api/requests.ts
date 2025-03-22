@@ -256,7 +256,7 @@ async function uploadMatchData(auth, matchData) {
     }
 }
 
-async function getUserMatches(auth) {
+async function getUserMatches(auth, userId) {
     if (checkCurrentAuthState(auth)) {
         const idToken = await auth.currentUser.getIdToken().then((res) => res)
         try {
@@ -267,6 +267,7 @@ async function getUserMatches(auth) {
                 },
                 body: JSON.stringify({
                     idToken: idToken || 'not real',
+                    userId: userId,
                 }),
             })
 

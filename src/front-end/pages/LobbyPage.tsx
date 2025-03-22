@@ -11,7 +11,7 @@ export default function LobbyPage() {
                 <ChatBar />
             </Stack>
             <Box flex='1'>
-                Users:
+                {/* Users: */}
                 <UsersChat />
             </Box>
         </Box>

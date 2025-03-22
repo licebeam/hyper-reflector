@@ -82,9 +82,9 @@ const chatRoute = createRoute({
 
 const profileRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '/profile',
-    component: function Settings() {
-        return <PlayerProfilePage />
+    path: '/profile/$userId',
+    component: function Profile({ $userId }) {
+        return <PlayerProfilePage/>
     },
 })
 
