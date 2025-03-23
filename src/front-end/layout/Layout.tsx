@@ -38,7 +38,6 @@ export default function Layout({ children }) {
         }
     }, [isLoggedIn])
 
-    console.log(layoutTab)
     return (
         <Stack minH="100vh" height="100vh">
             <Box

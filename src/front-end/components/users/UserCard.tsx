@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useLoginStore, useMessageStore } from '../../state/store'
+import { useLoginStore, useMessageStore, useLayoutStore } from '../../state/store'
 import {
     Button,
     Stack,
@@ -26,6 +26,7 @@ export default function UserCard({ user }) {
     const userState = useLoginStore((state) => state.userState)
     const callData = useMessageStore((state) => state.callData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
+    const setLayoutTab = useLayoutStore((state) => state.setSelectedTab)
 
     const navigate = useNavigate()
 
@@ -145,7 +146,9 @@ export default function UserCard({ user }) {
                             )}
                             {/* link to user profile */}
                             <Button
-                                onClick={() => {
+                                bg="blue.500"
+                                onClick={async () => {
+                                    await setLayoutTab('profile')
                                     navigate({ to: `/profile/${user.uid || ''}` })
                                 }}
                             >
