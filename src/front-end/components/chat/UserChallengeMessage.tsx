@@ -43,8 +43,6 @@ export default function UserChallengeMessage({ message }) {
                                     console.log(message)
                                     // setIsInMatch(true)
                                     window.api.answerCall(caller)
-                                    console.log(caller)
-                                    removeCallData(caller.callerId)
                                 }}
                             >
                                 Accept
