@@ -1,7 +1,6 @@
 import { useRef, useEffect } from 'react'
 import { Flex, Stack, Tabs, Box, Text, Button } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
-import UserChallengMEssage from './chat/UserChallengeMessage'
 import UserChallengeMessage from './chat/UserChallengeMessage'
 
 export default function ChatWindow() {
@@ -11,16 +10,23 @@ export default function ChatWindow() {
 
     const callData = useMessageStore((state) => state.callData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
+    const processedCallers = useRef(new Set()) // Keep track of processed callers
 
     useEffect(() => {
         if (callData && callData.length) {
-            console.log('call data', callData)
             const newestCaller = callData[callData.length - 1]
-            pushMessage({
-                sender: newestCaller.callerId,
-                message: 'got a challenge',
-                type: 'challenge',
-            })
+
+            // Only send message if the call is new
+            if (!processedCallers.current.has(newestCaller.callerId)) {
+                pushMessage({
+                    sender: newestCaller.callerId,
+                    message: 'got a challenge',
+                    type: 'challenge',
+                })
+
+                // Mark this caller as processed
+                processedCallers.current.add(newestCaller.callerId)
+            }
         }
     }, [callData])
 
