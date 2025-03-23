@@ -53,7 +53,6 @@ export default function UserChallengeMessage({ message }) {
                                         (call) => call.callerId === message.sender
                                     )
                                     window.api.declineCall(caller)
-                                    // clearCallData()
                                 }}
                             >
                                 Decline

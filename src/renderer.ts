@@ -372,13 +372,7 @@ function connectWebSocket(user) {
         if (data.type === 'callDeclined') {
             closePeerConnection(data.data.answererId)
             console.log('sending socket signal to close')
-            signalServerSocket.send(
-                JSON.stringify({
-                    type: 'matchEnd',
-                    uid: myUID,
-                })
-            )
-            resetState()
+            // resetState()
         }
 
         if (data.type === 'iceCandidate') {
