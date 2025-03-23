@@ -34,6 +34,7 @@ export default function UserChallengeMessage({ message }) {
                             <Button
                                 onClick={() => {
                                     console.log('accepting match')
+                                    setIsAccepted(true)
                                     const caller = callData.find(
                                         (call) => call.callerId === message.sender
                                     )

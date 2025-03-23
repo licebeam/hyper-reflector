@@ -695,6 +695,7 @@ const createWindow = () => {
 
     ipcMain.on('declineCall', (event, data) => {
         mainWindow.webContents.send('declineCall', { ...data, answererId: userUID })
+        mainWindow.webContents.send('endMatch', userUID)
     })
 
     ipcMain.on('receivedCall', (event, data) => {
