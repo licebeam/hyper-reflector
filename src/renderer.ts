@@ -255,6 +255,23 @@ function connectWebSocket(user) {
         }
     )
 
+    window.api.on(
+        'declineCall',
+        async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
+            console.log('we should be declining the call')
+            console.log('sending out decline', callerId)
+            signalServerSocket.send(
+                JSON.stringify({
+                    type: 'declineCall',
+                    data: {
+                        callerId,
+                        answererId,
+                    },
+                })
+            )
+        }
+    )
+
     // allow users to chat
     window.api.on('sendMessage', (text: string) => {
         console.log(JSON.stringify(candidateList))
@@ -350,6 +367,11 @@ function connectWebSocket(user) {
             )
             playerNum = 0 // if our call is answered we are always player 0
             window.api.startGameOnline(opponentUID, playerNum)
+        }
+
+        if (data.type === 'callDeclined') {
+            closePeerConnection(data.data.answererId)
+            resetState()
         }
 
         if (data.type === 'iceCandidate') {

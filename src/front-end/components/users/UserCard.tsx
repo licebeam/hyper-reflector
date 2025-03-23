@@ -72,7 +72,7 @@ export default function UserCard({ user }) {
     }
 
     return (
-        <Popover.Root positioning={{ sameWidth: true }}>
+        <Popover.Root positioning={{ sameWidth: true, offset: { crossAxis: 0, mainAxis: -4 } }}>
             <Popover.Trigger asChild>
                 <Box
                     minH="60px"
@@ -121,39 +121,41 @@ export default function UserCard({ user }) {
             </Popover.Trigger>
             <Portal>
                 <Popover.Positioner>
-                    <Popover.Content width="auto" backgroundColor="gray.900">
+                    <Popover.Content width="auto" backgroundColor="gray.700">
                         <Popover.Arrow />
                         <Popover.Body>
-                            {!isUserChallenging && user.uid !== userState.uid && (
+                            <Flex gap="8px">
+                                {!isUserChallenging && user.uid !== userState.uid && (
+                                    <Button
+                                        bg="red.500"
+                                        disabled={isInMatch}
+                                        onClick={() => {
+                                            setIsInMatch(true)
+                                            console.log(
+                                                'trying to call someone from: ',
+                                                userState.uid,
+                                                ' to => ',
+                                                user.uid
+                                            )
+                                            window.api.callUser({
+                                                callerId: userState.uid,
+                                                calleeId: user.uid,
+                                            })
+                                        }}
+                                    >
+                                        Challenge
+                                    </Button>
+                                )}
                                 <Button
-                                    disabled={isInMatch}
-                                    onClick={() => {
-                                        setIsInMatch(true)
-                                        console.log(
-                                            'trying to call someone from: ',
-                                            userState.uid,
-                                            ' to => ',
-                                            user.uid
-                                        )
-                                        window.api.callUser({
-                                            callerId: userState.uid,
-                                            calleeId: user.uid,
-                                        })
+                                    bg="blue.500"
+                                    onClick={async () => {
+                                        await setLayoutTab('profile')
+                                        navigate({ to: `/profile/${user.uid || ''}` })
                                     }}
                                 >
-                                    Challenge
+                                    Profile
                                 </Button>
-                            )}
-                            {/* link to user profile */}
-                            <Button
-                                bg="blue.500"
-                                onClick={async () => {
-                                    await setLayoutTab('profile')
-                                    navigate({ to: `/profile/${user.uid || ''}` })
-                                }}
-                            >
-                                Profile
-                            </Button>
+                            </Flex>
                         </Popover.Body>
                     </Popover.Content>
                 </Popover.Positioner>

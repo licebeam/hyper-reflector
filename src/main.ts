@@ -693,6 +693,10 @@ const createWindow = () => {
         mainWindow.webContents.send('answerCall', { ...data, answererId: userUID })
     })
 
+    ipcMain.on('declineCall', (event, data) => {
+        mainWindow.webContents.send('declineCall', { ...data, answererId: userUID })
+    })
+
     ipcMain.on('receivedCall', (event, data) => {
         mainWindow.webContents.send('receivedCall', data)
     })

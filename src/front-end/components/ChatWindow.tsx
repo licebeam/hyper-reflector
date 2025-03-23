@@ -1,11 +1,28 @@
 import { useRef, useEffect } from 'react'
-import { Flex, Stack, Tabs, Box, Text } from '@chakra-ui/react'
+import { Flex, Stack, Tabs, Box, Text, Button } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
+import UserChallengMEssage from './chat/UserChallengeMessage'
+import UserChallengeMessage from './chat/UserChallengeMessage'
 
 export default function ChatWindow() {
     const messageState = useMessageStore((state) => state.messageState)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const pushMessage = useMessageStore((state) => state.pushMessage)
+
+    const callData = useMessageStore((state) => state.callData)
+    const clearCallData = useMessageStore((state) => state.clearCallData)
+
+    useEffect(() => {
+        if (callData && callData.length) {
+            console.log('call data', callData)
+            const newestCaller = callData[callData.length - 1]
+            pushMessage({
+                sender: newestCaller.callerId,
+                message: 'got a challenge',
+                type: 'challenge',
+            })
+        }
+    }, [callData])
 
     const chatEndRef = useRef<null | HTMLDivElement>(null)
 
@@ -44,36 +61,13 @@ export default function ChatWindow() {
         scrollToBottom()
     }, [messageState])
 
-    const renderMessages = () => {
-        return messageState.map((message, index) => {
-            var timestamp = new Date()
-            // really simple chat display
-            return (
-                <Flex
-                    key={index + timestamp + message.message}
-                    flexDirection="column"
-                    width="100%"
-                    wordBreak="break-word" // Ensures words wrap properly
-                    whiteSpace="pre-wrap" // Preserves line breaks
-                    p="2"
-                    borderRadius="md"
-                    mb="1"
-                    bg="gray.700"
-                >
-                    <Text fontWeight="bold" color="blue.400">
-                        {message.sender}
-                    </Text>
-                    <Text color="gray.50">{message.message}</Text>
-                </Flex>
-            )
-        })
-    }
-
     return (
         <Stack height="100%" key={'chat'} overflowY="auto" id="chatbox-id">
             {isLoggedIn && (
                 <Box paddingLeft="8px" paddingRight="8px">
-                    {renderMessages()}
+                    {messageState.map((message, index) => {
+                        return <UserChallengeMessage message={message} />
+                    })}
                     <Box ref={chatEndRef} />
                 </Box>
             )}
