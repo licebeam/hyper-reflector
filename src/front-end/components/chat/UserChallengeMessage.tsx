@@ -8,6 +8,8 @@ export default function UserChallengeMessage({ message }) {
     const [isAccepted, setIsAccepted] = useState(false)
     const callData = useMessageStore((state) => state.callData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
+    const removeCallData = useMessageStore((state) => state.removeCallData)
+
     var timestamp = new Date()
     return (
         <Flex
@@ -53,6 +55,8 @@ export default function UserChallengeMessage({ message }) {
                                         (call) => call.callerId === message.sender
                                     )
                                     window.api.declineCall(caller)
+                                    console.log(caller)
+                                    removeCallData(caller.callerId)
                                 }}
                             >
                                 Decline
