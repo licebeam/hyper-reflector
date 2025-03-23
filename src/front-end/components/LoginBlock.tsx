@@ -53,19 +53,25 @@ export default function LoginBlock() {
     return (
         <>
             {isLoading && (
-                <Box pos="absolute" inset="0" bg="bg/80">
+                <Box pos="absolute" inset="0" bg="gray.800" opacity="50%">
                     <Center h="full">
                         <Spinner color="red.500" />
                     </Center>
                 </Box>
             )}
             <Stack gap={2}>
-                {!isLoading && <Heading size="md">Sign In</Heading>}
+                {!isLoading && (
+                    <Heading size="md" color="gray.300">
+                        Sign In
+                    </Heading>
+                )}
                 <Box>
                     {!isLoading && !isLoggedIn && (
                         <Stack gap={6}>
-                            <Field label="Email" required>
+                            <Field label="Email" required color="gray.400">
                                 <Input
+                                    bg="gray.200"
+                                    color="gray.900"
                                     placeholder="bobby@example.com"
                                     disabled={isLoading}
                                     onChange={(e) =>
@@ -85,8 +91,10 @@ export default function LoginBlock() {
                                     }}
                                 />
                             </Field>
-                            <Field label="Password" required>
+                            <Field label="Password" required color="gray.400">
                                 <PasswordInput
+                                    bg="gray.200"
+                                    color="gray.900"
                                     placeholder="password"
                                     disabled={isLoading}
                                     onChange={(e) =>
@@ -108,7 +116,8 @@ export default function LoginBlock() {
                             </Field>
                             <Stack>
                                 <Button
-                                    disabled={isLoading}
+                                    bg="blue.500"
+                                    disabled={isLoading || !login.pass || !login.email}
                                     id="login-btn"
                                     onClick={() => {
                                         setIsLoading(true)
@@ -117,7 +126,7 @@ export default function LoginBlock() {
                                 >
                                     Log In
                                 </Button>
-                                <Text textStyle="sm">
+                                <Text textStyle="sm" color="gray.400">
                                     <Link to="/create" className="[&.active]:font-bold">
                                         <Flex gap="1">
                                             <p> Create New Account </p>

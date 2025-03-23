@@ -1,5 +1,13 @@
 import { create } from 'zustand'
 
+export const useLayoutStore = create((set) => ({
+    selectedTab: 'login',
+    setSelectedTab: (tab: string) =>
+        set({
+            selectedTab: tab,
+        }),
+}))
+
 export const useLoginStore = create((set) => ({
     userState: { email: '' },
     isLoggedIn: false,
@@ -27,6 +35,8 @@ export const useMessageStore = create((set) => ({
     callData: [],
     setCallData: (call) => set((state) => ({ callData: [...state.callData, call] })),
     removeCallData: (caller) =>
-        set((state) => ({ callData: [...state.callData.filter((call) => call.callerId !== caller.callerId)] })),
+        set((state) => ({
+            callData: [...state.callData.filter((call) => call.callerId !== caller.callerId)],
+        })),
     clearCallData: (call) => set((state) => ({ callData: [] })),
 }))

@@ -1,7 +1,8 @@
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica,
-    Arial, sans-serif;
+  Arial, sans-serif;
   margin: auto;
+  background-color: #27272a;
   /* max-width: 50%; */
   height: 100%;
   margin: 0;

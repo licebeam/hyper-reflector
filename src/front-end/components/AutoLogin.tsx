@@ -63,7 +63,7 @@ export default function Autologin() {
     return (
         <>
             {isLoading && (
-                <Box pos="absolute" inset="0" bg="bg/80">
+                <Box pos="absolute" inset="0" bg="gray.800" opacity="50%">
                     <Center h="full">
                         <Spinner color="red.500" />
                     </Center>
@@ -71,7 +71,9 @@ export default function Autologin() {
             )}
             <Stack justifySelf="center">
                 <Box>
-                    <Text textStyle="4xl">Logging you in!</Text>
+                    <Text textStyle="4xl" color="red.600">
+                        Logging you in!
+                    </Text>
                 </Box>
             </Stack>
         </>

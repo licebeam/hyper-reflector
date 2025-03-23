@@ -121,21 +121,22 @@ export default function PlayerProfilePage() {
 
     return (
         <Stack minH="100%">
-            <Heading flex="0" size="lg">
+            <Heading flex="0" size="lg" color="red.500">
                 {userState.name}
             </Heading>
             {/* <Box>{userId}</Box> */}
             <Stack>
                 <Stack>
-                    <Heading flex="0" size="md">
+                    <Heading flex="0" size="md" color="gray.200">
                         Recent Matches
                     </Heading>
                     {matchTotal && (
                         <Box>
-                            <Text textStyle="md" padding="8px">
+                            <Text textStyle="md" padding="8px" color="gray.500">
                                 Total Matches Played: {matchTotal}
                             </Text>
                             <Pagination.Root
+                                color="red.500"
                                 count={matchTotal}
                                 pageSize={10}
                                 defaultPage={1}
@@ -150,7 +151,7 @@ export default function PlayerProfilePage() {
                             >
                                 <ButtonGroup gap="4" size="sm" variant="ghost">
                                     <Pagination.PrevTrigger asChild>
-                                        <IconButton>
+                                        <IconButton color="red.500">
                                             <ChevronLeft />
                                         </IconButton>
                                     </Pagination.PrevTrigger>
@@ -158,7 +159,7 @@ export default function PlayerProfilePage() {
                                         {pageNumber} of {pageCount}
                                     </Text>
                                     <Pagination.NextTrigger asChild>
-                                        <IconButton>
+                                        <IconButton color="red.500">
                                             <ChevronRight />
                                         </IconButton>
                                     </Pagination.NextTrigger>
@@ -173,39 +174,67 @@ export default function PlayerProfilePage() {
                                 <>
                                     {isLoading && <Skeleton height="230px" />}
                                     {!isLoading && (
-                                        <Card.Root variant="elevated" maxH="230px">
-                                            <Card.Header>
+                                        <Card.Root variant="elevated" maxH="230px" bg="gray.700">
+                                            <Card.Header color="gray.400">
                                                 {new Date(
                                                     match.timestamp._seconds * 1000
                                                 ).toLocaleString()}
                                             </Card.Header>
-                                            <Card.Body flex="1">
+                                            <Card.Body flex="1" bg="gray.700">
                                                 <Flex>
                                                     <Stack gap="0px" flex="1" alignItems="center">
-                                                        <Text textStyle="md" padding="8px">
+                                                        <Text
+                                                            textStyle="md"
+                                                            padding="8px"
+                                                            color="gray.200"
+                                                        >
                                                             {match.player1Name}
                                                         </Text>
-                                                        <Text textStyle="xs" padding="8px">
+                                                        <Text
+                                                            textStyle="xs"
+                                                            padding="8px"
+                                                            color="gray.200"
+                                                        >
                                                             {match.player1Char}
                                                         </Text>
                                                         <RenderSuperArt code={match.player1Super} />
                                                     </Stack>
                                                     <Flex flex="1" justifyContent="center">
-                                                        <Text textStyle="md" padding="8px">
+                                                        <Text
+                                                            textStyle="md"
+                                                            padding="8px"
+                                                            color="gray.200"
+                                                        >
                                                             {match.results === '1' ? 1 : 0}
                                                         </Text>
-                                                        <Text textStyle="md" padding="8px">
+                                                        <Text
+                                                            textStyle="md"
+                                                            padding="8px"
+                                                            color="gray.200"
+                                                        >
                                                             VS
                                                         </Text>
-                                                        <Text textStyle="md" padding="8px">
+                                                        <Text
+                                                            textStyle="md"
+                                                            padding="8px"
+                                                            color="gray.200"
+                                                        >
                                                             {match.results === '2' ? 1 : 0}
                                                         </Text>
                                                     </Flex>
                                                     <Stack gap="0px" flex="1" alignItems="center">
-                                                        <Text textStyle="md" padding="8px">
+                                                        <Text
+                                                            textStyle="md"
+                                                            padding="8px"
+                                                            color="gray.200"
+                                                        >
                                                             {match.player2Name || 'Unknown User'}
                                                         </Text>
-                                                        <Text textStyle="xs" padding="8px">
+                                                        <Text
+                                                            textStyle="xs"
+                                                            padding="8px"
+                                                            color="gray.200"
+                                                        >
                                                             {match.player2Char}
                                                         </Text>
                                                         <RenderSuperArt code={match.player2Super} />
@@ -221,7 +250,7 @@ export default function PlayerProfilePage() {
                 </Stack>
             </Stack>
             {isLoading && (
-                <Box pos="absolute" inset="0" bg="bg/80">
+                <Box pos="absolute" inset="0" bg="gray.800" opacity="50%">
                     <Center h="full">
                         <Spinner color="red.500" />
                     </Center>

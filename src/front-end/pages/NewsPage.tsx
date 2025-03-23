@@ -30,7 +30,9 @@ const blogsArray = [
 export default function NewsPage() {
     return (
         <Stack gap="2">
-            <Heading size="md">Updates</Heading>
+            <Heading size="md" color="gray.200">
+                Updates
+            </Heading>
             <Stack>
                 {blogsArray.map((blog) => (
                     <BlogPost blog={blog} />

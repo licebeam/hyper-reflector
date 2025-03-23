@@ -8,7 +8,7 @@ import {
     createRootRoute,
     createMemoryHistory,
 } from '@tanstack/react-router'
-import { ChakraProvider, defaultConfig, defineConfig, createSystem } from '@chakra-ui/react'
+import { ChakraProvider, defaultConfig, defineConfig, createSystem, Box } from '@chakra-ui/react'
 // import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import StartPage from './pages/StartPage'
 import LobbyPage from './pages/LobbyPage'
@@ -84,7 +84,7 @@ const profileRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/profile/$userId',
     component: function Profile({ $userId }) {
-        return <PlayerProfilePage/>
+        return <PlayerProfilePage />
     },
 })
 
@@ -142,7 +142,9 @@ const root = createRoot(document.body)
 root.render(
     <ErrorBoundary>
         <ChakraProvider value={system}>
-            <RouterProvider router={router} />
+            <Box backgroundColor="gray.900">
+                <RouterProvider router={router} />
+            </Box>
         </ChakraProvider>
     </ErrorBoundary>
 )

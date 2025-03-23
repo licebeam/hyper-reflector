@@ -68,15 +68,18 @@ export default function SettingsPage() {
 
     return (
         <Stack minH="100%">
-            <Heading flex="0" size="md">
+            <Heading flex="0" size="md" color="gray.200">
                 Application Settings
             </Heading>
             <Stack flex="1">
-                <Text textStyle="xs">
+                <Text textStyle="xs" color="gray.400">
                     This is where we can set our emulator path and other setting
                 </Text>
-                <Text textStyle="xs">Current Path: {currentEmuPath}</Text>
+                <Text textStyle="xs" color="gray.300">
+                    Current Path: {currentEmuPath}
+                </Text>
                 <Button
+                    bg="blue.500"
                     onClick={() => {
                         window.api.setEmulatorPath()
                     }}
@@ -85,9 +88,12 @@ export default function SettingsPage() {
                 </Button>
             </Stack>
             <Stack flex="1">
-                <Text textStyle="xs">Current delay: {currentDelay}</Text>
-                <Field label="Online Delay" helperText="">
+                <Text textStyle="xs" color="gray.300">
+                    Current delay: {currentDelay}
+                </Text>
+                <Field label="Online Delay" helperText="" color="gray.300">
                     <SelectRoot
+                        color="blue.400"
                         collection={delays}
                         value={[currentDelay]}
                         onValueChange={(e) => {
@@ -108,11 +114,11 @@ export default function SettingsPage() {
                     </SelectRoot>
                 </Field>
             </Stack>
-            <Stack flex="1" justifyContent='flex-end'>
+            <Stack flex="1" justifyContent="flex-end">
                 <Box display="flex">
                     {isLoggedIn && (
                         <>
-                            <Text textStyle="xs" flex="1">
+                            <Text textStyle="xs" flex="1" color="gray.400">
                                 Log out user, this will also make it so you do not automaitcally log
                                 in on start next time.
                             </Text>

@@ -56,12 +56,14 @@ export default function ChatWindow() {
                     wordBreak="break-word" // Ensures words wrap properly
                     whiteSpace="pre-wrap" // Preserves line breaks
                     p="2"
-                    bg="gray.100"
                     borderRadius="md"
                     mb="1"
+                    bg="gray.700"
                 >
-                    <Text fontWeight="bold">{message.sender}</Text>
-                    <Text>{message.message}</Text>
+                    <Text fontWeight="bold" color="blue.400">
+                        {message.sender}
+                    </Text>
+                    <Text color="gray.50">{message.message}</Text>
                 </Flex>
             )
         })
@@ -70,7 +72,7 @@ export default function ChatWindow() {
     return (
         <Stack height="100%" key={'chat'} overflowY="auto" id="chatbox-id">
             {isLoggedIn && (
-                <Box paddingLeft='8px' paddingRight='8px'>
+                <Box paddingLeft="8px" paddingRight="8px">
                     {renderMessages()}
                     <Box ref={chatEndRef} />
                 </Box>
