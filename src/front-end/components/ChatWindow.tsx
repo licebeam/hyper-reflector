@@ -1,5 +1,5 @@
 import { useRef, useEffect } from 'react'
-import { Flex, Stack, Tabs, Box, Text, Button } from '@chakra-ui/react'
+import { Stack, Box } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
 import UserChallengeMessage from './chat/UserChallengeMessage'
 
@@ -10,25 +10,6 @@ export default function ChatWindow() {
 
     const callData = useMessageStore((state) => state.callData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
-    const processedCallers = useRef(new Set()) // Keep track of processed callers
-
-    useEffect(() => {
-        if (callData && callData.length) {
-            const newestCaller = callData[callData.length - 1]
-
-            // Only send message if the call is new
-            if (!processedCallers.current.has(newestCaller.callerId)) {
-                pushMessage({
-                    sender: newestCaller.callerId,
-                    message: 'got a challenge',
-                    type: 'challenge',
-                })
-
-                // Mark this caller as processed
-                processedCallers.current.add(newestCaller.callerId)
-            }
-        }
-    }, [callData])
 
     const chatEndRef = useRef<null | HTMLDivElement>(null)
 
@@ -46,20 +27,6 @@ export default function ChatWindow() {
         window.api.on('sendRoomMessage', handleRoomMessage)
         return () => {
             window.api.removeListener('sendRoomMessage', handleRoomMessage)
-        }
-    }, [])
-
-    const handleMessage = (text: string) => {
-        const currentUser = useLoginStore.getState().userState
-        pushMessage({ sender: currentUser.name, message: text })
-    }
-
-    // show our own message, but probably need to have the server handle this too
-    useEffect(() => {
-        window.api.removeExtraListeners('user-message', handleMessage)
-        window.api.on('user-message', handleMessage)
-        return () => {
-            window.api.removeListener('user-message', handleMessage)
         }
     }, [])
 
