@@ -9,23 +9,25 @@ export default function UserChallengeMessage({ message }) {
     const callData = useMessageStore((state) => state.callData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
     const removeCallData = useMessageStore((state) => state.removeCallData)
+    const updateMessage = useMessageStore((state) => state.updateMessage)
 
     var timestamp = new Date()
+
     return (
         <Flex
             key={timestamp + message.message}
             flexDirection="column"
             width="100%"
-            wordBreak="break-word" // Ensures words wrap properly
-            whiteSpace="pre-wrap" // Preserves line breaks
+            wordBreak="break-word"
+            whiteSpace="pre-wrap"
             p="2"
             borderRadius="md"
             mb="1"
             bg="gray.700"
         >
-            {isAccepted && <div>Match Accepted</div>}
-            {isDeclined && <div>Match Declined</div>}
-            {!isAccepted && !isDeclined && (
+            {message.accepted && <div>Match Accepted</div>}
+            {message.declined && <div>Match Declined</div>}
+            {!message.declined && !message.accepted && (
                 <>
                     <Text fontWeight="bold" color="blue.400">
                         {message.sender}
@@ -40,8 +42,11 @@ export default function UserChallengeMessage({ message }) {
                                     const caller = callData.find(
                                         (call) => call.callerId === message.sender
                                     )
-                                    console.log(message)
-                                    // setIsInMatch(true)
+                                    const updatedMessage = {
+                                        ...message,
+                                        accepted: true,
+                                    }
+                                    updateMessage(updatedMessage)
                                     window.api.answerCall(caller)
                                 }}
                             >
@@ -49,14 +54,19 @@ export default function UserChallengeMessage({ message }) {
                             </Button>
                             <Button
                                 onClick={() => {
-                                    setIsDeclined(true)
-                                    console.log('accepting match')
-                                    const caller = callData.find(
+                                    // remove the call from the call list
+                                    const callToRemove = callData.find(
                                         (call) => call.callerId === message.sender
                                     )
-                                    window.api.declineCall(caller)
-                                    console.log(caller)
-                                    removeCallData(caller.callerId)
+                                    removeCallData(callToRemove)
+                                    // set visual state for declining cal
+                                    setIsDeclined(true)
+                                    window.api.declineCall(callToRemove)
+                                    const updatedMessage = {
+                                        ...message,
+                                        declined: true,
+                                    }
+                                    updateMessage(updatedMessage)
                                 }}
                             >
                                 Decline

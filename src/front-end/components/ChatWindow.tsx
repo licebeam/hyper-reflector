@@ -18,7 +18,14 @@ export default function ChatWindow() {
     }
 
     const handleRoomMessage = (messageObject) => {
-        pushMessage({ sender: messageObject.sender, message: messageObject.message })
+        pushMessage({
+            sender: messageObject.sender,
+            message: messageObject.message,
+            type: messageObject.type || null,
+            declined: false,
+            accepted: false,
+            id: Date.now(), // TODO this is not a long lasting solution
+        })
     }
 
     // get message from websockets

@@ -91,7 +91,6 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
 }
 
 function closePeerConnection(userId: string) {
-    console.log(peerConnections)
     if (peerConnections[userId]) {
         console.log(`closing peer connection with ${userId}`)
         peerConnections[userId].getSenders().forEach((sender) => {
@@ -103,13 +102,11 @@ function closePeerConnection(userId: string) {
 }
 
 function resetState() {
-    console.log('resetting renderer state for peer connection')
     candidateList = []
     callerIdState = null
     myUID = null
     userName = null
     opponentUID = null
-    console.log('opponentUID reset =  ', opponentUID)
 }
 
 function setupLogging(peer, userLabel, event) {

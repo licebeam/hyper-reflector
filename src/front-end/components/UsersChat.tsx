@@ -87,9 +87,5 @@ export default function UsersChat() {
         })
     }
 
-    return (
-        <>
-            {isLoggedIn && <Stack gap='8px'>{renderUsers()}</Stack>}
-        </>
-    )
+    return <>{isLoggedIn && <Stack gap="8px">{renderUsers()}</Stack>}</>
 }

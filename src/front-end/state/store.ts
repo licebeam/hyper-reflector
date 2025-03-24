@@ -20,6 +20,17 @@ export const useLoginStore = create((set) => ({
 export const useMessageStore = create((set) => ({
     // room messages
     messageState: [],
+    updateMessage: (message) =>
+        set((state) => ({
+            messageState: [
+                ...state.messageState.map((msg) => {
+                    if (msg.id === message.id) {
+                        return message
+                    }
+                    return msg
+                }),
+            ],
+        })),
     pushMessage: (message) => set((state) => ({ messageState: [...state.messageState, message] })),
     clearMessageState: () => set((state) => ({ messageState: [] })),
     //room users
@@ -34,9 +45,9 @@ export const useMessageStore = create((set) => ({
     //matchmaking
     callData: [],
     setCallData: (call) => set((state) => ({ callData: [...state.callData, call] })),
-    removeCallData: (caller) =>
+    removeCallData: (callRef) =>
         set((state) => ({
-            callData: [...state.callData.filter((call) => call.callerId !== caller.callerId)],
+            callData: [...state.callData.filter((call) => call.callerId !== callRef.callerId)],
         })),
     clearCallData: (call) => set((state) => ({ callData: [] })),
 }))

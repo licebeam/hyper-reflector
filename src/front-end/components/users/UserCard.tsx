@@ -51,6 +51,7 @@ export default function UserCard({ user }) {
         console.log('we declined a call')
         setIsUserChallenging(false)
         setIsInMatch(false)
+        clearCallData()
     }
 
     useEffect(() => {

@@ -699,6 +699,14 @@ const createWindow = () => {
 
     ipcMain.on('receivedCall', (event, data) => {
         mainWindow.webContents.send('receivedCall', data)
+        mainWindow.webContents.send('sendRoomMessage', {
+            sender: data.callerId,
+            message: 'got a challenge',
+            type: 'challenge',
+            declined: false,
+            accepted: false,
+            id: Date.now(), // TODO this is not a long lasting solution
+        })
     })
 
     // and load the index.html of the app.
