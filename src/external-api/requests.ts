@@ -1,8 +1,8 @@
 import keys from '../private/keys'
 import { firebaseConfig } from '../private/firebase'
 
-const SERVER = keys.COTURN_IP
-// const SERVER = '127.0.0.1' // -- used for testing the backend locally
+// const SERVER = keys.COTURN_IP
+const SERVER = '127.0.0.1' // -- used for testing the backend locally
 
 function checkCurrentAuthState(auth) {
     if (auth.currentUser != null) {
@@ -284,7 +284,7 @@ async function uploadMatchData(auth, matchData) {
     }
 }
 
-async function getUserMatches(auth, userId, lastMatchId = null) {
+async function getUserMatches(auth, userId, lastMatchId = null, firstMatchId = null) {
     console.log('last match', lastMatchId)
     if (checkCurrentAuthState(auth)) {
         const idToken = await auth.currentUser.getIdToken().then((res) => res)
@@ -298,6 +298,7 @@ async function getUserMatches(auth, userId, lastMatchId = null) {
                     idToken: idToken || 'not real',
                     lastMatchId,
                     userUID: userId,
+                    firstMatchId,
                 }),
             })
 

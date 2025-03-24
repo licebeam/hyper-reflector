@@ -27,34 +27,36 @@ import {
 } from '../components/chakra/ui/select'
 import { Field } from '../components/chakra/ui/field'
 import { useLoginStore } from '../state/store'
+import { FormatSelect } from 'node_modules/@chakra-ui/react/dist/types/components/color-picker/namespace'
 
 export default function PlayerProfilePage() {
     const { userId } = useParams({ strict: false })
-    console.log('got user id, ', userId)
     const userState = useLoginStore((state) => state.userState)
     const [isLoading, setIsLoading] = useState(true)
     const [recentMatches, setRecentMatches] = useState([])
     const [userData, setUserData] = useState([])
     const [lastMatch, setLastMatch] = useState(null)
+    const [firstMatch, setFirstMatch] = useState(null)
     const [pageNumber, setPageNumber] = useState(1)
     const [pageCount, setPageCount] = useState(null)
+    const [isBack, setIsBack] = useState(false)
     const [matchTotal, setMatchTotal] = useState(undefined)
 
     const handleSetRecentMatches = (matchData) => {
-        const { matches, lastVisible, totalMatches } = matchData
+        // console.log(matchData)
+        const { matches, lastVisible, totalMatches, firstVisible } = matchData
         // only set this once
         if (!matchTotal) {
             setMatchTotal(totalMatches)
             setPageCount(Math.ceil(totalMatches / 10))
         }
-
+        setFirstMatch(firstVisible)
         setLastMatch(lastVisible)
         setRecentMatches(matches)
         setIsLoading(false)
     }
 
     const handleSetUserData = (data) => {
-        console.log('USER DATA-------------', data)
         setUserData(data)
     }
 
@@ -69,7 +71,13 @@ export default function PlayerProfilePage() {
     }, [])
 
     useEffect(() => {
-        window.api.getUserMatches({ userId, lastMatchId: lastMatch })
+        if (isBack) {
+            window.api.getUserMatches({ userId, firstMatchId: firstMatch })
+            setIsBack(false)
+        } else {
+            setIsBack(false)
+            window.api.getUserMatches({ userId, lastMatchId: lastMatch })
+        }
     }, [pageNumber])
 
     useEffect(() => {
@@ -142,9 +150,10 @@ export default function PlayerProfilePage() {
                                 defaultPage={1}
                                 onPageChange={(event) => {
                                     setIsLoading(true)
-                                    console.log(event)
-                                    if (event.page === 1) {
+                                    if (event.page <= 1) {
                                         setLastMatch(null)
+                                    } else if (pageNumber > event.page) {
+                                        setIsBack(true)
                                     }
                                     setPageNumber(event.page)
                                 }}

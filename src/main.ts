@@ -121,6 +121,8 @@ const createWindow = () => {
             await dialog
                 .showOpenDialog({ properties: ['openFile', 'openDirectory'] })
                 .then((res) => {
+                    if (res.canceled || !res.filePaths.length) return
+                    console.log('response', res)
                     try {
                         const filePath = path.join(filePathBase, 'config.txt')
                         mainWindow.webContents.send(
@@ -670,9 +672,9 @@ const createWindow = () => {
         mainWindow.webContents.send('user-account-changed', complete)
     })
 
-    ipcMain.on('getUserMatches', async (event, { userId, lastMatchId }) => {
+    ipcMain.on('getUserMatches', async (event, { userId, lastMatchId, firstMatchId }) => {
         const setOfMatchesPaginated = await api
-            .getUserMatches(auth, userId, lastMatchId)
+            .getUserMatches(auth, userId, lastMatchId, firstMatchId)
             .catch((err) => console.log(err))
 
         mainWindow.webContents.send('getUserMatches', setOfMatchesPaginated)
@@ -770,16 +772,16 @@ async function handleReadAndUploadMatch() {
     const data = await readCommand()
     if (data && data.length) {
         //send match data to back end
-        // console.log('data', data)
+        console.log('we got some match data, sending it to the BE')
         const matchData = {
             matchData: {
-                raw: 'data', // uncomment me
+                raw: data, // uncomment me
             },
             matchId: 'test-id', // we should generate this on the BE
             player1: lastKnownPlayerSlot == 0 ? userUID : opponentUID || 'fake-user',
             player2: lastKnownPlayerSlot == 1 ? userUID : opponentUID || 'fake-user',
         }
-        api.uploadMatchData(auth, matchData)
+        await api.uploadMatchData(auth, matchData)
     }
 }
 
