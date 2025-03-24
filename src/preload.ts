@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
     // user profile
     getUserMatches: (matches: any) => ipcRenderer.send('getUserMatches', matches),
     getUserData: (user: any) => ipcRenderer.send('getUserData', user),
+    changeUserData: (userData: any) => ipcRenderer.send('changeUserData', userData),
     // match
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),

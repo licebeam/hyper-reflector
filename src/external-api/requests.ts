@@ -106,18 +106,19 @@ async function removeLoggedInUser(auth) {
     }
 }
 
-async function updateUserData(auth, name) {
+async function updateUserData(auth, userData) {
     if (checkCurrentAuthState(auth)) {
         const idToken = await auth.currentUser.getIdToken().then((res) => res)
         try {
-            fetch(`http://${SERVER}:${keys.API_PORT}/change-name`, {
+            console.log('trying to update')
+            fetch(`http://${SERVER}:${keys.API_PORT}/update-user-data`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     idToken: idToken || 'not real',
-                    userName: name,
+                    userData,
                 }),
             })
         } catch (error) {
@@ -303,6 +304,7 @@ async function getUserMatches(auth, userId, lastMatchId = null, firstMatchId = n
             })
 
             if (!response.ok) {
+                console.log(response)
                 return false
             }
 

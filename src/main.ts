@@ -667,9 +667,11 @@ const createWindow = () => {
     })
 
     // PROFILE RELATED IPC CALLS
-    ipcMain.on('changeUserData', async (event, name) => {
-        const complete = await api.updateUserData(auth, name).catch((err) => console.log(err))
-        mainWindow.webContents.send('user-account-changed', complete)
+    ipcMain.on('changeUserData', async (event, userData) => {
+        console.log('trying to change user data', userData)
+        const complete = await api.updateUserData(auth, userData).catch((err) => console.log(err))
+        console.log('data from api', complete)
+        // mainWindow.webContents.send('user-account-changed', complete)
     })
 
     ipcMain.on('getUserMatches', async (event, { userId, lastMatchId, firstMatchId }) => {

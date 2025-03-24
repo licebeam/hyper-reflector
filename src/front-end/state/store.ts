@@ -15,6 +15,10 @@ export const useLoginStore = create((set) => ({
     failedLogin: () => set({ isLoggedIn: false }),
     loggedOut: () => set({ isLoggedIn: false }),
     setUserState: (data) => set({ userState: data }),
+    updateUserState: (data) =>
+        set((state) => ({
+            userState: { ...state.userState, ...data },
+        })),
 }))
 
 export const useMessageStore = create((set) => ({

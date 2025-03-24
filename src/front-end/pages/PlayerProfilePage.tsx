@@ -16,8 +16,9 @@ import {
     Card,
     Pagination,
     Skeleton,
+    Editable,
 } from '@chakra-ui/react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Pencil, X } from 'lucide-react'
 import {
     SelectContent,
     SelectItem,
@@ -27,11 +28,13 @@ import {
 } from '../components/chakra/ui/select'
 import { Field } from '../components/chakra/ui/field'
 import { useLoginStore } from '../state/store'
-import { FormatSelect } from 'node_modules/@chakra-ui/react/dist/types/components/color-picker/namespace'
 
 export default function PlayerProfilePage() {
     const { userId } = useParams({ strict: false })
+    const [editedUserName, setEditedUserName] = useState(undefined)
+    const [isEditName, setIsEditName] = useState(false)
     const userState = useLoginStore((state) => state.userState)
+    const updateUserState = useLoginStore((state) => state.updateUserState)
     const [isLoading, setIsLoading] = useState(true)
     const [recentMatches, setRecentMatches] = useState([])
     const [userData, setUserData] = useState([])
@@ -57,7 +60,9 @@ export default function PlayerProfilePage() {
     }
 
     const handleSetUserData = (data) => {
+        console.log(data)
         setUserData(data)
+        setEditedUserName(data.userName)
     }
 
     useEffect(() => {
@@ -129,11 +134,53 @@ export default function PlayerProfilePage() {
 
     return (
         <Stack minH="100%">
-            <Heading flex="0" size="lg" color="red.500">
-                {userState.name}
-            </Heading>
-            {/* <Box>{userId}</Box> */}
-            <Stack>
+            <Editable.Root
+                defaultValue={userData?.userName}
+                maxLength={16}
+                onEditChange={(e) => setIsEditName(e.edit)}
+                onValueCommit={(e) => {
+                    setEditedUserName(e.value)
+                    updateUserState({ name: e.value })
+                    window.api.changeUserData({ userName: e.value })
+                }}
+                onValueChange={(e) => setEditedUserName(e.value)}
+                onValueRevert={(e) => {
+                    setEditedUserName(e.value)
+                    updateUserState({ name: e.value })
+                }}
+                value={editedUserName}
+                invalid={editedUserName && editedUserName.length <= 1}
+            >
+                {!isEditName && (
+                    <Heading flex="1" size="lg" color="red.500" width="100px" height="36px">
+                        {editedUserName || userData?.userName || 'Unknown User'}
+                    </Heading>
+                )}
+
+                <Editable.Input id="test" bg="gray.200" height="36px" value={editedUserName} />
+
+                <Editable.Control>
+                    <Editable.EditTrigger asChild>
+                        <IconButton variant="ghost" size="xs" color="red.500">
+                            <Pencil />
+                        </IconButton>
+                    </Editable.EditTrigger>
+                    <Editable.CancelTrigger asChild>
+                        <IconButton variant="outline" size="xs" color="red.500">
+                            <X />
+                        </IconButton>
+                    </Editable.CancelTrigger>
+                    <Editable.SubmitTrigger asChild>
+                        <IconButton variant="outline" size="xs" color="red.500">
+                            <Check />
+                        </IconButton>
+                    </Editable.SubmitTrigger>
+                </Editable.Control>
+            </Editable.Root>
+            <Text textStyle="xs" color="gray.500">
+                Profile changes are not visible to others until the next time you log in.
+            </Text>
+            <Stack padding="24px">
                 <Stack>
                     <Heading flex="0" size="md" color="gray.200">
                         Recent Matches
