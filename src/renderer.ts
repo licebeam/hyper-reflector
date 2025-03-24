@@ -91,7 +91,6 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
 }
 
 function closePeerConnection(userId: string) {
-    console.log(peerConnections)
     if (peerConnections[userId]) {
         console.log(`closing peer connection with ${userId}`)
         peerConnections[userId].getSenders().forEach((sender) => {
@@ -103,13 +102,11 @@ function closePeerConnection(userId: string) {
 }
 
 function resetState() {
-    console.log('resetting renderer state for peer connection')
     candidateList = []
     callerIdState = null
     myUID = null
     userName = null
     opponentUID = null
-    console.log('opponentUID reset =  ', opponentUID)
 }
 
 function setupLogging(peer, userLabel, event) {
@@ -255,6 +252,23 @@ function connectWebSocket(user) {
         }
     )
 
+    window.api.on(
+        'declineCall',
+        async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
+            console.log('declining call')
+            await signalServerSocket.send(
+                JSON.stringify({
+                    type: 'declineCall',
+                    data: {
+                        callerId,
+                        answererId,
+                    },
+                })
+            )
+            await closePeerConnection(callerId) // close the peer connection when we decline
+        }
+    )
+
     // allow users to chat
     window.api.on('sendMessage', (text: string) => {
         console.log(JSON.stringify(candidateList))
@@ -350,6 +364,11 @@ function connectWebSocket(user) {
             )
             playerNum = 0 // if our call is answered we are always player 0
             window.api.startGameOnline(opponentUID, playerNum)
+        }
+
+        if (data.type === 'callDeclined') {
+            closePeerConnection(data.data.answererId)
+            window.api.callDeclined(data.data.answererId)
         }
 
         if (data.type === 'iceCandidate') {

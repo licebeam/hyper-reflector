@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Flex, Stack, Tabs, Box } from '@chakra-ui/react'
+import { Flex, Stack, Tabs, Box, Text } from '@chakra-ui/react'
 import { useNavigate } from '@tanstack/react-router'
-import { useLoginStore, useMessageStore } from '../state/store'
+import { useLayoutStore, useLoginStore, useMessageStore } from '../state/store'
 
 export default function Layout({ children }) {
-    const [currentTab, setCurrentTab] = useState<string>('login')
     const [isLoading, setIsLoading] = useState(false)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const setUserState = useLoginStore((state) => state.setUserState)
+    const user = useLoginStore((state) => state.userState)
     const loggedOut = useLoginStore((state) => state.loggedOut)
     const clearMessageState = useMessageStore((state) => state.clearMessageState)
     const clearUserList = useMessageStore((state) => state.clearUserList)
+    const layoutTab = useLayoutStore((state) => state.selectedTab)
+    const setLayoutTab = useLayoutStore((state) => state.setSelectedTab)
 
     const navigate = useNavigate()
 
@@ -29,10 +31,10 @@ export default function Layout({ children }) {
     useEffect(() => {
         if (isLoggedIn) {
             // user logged in
-            setCurrentTab('chat')
+            setLayoutTab('chat')
         } else {
             // user logged out
-            setCurrentTab('login')
+            setLayoutTab('login')
         }
     }, [isLoggedIn])
 
@@ -43,28 +45,32 @@ export default function Layout({ children }) {
                 display="flex"
                 justifyContent="space-between"
                 alignItems="center"
-                bg="gray.200"
+                bg="gray.700"
                 px="4"
                 flexShrink={0}
             >
-                <Tabs.Root variant="plain" value={currentTab}>
-                    <Tabs.List bg="bg.muted" rounded="l3" p="1">
+                <Tabs.Root variant="enclosed" value={layoutTab}>
+                    <Tabs.List bg="gray.700" rounded="l3" p="1">
                         {!isLoggedIn && (
                             <Tabs.Trigger
+                                _selected={{ bg: 'red.500' }}
+                                color="gray.100"
                                 value="login"
                                 onClick={() => {
                                     navigate({ to: '/' })
-                                    setCurrentTab('login')
+                                    setLayoutTab('login')
                                 }}
                             >
                                 Sign In
                             </Tabs.Trigger>
                         )}
                         <Tabs.Trigger
+                            _selected={{ bg: 'red.500' }}
+                            color="gray.100"
                             value="news"
                             onClick={() => {
                                 navigate({ to: '/news' })
-                                setCurrentTab('news')
+                                setLayoutTab('news')
                             }}
                         >
                             News
@@ -72,19 +78,23 @@ export default function Layout({ children }) {
                         {isLoggedIn && (
                             <>
                                 <Tabs.Trigger
+                                    _selected={{ bg: 'red.500' }}
+                                    color="gray.100"
                                     value="chat"
                                     onClick={() => {
                                         navigate({ to: '/chat' })
-                                        setCurrentTab('chat')
+                                        setLayoutTab('chat')
                                     }}
                                 >
                                     Chat
                                 </Tabs.Trigger>
                                 <Tabs.Trigger
+                                    _selected={{ bg: 'red.500' }}
+                                    color="gray.100"
                                     value="profile"
                                     onClick={() => {
-                                        navigate({ to: '/profile' })
-                                        setCurrentTab('profile')
+                                        navigate({ to: `/profile/${user.uid}` })
+                                        setLayoutTab('profile')
                                     }}
                                 >
                                     Profile
@@ -92,19 +102,23 @@ export default function Layout({ children }) {
                             </>
                         )}
                         <Tabs.Trigger
+                            _selected={{ bg: 'red.500' }}
+                            color="gray.100"
                             value="offline"
                             onClick={() => {
                                 navigate({ to: '/offline' })
-                                setCurrentTab('offline')
+                                setLayoutTab('offline')
                             }}
                         >
                             Play Offline
                         </Tabs.Trigger>
                         <Tabs.Trigger
+                            _selected={{ bg: 'red.500' }}
+                            color="gray.100"
                             value="settings"
                             onClick={() => {
                                 navigate({ to: '/settings' })
-                                setCurrentTab('settings')
+                                setLayoutTab('settings')
                             }}
                         >
                             Settings
@@ -123,12 +137,16 @@ export default function Layout({ children }) {
                 display="flex"
                 justifyContent="space-between"
                 alignItems="center"
-                bg="gray.200"
+                bg="gray.700"
                 px="4"
                 flexShrink={0}
             >
-                <div style={{ fontSize: '0.8rem' }}>https://discord.gg/T77dSXG7Re</div>
-                <div style={{ fontSize: '0.8rem' }}>Hyper Reflector version 0.1.8a 2025</div>
+                <Text textStyle="xs" color="red.400">
+                    https://discord.gg/T77dSXG7Re
+                </Text>
+                <Text textStyle="xs" color="red.400">
+                    Hyper Reflector version 0.1.9a 2025
+                </Text>
             </Box>
         </Stack>
     )

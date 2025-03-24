@@ -1,5 +1,13 @@
 import { create } from 'zustand'
 
+export const useLayoutStore = create((set) => ({
+    selectedTab: 'login',
+    setSelectedTab: (tab: string) =>
+        set({
+            selectedTab: tab,
+        }),
+}))
+
 export const useLoginStore = create((set) => ({
     userState: { email: '' },
     isLoggedIn: false,
@@ -7,11 +15,26 @@ export const useLoginStore = create((set) => ({
     failedLogin: () => set({ isLoggedIn: false }),
     loggedOut: () => set({ isLoggedIn: false }),
     setUserState: (data) => set({ userState: data }),
+    updateUserState: (data) =>
+        set((state) => ({
+            userState: { ...state.userState, ...data },
+        })),
 }))
 
 export const useMessageStore = create((set) => ({
     // room messages
     messageState: [],
+    updateMessage: (message) =>
+        set((state) => ({
+            messageState: [
+                ...state.messageState.map((msg) => {
+                    if (msg.id === message.id) {
+                        return message
+                    }
+                    return msg
+                }),
+            ],
+        })),
     pushMessage: (message) => set((state) => ({ messageState: [...state.messageState, message] })),
     clearMessageState: () => set((state) => ({ messageState: [] })),
     //room users
@@ -26,7 +49,9 @@ export const useMessageStore = create((set) => ({
     //matchmaking
     callData: [],
     setCallData: (call) => set((state) => ({ callData: [...state.callData, call] })),
-    removeCallData: (caller) =>
-        set((state) => ({ callData: [...state.callData.filter((call) => call.callerId !== caller.callerId)] })),
+    removeCallData: (callRef) =>
+        set((state) => ({
+            callData: [...state.callData.filter((call) => call.callerId !== callRef.callerId)],
+        })),
     clearCallData: (call) => set((state) => ({ callData: [] })),
 }))

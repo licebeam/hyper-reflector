@@ -26,15 +26,21 @@ export default function OfflinePage() {
     return (
         <Stack gap={8}>
             <Stack>
-                <Heading size="md">Play Offline</Heading>
-                <Button onClick={() => window.api.startSoloTraining()}>Training Mode</Button>
+                <Heading size="md" color="gray.200">
+                    Play Offline
+                </Heading>
+                <Button bg="blue.500" onClick={() => window.api.startSoloTraining()}>
+                    Training Mode
+                </Button>
             </Stack>
             <Stack>
-                <Heading size="sm">Manual Connection</Heading>
-                <Text textStyle="xs">
+                <Heading size="sm" color="gray.200">
+                    Manual Connection
+                </Heading>
+                <Text textStyle="xs" color="gray.300">
                     Used for bypassing the online server and playing with someone directly.
                 </Text>
-                <Text textStyle="xs">
+                <Text textStyle="xs" color="gray.300">
                     Make sure both players create a long 8 digit code to connect to eachother. This
                     is an early feature, so there are bound to be issues.
                 </Text>
@@ -42,8 +48,10 @@ export default function OfflinePage() {
                     <Field
                         label="Player"
                         helperText="The side you wish to play on, both users must be on opposite sides."
+                        color="gray.300"
                     >
                         <SelectRoot
+                            color="blue.400"
                             collection={players}
                             value={[player]}
                             onValueChange={(e) => setPlayer(e.value[0])}
@@ -63,8 +71,11 @@ export default function OfflinePage() {
                     <Field
                         label="Player Code"
                         helperText="Send this to your opponent, atleast 8 characters"
+                        color="gray.300"
                     >
                         <Input
+                            bg="gray.200"
+                            color="gray.900"
                             min={8}
                             max={16}
                             type="text"
@@ -76,8 +87,11 @@ export default function OfflinePage() {
                     <Field
                         label="Opponent Code"
                         helperText="The Code of your opponent, atleast 8 characters"
+                        color="gray.300"
                     >
                         <Input
+                            bg="gray.200"
+                            color="gray.900"
                             min={8}
                             max={16}
                             type="text"
@@ -97,6 +111,7 @@ export default function OfflinePage() {
                         />
                     </Field> */}
                     <Button
+                        bg="blue.500"
                         disabled={opponentPort.length < 8 || !player || myPort.length < 8}
                         alignSelf="center"
                         onClick={() => {

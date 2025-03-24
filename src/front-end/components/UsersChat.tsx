@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
+import { Button, Stack, Input, Flex, Box, Avatar, AvatarGroup, Card } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
-import UserButton from './chat/UserButton'
+import UserCard from './users/UserCard'
 
 export default function UsersChat() {
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
@@ -16,7 +17,6 @@ export default function UsersChat() {
     // user has joined lobby
     const handleUserJoinGroup = (users) => {
         clearUserList()
-        console.log('setting list to : ', users)
         // sets the list of users from the websocket server
         setUsersList(users)
     }
@@ -34,7 +34,6 @@ export default function UsersChat() {
     const handleReceiveCall = (data) => {
         console.log('RECIEVED CALL')
         if (!callData.find((c) => c.callerId === data.callerId)) {
-            console.log('no user found, adding to call')
             setCallData(data)
         }
     }
@@ -73,20 +72,13 @@ export default function UsersChat() {
         }
     }, [])
 
-    useEffect(() => {
-        console.log('users updated', userList)
-    }, [userList])
-
     const renderUsers = () => {
         return userList.map((user, index) => {
             var timestamp = new Date()
-            return <UserButton key={index + timestamp + user.uid} user={user} />
+            const isMe = user.uid === userState.uid
+            return <UserCard key={index + timestamp + user.uid} user={isMe ? userState : user} />
         })
     }
 
-    return (
-        <div style={{ display: 'flex', overflowY: 'auto' }}>
-            {isLoggedIn && <div>{renderUsers()}</div>}
-        </div>
-    )
+    return <>{isLoggedIn && <Stack gap="8px">{renderUsers()}</Stack>}</>
 }
