@@ -2,7 +2,6 @@ import { useRef, useEffect, useState } from 'react'
 import { Stack, Box } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
 import UserChallengeMessage from './chat/UserChallengeMessage'
-import { Howl } from 'howler'
 
 import soundBase64Data from './sound/challenge.wav'
 
@@ -10,10 +9,8 @@ export default function ChatWindow() {
     const messageState = useMessageStore((state) => state.messageState)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const pushMessage = useMessageStore((state) => state.pushMessage)
-    const [sound, setSound] = useState(null)
-
-    const callData = useMessageStore((state) => state.callData)
-    const clearCallData = useMessageStore((state) => state.clearCallData)
+    const userState = useLoginStore((state) => state.userState)
+    const updateUserState = useLoginStore((state) => state.updateUserState)
 
     const chatEndRef = useRef<null | HTMLDivElement>(null)
 
@@ -22,7 +19,7 @@ export default function ChatWindow() {
     }
 
     const handleRoomMessage = (messageObject) => {
-        if (messageObject.type === 'challenge') {
+        if (messageObject.type === 'challenge' && !userState.isFighting) {
             new Audio(soundBase64Data).play() // this line for renderer process only
         }
         pushMessage({
@@ -35,12 +32,21 @@ export default function ChatWindow() {
         })
     }
 
+    // const handleEndMatch = () => {
+    //     updateUserState({ isFighting: false })
+    // }
+
     // get message from websockets
     useEffect(() => {
         window.api.removeAllListeners('sendRoomMessage', handleRoomMessage)
         window.api.on('sendRoomMessage', handleRoomMessage)
+
+        // window.api.removeAllListeners('endMatch', handleEndMatch)
+        // window.api.on('endMatch', handleEndMatch)
+
         return () => {
             window.api.removeListener('sendRoomMessage', handleRoomMessage)
+            // window.api.removeListener('endMatch', handleEndMatch)
         }
     }, [])
 

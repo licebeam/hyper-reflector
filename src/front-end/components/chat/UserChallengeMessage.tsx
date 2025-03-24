@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { Flex, Stack, Tabs, Box, Text, Button } from '@chakra-ui/react'
-import { useMessageStore } from '../../state/store'
+import { useMessageStore, useLoginStore } from '../../state/store'
 
 export default function UserChallengeMessage({ message }) {
     // console.log('message', message)
@@ -10,6 +10,7 @@ export default function UserChallengeMessage({ message }) {
     const removeCallData = useMessageStore((state) => state.removeCallData)
     const updateMessage = useMessageStore((state) => state.updateMessage)
     const userList = useMessageStore((state) => state.userList)
+    const updateUserState = useLoginStore((state) => state.updateUserState)
 
     var timestamp = new Date()
     console.log('message', message)
@@ -50,6 +51,7 @@ export default function UserChallengeMessage({ message }) {
                                     }
                                     updateMessage(updatedMessage)
                                     window.api.answerCall(caller)
+                                    updateUserState({ isFighting: true })
                                 }}
                             >
                                 Accept
@@ -69,6 +71,7 @@ export default function UserChallengeMessage({ message }) {
                                         declined: true,
                                     }
                                     updateMessage(updatedMessage)
+                                    updateUserState({ isFighting: true })
                                 }}
                             >
                                 Decline

@@ -24,6 +24,7 @@ export default function UserCard({ user }) {
     const [isInMatch, setIsInMatch] = useState(false)
     const [isUserChallenging, setIsUserChallenging] = useState(false)
     const userState = useLoginStore((state) => state.userState)
+    const updateUserState = useLoginStore((state) => state.updateUserState)
     const callData = useMessageStore((state) => state.callData)
     const removeCallData = useMessageStore((state) => state.removeCallData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
@@ -33,18 +34,16 @@ export default function UserCard({ user }) {
 
     useEffect(() => {
         setIsUserChallenging((prevState) => {
-            console.log('user is challenging some how')
             const found = callData.some((call) => call.callerId === user.uid)
-            console.log(found ? 'Found USER in call' : 'Did not find user in call')
             return found // This ensures the state is always updated properly
         })
     }, [callData, user.uid])
 
     const handleEndMatch = () => {
+        updateUserState({ isFighting: false })
         setTimeout(() => {
             setIsInMatch(false)
             clearCallData()
-            console.log('match ended----------------------------')
         }, 2000)
     }
 
