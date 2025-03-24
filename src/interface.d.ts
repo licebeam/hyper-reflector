@@ -4,6 +4,8 @@ export interface IElectronAPI {
     sendIceCandidate: any
     callUser: any
     answerCall: any
+    declineCall: any
+    callDeclined: any
     receivedCall: any
     // server and online
     loginUser: any

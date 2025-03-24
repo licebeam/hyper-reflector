@@ -19,6 +19,8 @@ export default function ChatBar() {
             {isLoggedIn && (
                 <Flex gap="12px" padding="8px">
                     <Input
+                        bg="gray.100"
+                        color="gray.900"
                         placeholder="Type a message!"
                         maxW="300px"
                         autoFocus
@@ -31,7 +33,12 @@ export default function ChatBar() {
                             }
                         }}
                     />
-                    <Button id="message-send-btn" onClick={sendMessage}>
+                    <Button
+                        id="message-send-btn"
+                        onClick={sendMessage}
+                        bg="gray.700"
+                        color="red.500"
+                    >
                         <Send />
                     </Button>
                 </Flex>

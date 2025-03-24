@@ -86,7 +86,6 @@ export function startPlayingOnline({
     switch (process.platform) {
         case 'darwin':
             return launchGGPOSpawn(directCommand, callBack)
-        // return launchGGPOSpawn(directCommand, () => {})
         case 'linux':
             return launchGGPOSpawn(directCommand, callBack)
         default:

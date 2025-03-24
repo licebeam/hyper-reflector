@@ -106,20 +106,49 @@ async function removeLoggedInUser(auth) {
     }
 }
 
-async function changeUserName(auth, name) {
+async function updateUserData(auth, userData) {
     if (checkCurrentAuthState(auth)) {
         const idToken = await auth.currentUser.getIdToken().then((res) => res)
         try {
-            fetch(`http://${SERVER}:${keys.API_PORT}/change-name`, {
+            console.log('trying to update')
+            fetch(`http://${SERVER}:${keys.API_PORT}/update-user-data`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
                     idToken: idToken || 'not real',
-                    userName: name,
+                    userData,
                 }),
             })
+        } catch (error) {
+            console.log(error)
+            console.error(error.message)
+        }
+    }
+}
+
+async function getUserData(auth, userId) {
+    if (checkCurrentAuthState(auth)) {
+        const idToken = await auth.currentUser.getIdToken().then((res) => res)
+        try {
+            const response = await fetch(`http://${SERVER}:${keys.API_PORT}/get-user-data`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken: idToken || 'not real',
+                    userUID: userId,
+                }),
+            })
+
+            if (!response.ok) {
+                return false
+            }
+
+            const data = await response.json()
+            return data
         } catch (error) {
             console.log(error)
             console.error(error.message)
@@ -256,7 +285,8 @@ async function uploadMatchData(auth, matchData) {
     }
 }
 
-async function getUserMatches(auth) {
+async function getUserMatches(auth, userId, lastMatchId = null, firstMatchId = null) {
+    console.log('last match', lastMatchId)
     if (checkCurrentAuthState(auth)) {
         const idToken = await auth.currentUser.getIdToken().then((res) => res)
         try {
@@ -267,10 +297,14 @@ async function getUserMatches(auth) {
                 },
                 body: JSON.stringify({
                     idToken: idToken || 'not real',
+                    lastMatchId,
+                    userUID: userId,
+                    firstMatchId,
                 }),
             })
 
             if (!response.ok) {
+                console.log(response)
                 return false
             }
 
@@ -291,9 +325,10 @@ export default {
     autoLogin,
     getCustomToken,
     //profile
-    changeUserName,
+    updateUserData,
     createAccount,
     getUserByAuth,
+    getUserData,
     //matches
     uploadMatchData,
     getUserMatches,

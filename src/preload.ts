@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.send('iceCandidate', data),
     callUser: (data: { callerId: string; calleeId: string }) => ipcRenderer.send('callUser', data),
     answerCall: (data: { callerId: string; answer: any }) => ipcRenderer.send('answerCall', data),
+    declineCall: (data: { callerId: string }) => ipcRenderer.send('declineCall', data),
+    callDeclined: (data: { callerId: string }) => ipcRenderer.send('callDeclined', data),
     receivedCall: (data: { callerId: string; answer: any }) =>
         ipcRenderer.send('receivedCall', data),
     // server and online
@@ -25,6 +27,8 @@ contextBridge.exposeInMainWorld('api', {
     sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
     // user profile
     getUserMatches: (matches: any) => ipcRenderer.send('getUserMatches', matches),
+    getUserData: (user: any) => ipcRenderer.send('getUserData', user),
+    changeUserData: (userData: any) => ipcRenderer.send('changeUserData', userData),
     // match
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),

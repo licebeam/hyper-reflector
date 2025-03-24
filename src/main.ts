@@ -20,8 +20,6 @@ let emuListener = null
 let opponentUID = null
 let lastKnownPlayerSlot = 0 // this is the player 1 or player 2 reference, used for tracking matches.
 
-//
-
 // - FIREBASE AUTH CODE - easy peasy
 import { initializeApp } from 'firebase/app'
 import {
@@ -50,6 +48,19 @@ let userUID: string | null = null
 let filePathBase = process.resourcesPath
 const tokenFilePath = path.join(app.getPath('userData'), 'auth_token.json')
 
+const getLoginObject = (user: any) => {
+    // TODO make a
+    console.log(user)
+    return {
+        name: user.userName,
+        email: user.userEmail,
+        uid: user.uid,
+        elo: user.accountELO || 0,
+        profilePicture: user.profilePicture || 'test',
+        userTitle: user.userTitle || null,
+    }
+}
+
 //handle dev mode toggle for file paths.
 if (isDev) {
     filePathBase = path.join(app.getAppPath(), 'src')
@@ -73,6 +84,7 @@ const createWindow = () => {
     mainWindow = new BrowserWindow({
         width: 1100,
         height: 700,
+        backgroundColor: '#27272a',
         webPreferences: {
             nodeIntegration: true,
             preload: path.join(__dirname, 'preload.js'),
@@ -109,6 +121,8 @@ const createWindow = () => {
             await dialog
                 .showOpenDialog({ properties: ['openFile', 'openDirectory'] })
                 .then((res) => {
+                    if (res.canceled || !res.filePaths.length) return
+                    console.log('response', res)
                     try {
                         const filePath = path.join(filePathBase, 'config.txt')
                         mainWindow.webContents.send(
@@ -271,11 +285,7 @@ const createWindow = () => {
             .catch((err) => console.log('err getting user by auth'))
         if (user) {
             // send our user object to the front end
-            mainWindow.webContents.send('loginSuccess', {
-                name: user.userName,
-                email: user.userEmail,
-                uid: user.uid,
-            })
+            mainWindow.webContents.send('loginSuccess', getLoginObject(user))
             userUID = user.uid
             console.log('user is: ', user)
         }
@@ -657,14 +667,25 @@ const createWindow = () => {
     })
 
     // PROFILE RELATED IPC CALLS
-    ipcMain.on('changeUserName', async (event, name) => {
-        const complete = await api.changeUserName(auth, name).catch((err) => console.log(err))
-        mainWindow.webContents.send('user-name-changed', complete)
+    ipcMain.on('changeUserData', async (event, userData) => {
+        console.log('trying to change user data', userData)
+        const complete = await api.updateUserData(auth, userData).catch((err) => console.log(err))
+        console.log('data from api', complete)
+        // mainWindow.webContents.send('user-account-changed', complete)
     })
 
-    ipcMain.on('getUserMatches', async (event, name) => {
-        const userMatches = await api.getUserMatches(auth).catch((err) => console.log(err))
-        mainWindow.webContents.send('getUserMatches', userMatches)
+    ipcMain.on('getUserMatches', async (event, { userId, lastMatchId, firstMatchId }) => {
+        const setOfMatchesPaginated = await api
+            .getUserMatches(auth, userId, lastMatchId, firstMatchId)
+            .catch((err) => console.log(err))
+
+        mainWindow.webContents.send('getUserMatches', setOfMatchesPaginated)
+    })
+
+    ipcMain.on('getUserData', async (event, userId) => {
+        const userData = await api.getUserData(auth, userId).catch((err) => console.log(err))
+        console.log('user data', userData)
+        mainWindow.webContents.send('getUserData', userData)
     })
 
     // matchmaking
@@ -676,8 +697,26 @@ const createWindow = () => {
         mainWindow.webContents.send('answerCall', { ...data, answererId: userUID })
     })
 
+    ipcMain.on('declineCall', (event, data) => {
+        console.log('call is being declined in main')
+        mainWindow.webContents.send('declineCall', data)
+    })
+
+    ipcMain.on('callDeclined', (event, data) => {
+        console.log('our call was declined')
+        mainWindow.webContents.send('callDeclined', { ...data, answererId: userUID })
+    })
+
     ipcMain.on('receivedCall', (event, data) => {
         mainWindow.webContents.send('receivedCall', data)
+        mainWindow.webContents.send('sendRoomMessage', {
+            sender: data.callerId,
+            message: 'got a challenge',
+            type: 'challenge',
+            declined: false,
+            accepted: false,
+            id: Date.now(), // TODO this is not a long lasting solution
+        })
     })
 
     // and load the index.html of the app.
@@ -731,24 +770,28 @@ ipcMain.on('request-data', (event) => {
     })
 })
 
-// read files
-const readInterval = setInterval(async () => {
-    // currently we aren't really using this polling, but we will eventually need something like this
-    // we also need to set this up so it only works in a match.
+async function handleReadAndUploadMatch() {
     const data = await readCommand()
     if (data && data.length) {
         //send match data to back end
-        // console.log('data', data)
+        console.log('we got some match data, sending it to the BE')
         const matchData = {
             matchData: {
-                raw: data,
+                raw: data, // uncomment me
             },
             matchId: 'test-id', // we should generate this on the BE
             player1: lastKnownPlayerSlot == 0 ? userUID : opponentUID || 'fake-user',
             player2: lastKnownPlayerSlot == 1 ? userUID : opponentUID || 'fake-user',
         }
-        api.uploadMatchData(auth, matchData)
+        await api.uploadMatchData(auth, matchData)
     }
+}
+
+// read files
+const readInterval = setInterval(async () => {
+    // currently we aren't really using this polling, but we will eventually need something like this
+    // we also need to set this up so it only works in a match.
+    handleReadAndUploadMatch()
 }, 1000) // read from reflector.text every 1000 ms
 
 // This method will be called when Electron has finished
@@ -831,11 +874,7 @@ app.whenReady().then(async () => {
                 if (user) {
                     console.log('user logged in')
                     // send our user object to the front end
-                    mainWindow.webContents.send('loginSuccess', {
-                        name: user.userName,
-                        email: user.userEmail,
-                        uid: user.uid,
-                    })
+                    mainWindow.webContents.send('loginSuccess', getLoginObject(user))
 
                     userUID = user.uid
                     console.log('user is: ', user)
