@@ -28,62 +28,54 @@ export default function UserChallengeMessage({ message }) {
             {message.accepted && <div>Match Accepted</div>}
             {message.declined && <div>Match Declined</div>}
             {!message.declined && !message.accepted && (
-                <Box>
-                    <Stack>
+                <Stack>
+                    <Flex>
+                        <Text color="gray.50">Recieved a challenge from: </Text>
                         <Text fontWeight="bold" color="blue.400">
-                            {message.sender}
+                            {userList.find((user) => user.uid === message.sender)?.name}
+                            {/* {message.sender} */}
                         </Text>
-                        <Text color="gray.50">{message.message} </Text>
-                    </Stack>
+                    </Flex>
                     {message.type && message.type === 'challenge' && (
-                        <>
-                            <Flex>
-                                <Text color="gray.50">Recieved a challenge from: </Text>
-                                <Text fontWeight="bold" color="blue.400">
-                                    {userList.find((user) => user.uid === message.sender)?.name}
-                                    {message.sender}
-                                </Text>
-                            </Flex>
-                            <Flex gap="8px">
-                                <Button
-                                    onClick={() => {
-                                        setIsAccepted(true)
-                                        const caller = callData.find(
-                                            (call) => call.callerId === message.sender
-                                        )
-                                        const updatedMessage = {
-                                            ...message,
-                                            accepted: true,
-                                        }
-                                        updateMessage(updatedMessage)
-                                        window.api.answerCall(caller)
-                                    }}
-                                >
-                                    Accept
-                                </Button>
-                                <Button
-                                    onClick={async () => {
-                                        // remove the call from the call list
-                                        const callToRemove = callData.find(
-                                            (call) => call.callerId === message.sender
-                                        )
-                                        removeCallData(callToRemove)
-                                        // set visual state for declining cal
-                                        setIsDeclined(true)
-                                        await window.api.declineCall(callToRemove)
-                                        const updatedMessage = {
-                                            ...message,
-                                            declined: true,
-                                        }
-                                        updateMessage(updatedMessage)
-                                    }}
-                                >
-                                    Decline
-                                </Button>
-                            </Flex>
-                        </>
+                        <Flex gap="8px">
+                            <Button
+                                onClick={() => {
+                                    setIsAccepted(true)
+                                    const caller = callData.find(
+                                        (call) => call.callerId === message.sender
+                                    )
+                                    const updatedMessage = {
+                                        ...message,
+                                        accepted: true,
+                                    }
+                                    updateMessage(updatedMessage)
+                                    window.api.answerCall(caller)
+                                }}
+                            >
+                                Accept
+                            </Button>
+                            <Button
+                                onClick={async () => {
+                                    // remove the call from the call list
+                                    const callToRemove = callData.find(
+                                        (call) => call.callerId === message.sender
+                                    )
+                                    removeCallData(callToRemove)
+                                    // set visual state for declining cal
+                                    setIsDeclined(true)
+                                    await window.api.declineCall(callToRemove)
+                                    const updatedMessage = {
+                                        ...message,
+                                        declined: true,
+                                    }
+                                    updateMessage(updatedMessage)
+                                }}
+                            >
+                                Decline
+                            </Button>
+                        </Flex>
                     )}
-                </Box>
+                </Stack>
             )}
         </Flex>
     )
