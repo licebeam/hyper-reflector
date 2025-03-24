@@ -47,22 +47,20 @@ export default function UserCard({ user }) {
         }, 2000)
     }
 
-    const handleCallDeclined = () => {
-        console.log('we declined a call')
-        setIsUserChallenging(false)
-        setIsInMatch(false)
-        clearCallData()
-    }
+    // const handleCallDeclined = () => {
+    //     setIsUserChallenging(false)
+    //     setIsInMatch(false)
+    // }
 
     useEffect(() => {
         window.api.removeAllListeners('endMatchUI', handleEndMatch)
         window.api.on('endMatchUI', handleEndMatch)
 
-        window.api.removeAllListeners('declineCall', handleCallDeclined)
-        window.api.on('declineCall', handleCallDeclined)
+        // window.api.removeAllListeners('declineCall', handleCallDeclined)
+        // window.api.on('declineCall', handleCallDeclined)
         return () => {
             window.api.removeListener('endMatchUI', handleEndMatch)
-            window.api.removeListener('declineCall', handleCallDeclined)
+            // window.api.removeListener('declineCall', handleCallDeclined)
         }
     }, [])
 

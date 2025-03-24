@@ -255,9 +255,8 @@ function connectWebSocket(user) {
     window.api.on(
         'declineCall',
         async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
-            console.log('we should be declining the call')
-            console.log('sending out decline', callerId)
-            signalServerSocket.send(
+            console.log('declining call')
+            await signalServerSocket.send(
                 JSON.stringify({
                     type: 'declineCall',
                     data: {
@@ -266,6 +265,7 @@ function connectWebSocket(user) {
                     },
                 })
             )
+            await closePeerConnection(callerId) // close the peer connection when we decline
         }
     )
 
@@ -369,7 +369,7 @@ function connectWebSocket(user) {
         if (data.type === 'callDeclined') {
             closePeerConnection(data.data.answererId)
             console.log('sending socket signal to close')
-            // resetState()
+            window.api.callDeclined(data.data.answererId)
         }
 
         if (data.type === 'iceCandidate') {

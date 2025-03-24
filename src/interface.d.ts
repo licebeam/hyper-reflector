@@ -5,6 +5,7 @@ export interface IElectronAPI {
     callUser: any
     answerCall: any
     declineCall: any
+    callDeclined: any
     receivedCall: any
     // server and online
     loginUser: any

@@ -53,7 +53,7 @@ export default function UserChallengeMessage({ message }) {
                                 Accept
                             </Button>
                             <Button
-                                onClick={() => {
+                                onClick={async () => {
                                     // remove the call from the call list
                                     const callToRemove = callData.find(
                                         (call) => call.callerId === message.sender
@@ -61,7 +61,8 @@ export default function UserChallengeMessage({ message }) {
                                     removeCallData(callToRemove)
                                     // set visual state for declining cal
                                     setIsDeclined(true)
-                                    window.api.declineCall(callToRemove)
+                                    console.log('clicking decline button')
+                                    await window.api.declineCall(callToRemove)
                                     const updatedMessage = {
                                         ...message,
                                         declined: true,
