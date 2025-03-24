@@ -1,12 +1,16 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { Stack, Box } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
 import UserChallengeMessage from './chat/UserChallengeMessage'
+import { Howl } from 'howler'
+
+import soundBase64Data from './sound/challenge.wav'
 
 export default function ChatWindow() {
     const messageState = useMessageStore((state) => state.messageState)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const pushMessage = useMessageStore((state) => state.pushMessage)
+    const [sound, setSound] = useState(null)
 
     const callData = useMessageStore((state) => state.callData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
@@ -18,6 +22,10 @@ export default function ChatWindow() {
     }
 
     const handleRoomMessage = (messageObject) => {
+        if (messageObject.type === 'challenge') {
+            new Audio(soundBase64Data).play() // this line for renderer process only
+        }
+
         pushMessage({
             sender: messageObject.sender,
             message: messageObject.message,
