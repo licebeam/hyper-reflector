@@ -105,7 +105,7 @@ export default function CreateAccountBlock() {
                                         pass: login.pass,
                                         repass: login.repass,
                                     })
-                                }
+                                } // test
                                 type="text"
                                 value={login.name}
                             />
