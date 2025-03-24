@@ -1,15 +1,15 @@
 import { useRef, useEffect, useState } from 'react'
 import { Flex, Stack, Tabs, Box, Text, Button } from '@chakra-ui/react'
-import { useLoginStore, useMessageStore } from '../../state/store'
+import { useMessageStore } from '../../state/store'
 
 export default function UserChallengeMessage({ message }) {
     // console.log('message', message)
     const [isDeclined, setIsDeclined] = useState(false)
     const [isAccepted, setIsAccepted] = useState(false)
     const callData = useMessageStore((state) => state.callData)
-    const clearCallData = useMessageStore((state) => state.clearCallData)
     const removeCallData = useMessageStore((state) => state.removeCallData)
     const updateMessage = useMessageStore((state) => state.updateMessage)
+    const userList = useMessageStore((state) => state.userList)
 
     var timestamp = new Date()
 
@@ -28,16 +28,18 @@ export default function UserChallengeMessage({ message }) {
             {message.accepted && <div>Match Accepted</div>}
             {message.declined && <div>Match Declined</div>}
             {!message.declined && !message.accepted && (
-                <>
-                    <Text fontWeight="bold" color="blue.400">
-                        {message.sender}
-                    </Text>
-                    <Text color="gray.50">{message.message}</Text>
+                <Stack>
+                    <Flex>
+                        <Text color="gray.50">Recieved a challenge from: </Text>
+                        <Text fontWeight="bold" color="blue.400">
+                            {userList.find((user) => user.uid === message.sender)?.name}
+                            {/* {message.sender} */}
+                        </Text>
+                    </Flex>
                     {message.type && message.type === 'challenge' && (
-                        <Box>
+                        <Flex gap="8px">
                             <Button
                                 onClick={() => {
-                                    console.log('accepting match')
                                     setIsAccepted(true)
                                     const caller = callData.find(
                                         (call) => call.callerId === message.sender
@@ -61,7 +63,6 @@ export default function UserChallengeMessage({ message }) {
                                     removeCallData(callToRemove)
                                     // set visual state for declining cal
                                     setIsDeclined(true)
-                                    console.log('clicking decline button')
                                     await window.api.declineCall(callToRemove)
                                     const updatedMessage = {
                                         ...message,
@@ -72,9 +73,9 @@ export default function UserChallengeMessage({ message }) {
                             >
                                 Decline
                             </Button>
-                        </Box>
+                        </Flex>
                     )}
-                </>
+                </Stack>
             )}
         </Flex>
     )
