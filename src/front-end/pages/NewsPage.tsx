@@ -3,9 +3,9 @@ import BlogPost from '../components/BlogPost'
 
 const blogsArray = [
     {
-        title: 'Update Version 0.2.0a',
+        title: 'Update Version 0.2.1a',
         date: '3/24/2025',
-        content: 'Small bug fixes',
+        content: 'hot fixes lua sorry + Small bug fixes from 0.2.0',
     },
     {
         title: 'Update Version 0.1.9a',

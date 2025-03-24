@@ -96,6 +96,8 @@ export default function CreateAccountBlock() {
                                 bg="gray.200"
                                 color="gray.900"
                                 placeholder="my_user_name"
+                                maxLength={16}
+                                minLength={1}
                                 onChange={(e) =>
                                     setLogin({
                                         name: e.target.value,
@@ -103,7 +105,7 @@ export default function CreateAccountBlock() {
                                         pass: login.pass,
                                         repass: login.repass,
                                     })
-                                }
+                                } // test
                                 type="text"
                                 value={login.name}
                             />
