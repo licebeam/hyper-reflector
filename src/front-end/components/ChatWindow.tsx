@@ -25,11 +25,10 @@ export default function ChatWindow() {
         if (messageObject.type === 'challenge') {
             new Audio(soundBase64Data).play() // this line for renderer process only
         }
-
         pushMessage({
             sender: messageObject.sender,
             message: messageObject.message,
-            type: messageObject.type || null,
+            type: messageObject.type || 'sendMessage',
             declined: false,
             accepted: false,
             id: Date.now(), // TODO this is not a long lasting solution
