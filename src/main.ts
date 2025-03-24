@@ -695,7 +695,7 @@ const createWindow = () => {
 
     ipcMain.on('declineCall', (event, data) => {
         console.log('call is being declined in main')
-        mainWindow.webContents.send('declineCall', { ...data, answererId: userUID })
+        mainWindow.webContents.send('declineCall', data)
     })
 
     ipcMain.on('callDeclined', (event, data) => {

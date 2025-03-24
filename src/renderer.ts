@@ -368,7 +368,6 @@ function connectWebSocket(user) {
 
         if (data.type === 'callDeclined') {
             closePeerConnection(data.data.answererId)
-            console.log('sending socket signal to close')
             window.api.callDeclined(data.data.answererId)
         }
 

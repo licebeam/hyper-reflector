@@ -25,14 +25,15 @@ export default function UserCard({ user }) {
     const [isUserChallenging, setIsUserChallenging] = useState(false)
     const userState = useLoginStore((state) => state.userState)
     const callData = useMessageStore((state) => state.callData)
+    const removeCallData = useMessageStore((state) => state.removeCallData)
     const clearCallData = useMessageStore((state) => state.clearCallData)
     const setLayoutTab = useLayoutStore((state) => state.setSelectedTab)
 
     const navigate = useNavigate()
 
     useEffect(() => {
-        console.log('call', callData)
         setIsUserChallenging((prevState) => {
+            console.log('user is challenging some how')
             const found = callData.some((call) => call.callerId === user.uid)
             console.log(found ? 'Found USER in call' : 'Did not find user in call')
             return found // This ensures the state is always updated properly
@@ -47,20 +48,23 @@ export default function UserCard({ user }) {
         }, 2000)
     }
 
-    // const handleCallDeclined = () => {
-    //     setIsUserChallenging(false)
-    //     setIsInMatch(false)
-    // }
+    const handleCallDeclined = (declinedCall) => {
+        const { answererId } = declinedCall
+        setIsUserChallenging(false)
+        setIsInMatch(false)
+        const callToRemove = callData.find((call) => call.callerId === answererId)
+        removeCallData(callToRemove)
+    }
 
     useEffect(() => {
         window.api.removeAllListeners('endMatchUI', handleEndMatch)
         window.api.on('endMatchUI', handleEndMatch)
 
-        // window.api.removeAllListeners('declineCall', handleCallDeclined)
-        // window.api.on('declineCall', handleCallDeclined)
+        window.api.removeAllListeners('callDeclined', handleCallDeclined)
+        window.api.on('callDeclined', handleCallDeclined)
         return () => {
             window.api.removeListener('endMatchUI', handleEndMatch)
-            // window.api.removeListener('declineCall', handleCallDeclined)
+            window.api.removeListener('callDeclined', handleCallDeclined)
         }
     }, [])
 
