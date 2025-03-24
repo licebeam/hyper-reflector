@@ -60,7 +60,7 @@ export default function PlayerProfilePage() {
     }
 
     const handleSetUserData = (data) => {
-        console.log(data)
+        console.log(data, userState)
         setUserData(data)
         setEditedUserName(data.userName)
     }
@@ -158,24 +158,25 @@ export default function PlayerProfilePage() {
                 )}
 
                 <Editable.Input id="test" bg="gray.200" height="36px" value={editedUserName} />
-
-                <Editable.Control>
-                    <Editable.EditTrigger asChild>
-                        <IconButton variant="ghost" size="xs" color="red.500">
-                            <Pencil />
-                        </IconButton>
-                    </Editable.EditTrigger>
-                    <Editable.CancelTrigger asChild>
-                        <IconButton variant="outline" size="xs" color="red.500">
-                            <X />
-                        </IconButton>
-                    </Editable.CancelTrigger>
-                    <Editable.SubmitTrigger asChild>
-                        <IconButton variant="outline" size="xs" color="red.500">
-                            <Check />
-                        </IconButton>
-                    </Editable.SubmitTrigger>
-                </Editable.Control>
+                {userData?.uid === userState.uid && (
+                    <Editable.Control>
+                        <Editable.EditTrigger asChild>
+                            <IconButton variant="ghost" size="xs" color="red.500">
+                                <Pencil />
+                            </IconButton>
+                        </Editable.EditTrigger>
+                        <Editable.CancelTrigger asChild>
+                            <IconButton variant="outline" size="xs" color="red.500">
+                                <X />
+                            </IconButton>
+                        </Editable.CancelTrigger>
+                        <Editable.SubmitTrigger asChild>
+                            <IconButton variant="outline" size="xs" color="red.500">
+                                <Check />
+                            </IconButton>
+                        </Editable.SubmitTrigger>
+                    </Editable.Control>
+                )}
             </Editable.Root>
             <Text textStyle="xs" color="gray.500">
                 Profile changes are not visible to others until the next time you log in.
