@@ -29,14 +29,13 @@ export default function UserChallengeMessage({ message }) {
             {message.accepted && <div>Match Accepted</div>}
             {message.declined && <div>Match Declined</div>}
             {!message.declined && !message.accepted && (
-                <Stack>
-                    <Flex>
-                        <Text color="gray.50">Recieved a challenge from: </Text>
+                <>
+                    <Stack>
                         <Text fontWeight="bold" color="blue.400">
-                            {userList.find((user) => user.uid === message.sender)?.name}
-                            {/* {message.sender} */}
+                            {message.sender}
                         </Text>
-                    </Flex>
+                        <Text color="gray.50"> {message.message}</Text>
+                    </Stack>
                     {message.type && message.type === 'challenge' && (
                         <Flex gap="8px">
                             <Button
@@ -78,7 +77,7 @@ export default function UserChallengeMessage({ message }) {
                             </Button>
                         </Flex>
                     )}
-                </Stack>
+                </>
             )}
         </Flex>
     )
