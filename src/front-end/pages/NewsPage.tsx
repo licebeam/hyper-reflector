@@ -3,6 +3,11 @@ import BlogPost from '../components/BlogPost'
 
 const blogsArray = [
     {
+        title: 'Update Version 0.2.0a',
+        date: '3/24/2025',
+        content: 'Small bug fixes',
+    },
+    {
         title: 'Update Version 0.1.9a',
         date: '3/23/2025',
         content:

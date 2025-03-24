@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { Flex, Stack, Tabs, Box, Text, Button } from '@chakra-ui/react'
-import { useMessageStore } from '../../state/store'
+import { useMessageStore, useLoginStore } from '../../state/store'
 
 export default function UserChallengeMessage({ message }) {
     // console.log('message', message)
@@ -10,9 +10,10 @@ export default function UserChallengeMessage({ message }) {
     const removeCallData = useMessageStore((state) => state.removeCallData)
     const updateMessage = useMessageStore((state) => state.updateMessage)
     const userList = useMessageStore((state) => state.userList)
+    const updateUserState = useLoginStore((state) => state.updateUserState)
 
     var timestamp = new Date()
-
+    console.log('message', message)
     return (
         <Flex
             key={timestamp + message.message}
@@ -28,14 +29,13 @@ export default function UserChallengeMessage({ message }) {
             {message.accepted && <div>Match Accepted</div>}
             {message.declined && <div>Match Declined</div>}
             {!message.declined && !message.accepted && (
-                <Stack>
-                    <Flex>
-                        <Text color="gray.50">Recieved a challenge from: </Text>
+                <>
+                    <Stack>
                         <Text fontWeight="bold" color="blue.400">
-                            {userList.find((user) => user.uid === message.sender)?.name}
-                            {/* {message.sender} */}
+                            {message.sender}
                         </Text>
-                    </Flex>
+                        <Text color="gray.50"> {message.message}</Text>
+                    </Stack>
                     {message.type && message.type === 'challenge' && (
                         <Flex gap="8px">
                             <Button
@@ -50,6 +50,7 @@ export default function UserChallengeMessage({ message }) {
                                     }
                                     updateMessage(updatedMessage)
                                     window.api.answerCall(caller)
+                                    updateUserState({ isFighting: true })
                                 }}
                             >
                                 Accept
@@ -69,13 +70,14 @@ export default function UserChallengeMessage({ message }) {
                                         declined: true,
                                     }
                                     updateMessage(updatedMessage)
+                                    updateUserState({ isFighting: true })
                                 }}
                             >
                                 Decline
                             </Button>
                         </Flex>
                     )}
-                </Stack>
+                </>
             )}
         </Flex>
     )

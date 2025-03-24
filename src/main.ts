@@ -523,7 +523,7 @@ const createWindow = () => {
             }
 
             async function startEmulator(address, port) {
-                console.log('Starting emulator for player:', address, port)
+                // console.log('Starting emulator for player:', address, port)
                 lastKnownPlayerSlot = data.player // set the last know player slot for sending to the BE to record matches
                 return await startPlayingOnline({
                     config,
