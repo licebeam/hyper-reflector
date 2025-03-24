@@ -1,8 +1,8 @@
 import keys from '../private/keys'
 import { firebaseConfig } from '../private/firebase'
 
-// const SERVER = keys.COTURN_IP
-const SERVER = '127.0.0.1' // -- used for testing the backend locally
+const SERVER = keys.COTURN_IP
+// const SERVER = '127.0.0.1' // -- used for testing the backend locally
 
 function checkCurrentAuthState(auth) {
     if (auth.currentUser != null) {
