@@ -13,7 +13,7 @@ export default function UserChallengeMessage({ message }) {
     const updateUserState = useLoginStore((state) => state.updateUserState)
 
     var timestamp = new Date()
-    console.log('message', message)
+    const caller = callData.find((call) => call.callerId === message.sender)
     return (
         <Flex
             key={timestamp + message.message}
@@ -29,21 +29,30 @@ export default function UserChallengeMessage({ message }) {
             {message.accepted && <div>Match Accepted</div>}
             {message.declined && <div>Match Declined</div>}
             {!message.declined && !message.accepted && (
-                <>
-                    <Stack>
-                        <Text fontWeight="bold" color="blue.400">
-                            {message.sender}
-                        </Text>
-                        <Text color="gray.50"> {message.message}</Text>
-                    </Stack>
+                <Stack>
+                    {message.type && message.type !== 'challenge' && (
+                        <Stack>
+                            <Text fontWeight="bold" color="blue.400">
+                                {message.sender}
+                            </Text>
+                            <Text color="gray.50"> {message.message}</Text>
+                        </Stack>
+                    )}
+
+                    {message.type && message.type === 'challenge' && caller && (
+                        <Flex>
+                            <Text color="gray.50">Received challenge from: </Text>
+                            <Text fontWeight="bold" color="blue.400">
+                                {userList.find((user) => user.uid === caller.callerId).name}
+                            </Text>
+                        </Flex>
+                    )}
+
                     {message.type && message.type === 'challenge' && (
                         <Flex gap="8px">
                             <Button
                                 onClick={() => {
                                     setIsAccepted(true)
-                                    const caller = callData.find(
-                                        (call) => call.callerId === message.sender
-                                    )
                                     const updatedMessage = {
                                         ...message,
                                         accepted: true,
@@ -77,7 +86,7 @@ export default function UserChallengeMessage({ message }) {
                             </Button>
                         </Flex>
                     )}
-                </>
+                </Stack>
             )}
         </Flex>
     )
