@@ -423,6 +423,7 @@ const createWindow = () => {
             try {
                 socket.on('message', function (message, remote) {
                     const messageContent = message.toString()
+                    // TODO: we should check if after a period of time, we don't get a sucessful message back from the server and kill sockets etc.
                     if (messageContent === 'ping' || message.includes('"port"')) {
                         if (message.includes('"port"') && !keepAliveInterval) {
                             keepAliveInterval = setInterval(() => {
@@ -537,6 +538,15 @@ const createWindow = () => {
                         sendMessageToS(true)
                         // attempt to kill the emulator
                         console.log('emulator should die')
+                        try {
+                            socket.close()
+                            emuListener.close()
+                            socket = null
+                            emuListener = null
+                        } catch (error) {
+                            console.log('could not properly shut down emulator and sockets')
+                        }
+
                         mainWindow.webContents.send('endMatch', userUID)
                         // get user out of challenge pool
                     },
