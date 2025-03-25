@@ -321,7 +321,7 @@ function connectWebSocket(user) {
 
         if (data.type === 'matchEndedClose') {
             //user the userUID and close all matches.
-            console.log('killing emulator and closing peer connection')
+            console.log('killing emulator and closing peer connection', data.userUID)
             closePeerConnection(data.userUID)
             window.api.killEmulator()
             resetState()
@@ -387,7 +387,7 @@ window.api.on('endMatch', (userUID: string) => {
         signalServerSocket.send(
             JSON.stringify({
                 type: 'matchEnd',
-                uid: myUID,
+                userUID: myUID,
             })
         )
     }
