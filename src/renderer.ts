@@ -104,7 +104,6 @@ function closePeerConnection(userId: string) {
 function resetState() {
     candidateList = []
     callerIdState = null
-    myUID = null
     userName = null
     opponentUID = null
 }
@@ -321,10 +320,13 @@ function connectWebSocket(user) {
 
         if (data.type === 'matchEndedClose') {
             //user the userUID and close all matches.
-            console.log('killing emulator and closing peer connection', data.userUID)
-            closePeerConnection(data.userUID)
-            window.api.killEmulator()
-            resetState()
+            if (opponentUID === data.userUID) {
+                console.warn('my opponent wants to rage quit', opponentUID)
+                console.log('killing emulator and closing peer connection', data.userUID)
+                closePeerConnection(data.userUID)
+                window.api.killEmulator()
+                resetState()
+            }
         }
 
         if (data.type === 'getRoomMessage') {
@@ -387,7 +389,7 @@ window.api.on('endMatch', (userUID: string) => {
         signalServerSocket.send(
             JSON.stringify({
                 type: 'matchEnd',
-                userUID: myUID,
+                userUID,
             })
         )
     }
