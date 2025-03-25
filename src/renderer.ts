@@ -31,7 +31,7 @@ const googleStuns = [
 const peerConnections: Record<string, RTCPeerConnection> = {}
 
 async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
-    console.log('trying to create a new peer connection with - ', userUID)
+    // console.log('trying to create a new peer connection with - ', userUID)
     const peerConnection = new RTCPeerConnection({
         iceServers: [
             {
@@ -51,7 +51,7 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
 
     // create data channel
     if (isInitiator) {
-        console.log('creating a data channel')
+        // console.log('creating a data channel')
         // Only the initiator creates a data channel
         dataChannel = peerConnection.createDataChannel('updForwarding')
         dataChannel.onopen = () => console.log('Data channel open')
@@ -67,7 +67,6 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
 
     // send new ice candidates from the coturn server
     peerConnection.onicecandidate = (event) => {
-        console.log(event)
         if (event.candidate) {
             setupLogging(peerConnection, userName, event)
         } else {
@@ -77,9 +76,9 @@ async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
 
     peerConnection.oniceconnectionstatechange = () => {
         if (peerConnection.iceConnectionState === 'connected') {
-            console.log('Connected! Ready to send data.')
+            // console.log('Connected! Ready to send data.')
         } else if (peerConnection.iceConnectionState === 'failed') {
-            console.log('ICE connection failed. Check STUN/TURN settings.')
+            // console.log('ICE connection failed. Check STUN/TURN settings.')
         }
     }
 
@@ -327,6 +326,9 @@ function connectWebSocket(user) {
                 window.api.killEmulator()
                 resetState()
             }
+            if (!opponentUID) {
+                resetState()
+            }
         }
 
         if (data.type === 'getRoomMessage') {
@@ -393,5 +395,4 @@ window.api.on('endMatch', (userUID: string) => {
             })
         )
     }
-    resetState()
 })
