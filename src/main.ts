@@ -423,6 +423,7 @@ const createWindow = () => {
             try {
                 socket.on('message', function (message, remote) {
                     const messageContent = message.toString()
+                    // TODO: we should check if after a period of time, we don't get a sucessful message back from the server and kill sockets etc.
                     if (messageContent === 'ping' || message.includes('"port"')) {
                         if (message.includes('"port"') && !keepAliveInterval) {
                             keepAliveInterval = setInterval(() => {
