@@ -1,9 +1,9 @@
-import { useRef, useEffect, useState } from 'react'
-import { Flex, Stack, Tabs, Box, Text, Button } from '@chakra-ui/react'
-import { useMessageStore, useLoginStore } from '../../state/store'
+import { useState } from 'react'
+import { Flex, Stack, Text, Button } from '@chakra-ui/react'
+import { useMessageStore, useLoginStore, useLayoutStore } from '../../state/store'
 
 export default function UserChallengeMessage({ message }) {
-    // console.log('message', message)
+    const theme = useLayoutStore((state) => state.appTheme)
     const [isDeclined, setIsDeclined] = useState(false)
     const [isAccepted, setIsAccepted] = useState(false)
     const callData = useMessageStore((state) => state.callData)
@@ -11,9 +11,11 @@ export default function UserChallengeMessage({ message }) {
     const updateMessage = useMessageStore((state) => state.updateMessage)
     const userList = useMessageStore((state) => state.userList)
     const updateUserState = useLoginStore((state) => state.updateUserState)
+    const userState = useLoginStore((state) => state.userState)
 
     var timestamp = new Date()
     const caller = callData.find((call) => call.callerId === message.sender)
+    //TODO: fix bug where decline while fighting has some issues closing on the other users end
     return (
         <Flex
             key={timestamp + message.message}
@@ -24,7 +26,7 @@ export default function UserChallengeMessage({ message }) {
             p="2"
             borderRadius="md"
             mb="1"
-            bg="gray.700"
+            bg={theme.colors.main.tertiary}
         >
             {message.accepted && <div>Match Accepted</div>}
             {message.declined && <div>Match Declined</div>}
@@ -32,18 +34,19 @@ export default function UserChallengeMessage({ message }) {
                 <Stack>
                     {message.type && message.type !== 'challenge' && (
                         <Stack>
-                            <Text fontWeight="bold" color="blue.400">
+                            <Text fontWeight="bold" color={theme.colors.main.actionSecondaryLight}>
                                 {message.sender}
                             </Text>
-                            <Text color="gray.50"> {message.message}</Text>
+                            <Text color={theme.colors.main.text}> {message.message}</Text>
                         </Stack>
                     )}
 
                     {message.type && message.type === 'challenge' && caller && (
                         <Flex>
-                            <Text color="gray.50">Received challenge from: </Text>
-                            <Text fontWeight="bold" color="blue.400">
-                                {userList.find((user) => user.uid === caller.callerId).name}
+                            <Text color={theme.colors.main.text}>Received challenge from: </Text>
+                            <Text fontWeight="bold" color={theme.colors.main.actionSecondaryLight}>
+                                {userList.find((user) => user.uid === caller.callerId)?.name ||
+                                    'Unknown User'}
                             </Text>
                         </Flex>
                     )}
@@ -59,7 +62,7 @@ export default function UserChallengeMessage({ message }) {
                                     }
                                     updateMessage(updatedMessage)
                                     window.api.answerCall(caller)
-                                    updateUserState({ isFighting: true })
+                                    updateUserState({ ...userState, isFighting: true })
                                 }}
                             >
                                 Accept
@@ -79,7 +82,7 @@ export default function UserChallengeMessage({ message }) {
                                         declined: true,
                                     }
                                     updateMessage(updatedMessage)
-                                    updateUserState({ isFighting: true })
+                                    updateUserState({ ...userState, isFighting: false })
                                 }}
                             >
                                 Decline

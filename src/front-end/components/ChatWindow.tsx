@@ -1,16 +1,23 @@
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect } from 'react'
 import { Stack, Box } from '@chakra-ui/react'
 import { useLoginStore, useMessageStore } from '../state/store'
 import UserChallengeMessage from './chat/UserChallengeMessage'
+import {
+    RegExpMatcher,
+    TextCensor,
+    englishDataset,
+    englishRecommendedTransformers,
+} from 'obscenity'
 
-import soundBase64Data from './sound/challenge.wav'
+const matcher = new RegExpMatcher({
+    ...englishDataset.build(),
+    ...englishRecommendedTransformers,
+})
 
 export default function ChatWindow() {
     const messageState = useMessageStore((state) => state.messageState)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const pushMessage = useMessageStore((state) => state.pushMessage)
-    const userState = useLoginStore((state) => state.userState)
-    const updateUserState = useLoginStore((state) => state.updateUserState)
 
     const chatEndRef = useRef<null | HTMLDivElement>(null)
 
@@ -19,12 +26,21 @@ export default function ChatWindow() {
     }
 
     const handleRoomMessage = (messageObject) => {
-        if (messageObject.type === 'challenge' && !userState.isFighting) {
-            new Audio(soundBase64Data).play() // this line for renderer process only
+        // censor words befor sending to BE
+        const censor = new TextCensor()
+        const input = messageObject.message
+        const matches = matcher.getAllMatches(input)
+        const censoredMessage = censor.applyTo(input, matches)
+        const getSender = () => {
+            if (typeof messageObject.sender === 'string') {
+                return messageObject.sender
+            } else {
+                return messageObject.sender.name
+            }
         }
         pushMessage({
-            sender: messageObject.sender,
-            message: messageObject.message,
+            sender: getSender(),
+            message: censoredMessage,
             type: messageObject.type || 'sendMessage',
             declined: false,
             accepted: false,
@@ -32,21 +48,13 @@ export default function ChatWindow() {
         })
     }
 
-    // const handleEndMatch = () => {
-    //     updateUserState({ isFighting: false })
-    // }
-
     // get message from websockets
     useEffect(() => {
         window.api.removeAllListeners('sendRoomMessage', handleRoomMessage)
         window.api.on('sendRoomMessage', handleRoomMessage)
 
-        // window.api.removeAllListeners('endMatch', handleEndMatch)
-        // window.api.on('endMatch', handleEndMatch)
-
         return () => {
             window.api.removeListener('sendRoomMessage', handleRoomMessage)
-            // window.api.removeListener('endMatch', handleEndMatch)
         }
     }, [])
 
@@ -55,11 +63,16 @@ export default function ChatWindow() {
     }, [messageState])
 
     return (
-        <Stack height="100%" key={'chat'} overflowY="auto" id="chatbox-id">
+        <Stack height="100%" key={'chat'} overflowY="auto" scrollbarWidth={'thin'} id="chatbox-id">
             {isLoggedIn && (
                 <Box paddingLeft="8px" paddingRight="8px">
                     {messageState.map((message, index) => {
-                        return <UserChallengeMessage message={message} />
+                        return (
+                            <UserChallengeMessage
+                                key={`challenge-message-${index}`}
+                                message={message}
+                            />
+                        )
                     })}
                     <Box ref={chatEndRef} />
                 </Box>

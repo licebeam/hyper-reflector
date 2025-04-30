@@ -1,24 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
+import { BarList, Chart, type BarListData, useChart } from '@chakra-ui/charts'
+import { Cell, Pie, PieChart, Tooltip } from 'recharts'
 import {
-    Button,
     IconButton,
     ButtonGroup,
     Stack,
-    Input,
     Text,
     Heading,
-    createListCollection,
     Box,
-    Flex,
     Center,
     Spinner,
-    Card,
     Pagination,
     Skeleton,
     Editable,
+    Button,
+    createListCollection,
 } from '@chakra-ui/react'
-import { Check, ChevronLeft, ChevronRight, Pencil, X } from 'lucide-react'
 import {
     SelectContent,
     SelectItem,
@@ -26,15 +24,48 @@ import {
     SelectTrigger,
     SelectValueText,
 } from '../components/chakra/ui/select'
+import {
+    ChartBar,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    Construction,
+    Joystick,
+    Pencil,
+    UserRound,
+    Wrench,
+    X,
+} from 'lucide-react'
 import { Field } from '../components/chakra/ui/field'
-import { useLoginStore } from '../state/store'
+import { toaster } from '../components/chakra/ui/toaster'
+import { useLoginStore, useLayoutStore } from '../state/store'
 
+import {
+    RegExpMatcher,
+    TextCensor,
+    englishDataset,
+    englishRecommendedTransformers,
+} from 'obscenity'
+
+import SideBar from '../components/general/SideBar'
+import MatchSetCard from '../components/users/MatchSetCard'
+import TitleBadge from '../components/users/TitleBadge'
+
+const matcher = new RegExpMatcher({
+    ...englishDataset.build(),
+    ...englishRecommendedTransformers,
+})
+
+//TODO: user should have to click a button to save all data
 export default function PlayerProfilePage() {
+    const theme = useLayoutStore((state) => state.appTheme)
     const { userId } = useParams({ strict: false })
-    const [editedUserName, setEditedUserName] = useState(undefined)
-    const [isEditName, setIsEditName] = useState(false)
     const userState = useLoginStore((state) => state.userState)
     const updateUserState = useLoginStore((state) => state.updateUserState)
+    const [currentTab, setCurrentTab] = useState<number>(0)
+    const [editedUserName, setEditedUserName] = useState(undefined)
+    const [isEditName, setIsEditName] = useState(false)
+    const [nameInvalid, setNameInvalid] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
     const [recentMatches, setRecentMatches] = useState([])
     const [userData, setUserData] = useState([])
@@ -44,9 +75,25 @@ export default function PlayerProfilePage() {
     const [pageCount, setPageCount] = useState(null)
     const [isBack, setIsBack] = useState(false)
     const [matchTotal, setMatchTotal] = useState(undefined)
+    const [selectedMatchDetails, setSelectedMatchDetails] = useState(undefined)
+    const [titleList, setTitleList] = useState(undefined)
+    const [selectedTitle, setSelectedTitle] = useState(undefined)
+
+    // used when switching tabs etc
+    const resetState = () => {
+        setMatchTotal(undefined)
+        setIsBack(false)
+        setPageCount(null)
+        setPageNumber(1)
+        setFirstMatch(null)
+        setLastMatch(null)
+        setRecentMatches([])
+        setEditedUserName(undefined)
+        setIsEditName(false)
+        setSelectedMatchDetails(undefined)
+    }
 
     const handleSetRecentMatches = (matchData) => {
-        // console.log(matchData)
         const { matches, lastVisible, totalMatches, firstVisible } = matchData
         // only set this once
         if (!matchTotal) {
@@ -60,30 +107,68 @@ export default function PlayerProfilePage() {
     }
 
     const handleSetUserData = (data) => {
-        console.log(data, userState)
         setUserData(data)
         setEditedUserName(data.userName)
     }
 
     useEffect(() => {
-        //TODO sometimes this fails to get match data
-        window.api.getUserData(userId)
-        window.api.getUserMatches({ userId, lastMatchId: lastMatch })
-        // temp
-        setTimeout(() => {
+        // use effects when we switch tabs
+        // public profile
+        if (currentTab === 0) {
+            window.api.getAllTitles({ userId })
+            setIsLoading(true)
+            window.api.getUserData(userId)
+        }
+        // recent matches
+        if (currentTab === 1) {
+            setIsLoading(true)
+            // window.api.getUserMatches({ userId, lastMatchId: lastMatch })
+            if (isBack) {
+                window.api.getUserMatches({ userId, firstMatchId: firstMatch })
+                setIsBack(false)
+            } else {
+                setIsBack(false)
+                window.api.getUserMatches({ userId, lastMatchId: lastMatch })
+            }
+        }
+        // public profile
+        if (currentTab === 2) {
+            setIsLoading(true)
             setIsLoading(false)
-        }, 1000)
-    }, [])
+        }
+    }, [currentTab, pageNumber])
 
     useEffect(() => {
-        if (isBack) {
-            window.api.getUserMatches({ userId, firstMatchId: firstMatch })
-            setIsBack(false)
-        } else {
-            setIsBack(false)
-            window.api.getUserMatches({ userId, lastMatchId: lastMatch })
+        if (currentTab === 0 || currentTab === 3) {
+            setIsLoading(false)
         }
-    }, [pageNumber])
+    }, [userData])
+
+    useEffect(() => {
+        // if we are on the matches tab we want to wait until the full load is completed
+        if (currentTab === 1) {
+            setIsLoading(false)
+        }
+    }, [firstMatch])
+
+    const handleSetTitles = (data) => {
+        const titles = createListCollection({
+            items: [
+                ...data?.titleData?.titles.map((title, index) => {
+                    return { label: title.title, value: index, data: title }
+                }),
+            ],
+        })
+        setTitleList(titles)
+    }
+
+    useEffect(() => {
+        if (!titleList?.items) return
+        const newTitle = titleList.items[selectedTitle]?.data
+        if (!newTitle) return
+        updateUserState({ ...userState, userTitle: newTitle })
+        window.api.changeUserData({ userTitle: newTitle })
+    }, [selectedTitle])
 
     useEffect(() => {
         window.api.removeExtraListeners('getUserData', handleSetUserData)
@@ -92,11 +177,30 @@ export default function PlayerProfilePage() {
         window.api.removeExtraListeners('getUserMatches', handleSetRecentMatches)
         window.api.on('getUserMatches', handleSetRecentMatches)
 
+        window.api.removeExtraListeners('fillGlobalSet', globalSetDataFill)
+        window.api.on('fillGlobalSet', globalSetDataFill)
+
+        window.api.removeExtraListeners('fillAllTitles', handleSetTitles)
+        window.api.on('fillAllTitles', handleSetTitles)
+
         return () => {
             window.api.removeListener('getUserData', handleSetUserData)
             window.api.removeListener('getUserMatches', handleSetRecentMatches)
+            window.api.removeListener('fillGlobalSet', globalSetDataFill)
+            window.api.removeListener('fillAllTitles', handleSetTitles)
         }
     }, [])
+
+    const globalSetDataFill = ({ globalSet }) => {
+        if (globalSet) {
+            setSelectedMatchDetails(globalSet)
+        } else {
+            // toaster.error({
+            //     title: 'Failed to load set!',
+            // })
+            setSelectedMatchDetails({ matches: [] })
+        }
+    }
 
     const getSuperArt = (code) => {
         switch (parseInt(code)) {
@@ -122,197 +226,431 @@ export default function PlayerProfilePage() {
             superColor = 'yellow.500'
         } else if (code === 1) {
             superColor = 'orange.500'
-        } else {
+        } else if (code === 2) {
             superColor = 'blue.500'
         }
         return (
-            <Text textStyle="md" padding="8px" color={superColor}>
+            <Text textStyle="md" padding="8px" color={superColor} width={'60px'}>
                 {currentSuper}
             </Text>
         )
     }
 
+    useEffect(() => {
+        setNameInvalid(true)
+    }, [editedUserName])
+
+    const getCharacterData = () => {
+        if (!userData?.playerStatSet?.characters) return
+        const charKeys = Object.keys(userData?.playerStatSet?.characters)
+        const data = charKeys.map((char) => {
+            return {
+                name: char,
+                value: userData?.playerStatSet?.characters[char].picks,
+                test: 'poo',
+            }
+        })
+        return data
+    }
+
+    const chart = useChart<BarListData>({
+        sort: { by: 'value', direction: 'desc' },
+        data: getCharacterData() || [{ name: 'unknown', value: 0, test: 'poop' }],
+        series: [{ name: 'name', color: theme.colors.main.actionSecondary }],
+    })
+
+    const getPercent = (value: number) => chart.getValuePercent('value', value).toFixed(2)
+
+    const getWinRate = (): number => {
+        console.log(userData)
+        if (userData?.playerStatSet?.totalWins > 0) {
+            return (
+                (userData?.playerStatSet?.totalWins / userData?.playerStatSet?.totalGames) *
+                100
+            ).toFixed(2)
+        } else return 0
+    }
+
+    const GeneratedCharacterDonut = ({ characterName }) => {
+        if (!userData?.playerStatSet?.characters) return null
+        const character = userData?.playerStatSet?.characters[characterName]
+        if (!character) return null
+        console.log(character)
+        const sa1Picks = character?.superChoice[0]?.wins + character?.superChoice[0]?.losses || 0
+        const sa2Picks = character?.superChoice[1]?.wins + character?.superChoice[1]?.losses || 0
+        const sa3Picks = character?.superChoice[2]?.wins + character?.superChoice[2]?.losses || 0
+        console.log('making a donut', sa1Picks, sa2Picks, sa3Picks)
+        const superDonut = useChart({
+            data: [
+                { name: 'SA I', value: sa1Picks, color: theme.colors.main.sa1 },
+                { name: 'SA II', value: sa2Picks, color: theme.colors.main.sa2 },
+                { name: 'SA III', value: sa3Picks, color: theme.colors.main.sa3 },
+            ],
+        })
+
+        return (
+            <Chart.Root boxSize="20px" chart={superDonut} mx="-2">
+                <PieChart>
+                    <Tooltip
+                        cursor={false}
+                        animationDuration={100}
+                        content={<Chart.Tooltip hideLabel />}
+                    />
+                    <Pie
+                        innerRadius={10}
+                        outerRadius={22}
+                        isAnimationActive={false}
+                        data={superDonut.data}
+                        dataKey={superDonut.key('value')}
+                    >
+                        {superDonut.data.map((item) => (
+                            <Cell key={item.name} fill={superDonut.color(item.color)} />
+                        ))}
+                    </Pie>
+                </PieChart>
+            </Chart.Root>
+        )
+    }
+
+    const getSortedObjectData = (data) => {
+        const sorted = Object.entries(data).sort(([, a], [, b]) => b.picks - a.picks)
+        return sorted
+    }
+
     return (
-        <Stack minH="100%">
-            <Editable.Root
-                defaultValue={userData?.userName}
-                maxLength={16}
-                onEditChange={(e) => setIsEditName(e.edit)}
-                onValueCommit={(e) => {
-                    setEditedUserName(e.value)
-                    updateUserState({ name: e.value })
-                    window.api.changeUserData({ userName: e.value })
-                }}
-                onValueChange={(e) => setEditedUserName(e.value)}
-                onValueRevert={(e) => {
-                    setEditedUserName(e.value)
-                    updateUserState({ name: e.value })
-                }}
-                value={editedUserName}
-                invalid={editedUserName && editedUserName.length <= 1}
-            >
-                {!isEditName && (
-                    <Heading flex="1" size="lg" color="red.500" width="100px" height="36px">
-                        {editedUserName || userData?.userName || 'Unknown User'}
-                    </Heading>
-                )}
+        <Box display="flex" gap="12px">
+            <SideBar width="160px">
+                <Button
+                    disabled={currentTab === 0}
+                    justifyContent="flex-start"
+                    bg={theme.colors.main.secondary}
+                    onClick={() => setCurrentTab(0)}
+                >
+                    <UserRound />
+                    Profile
+                </Button>
+                <Button
+                    disabled={currentTab === 1}
+                    justifyContent="flex-start"
+                    bg={theme.colors.main.secondary}
+                    onClick={() => {
+                        resetState()
+                        setCurrentTab(1)
+                    }}
+                >
+                    <Joystick />
+                    Recent Matches
+                </Button>
+                <Button
+                    disabled={currentTab === 2 || userData?.uid !== userState.uid}
+                    justifyContent="flex-start"
+                    bg={theme.colors.main.secondary}
+                    onClick={() => setCurrentTab(2)}
+                >
+                    <ChartBar />
+                    Statistics
+                </Button>
+                <Button
+                    data-state="open"
+                    animationDuration="slow"
+                    animationStyle={{ _open: 'slide-fade-in', _closed: 'slide-fade-out' }}
+                    disabled={currentTab === 3 || userData?.uid !== userState.uid}
+                    justifyContent="flex-start"
+                    bg={theme.colors.main.secondary}
+                    onClick={() => {
+                        resetState()
+                        setCurrentTab(3)
+                    }}
+                >
+                    <Wrench />
+                    User Setting
+                </Button>
+            </SideBar>
 
-                <Editable.Input id="test" bg="gray.200" height="36px" value={editedUserName} />
-                {userData?.uid === userState.uid && (
-                    <Editable.Control>
-                        <Editable.EditTrigger asChild>
-                            <IconButton variant="ghost" size="xs" color="red.500">
-                                <Pencil />
-                            </IconButton>
-                        </Editable.EditTrigger>
-                        <Editable.CancelTrigger asChild>
-                            <IconButton variant="outline" size="xs" color="red.500">
-                                <X />
-                            </IconButton>
-                        </Editable.CancelTrigger>
-                        <Editable.SubmitTrigger asChild>
-                            <IconButton variant="outline" size="xs" color="red.500">
-                                <Check />
-                            </IconButton>
-                        </Editable.SubmitTrigger>
-                    </Editable.Control>
-                )}
-            </Editable.Root>
-            <Text textStyle="xs" color="gray.500">
-                Profile changes are not visible to others until the next time you log in.
-            </Text>
-            <Stack padding="24px">
-                <Stack>
-                    <Heading flex="0" size="md" color="gray.200">
-                        Recent Matches
-                    </Heading>
-                    {matchTotal && (
-                        <Box>
-                            <Text textStyle="md" padding="8px" color="gray.500">
-                                Total Matches Played: {matchTotal}
-                            </Text>
-                            <Pagination.Root
-                                color="red.500"
-                                count={matchTotal}
-                                pageSize={10}
-                                defaultPage={1}
-                                onPageChange={(event) => {
-                                    setIsLoading(true)
-                                    if (event.page <= 1) {
-                                        setLastMatch(null)
-                                    } else if (pageNumber > event.page) {
-                                        setIsBack(true)
-                                    }
-                                    setPageNumber(event.page)
-                                }}
-                            >
-                                <ButtonGroup gap="4" size="sm" variant="ghost">
-                                    <Pagination.PrevTrigger asChild>
-                                        <IconButton color="red.500">
-                                            <ChevronLeft />
-                                        </IconButton>
-                                    </Pagination.PrevTrigger>
-                                    <Text textStyle="md" padding="8px">
-                                        {pageNumber} of {pageCount}
-                                    </Text>
-                                    <Pagination.NextTrigger asChild>
-                                        <IconButton color="red.500">
-                                            <ChevronRight />
-                                        </IconButton>
-                                    </Pagination.NextTrigger>
-                                </ButtonGroup>
-                            </Pagination.Root>
+            <Stack minH="100%" maxWidth={'600px'} flex={1}>
+                {currentTab === 0 && (
+                    <Box>
+                        <Box color={theme.colors.main.actionSecondary} display="flex" gap="12px">
+                            <Construction /> Under Construction
                         </Box>
-                    )}
+                        {/* <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                            {JSON.stringify(userData)}
+                        </Text> */}
+                        <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                            {userData?.userName || 'Unknown User'}
+                            <TitleBadge title={userState?.userTitle || userData?.userTitle} />
+                        </Text>
+                        <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                            Overall win rate: {getWinRate()}%
+                        </Text>
+                        <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                            Current Win Streak: {userData?.playerStatSet?.winStreak}
+                        </Text>
+                        <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                            Total Games: {userData?.playerStatSet?.totalGames}
+                        </Text>
+                        <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                            Wins: {userData?.playerStatSet?.totalWins}
+                        </Text>
+                        <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                            Losses: {userData?.playerStatSet?.totalLosses}
+                        </Text>
 
-                    {recentMatches &&
-                        recentMatches.map((match) => {
-                            return (
-                                <>
-                                    {isLoading && <Skeleton height="230px" />}
-                                    {!isLoading && (
-                                        <Card.Root variant="elevated" maxH="230px" bg="gray.700">
-                                            <Card.Header color="gray.400">
-                                                {new Date(
-                                                    match.timestamp._seconds * 1000
-                                                ).toLocaleString()}
-                                            </Card.Header>
-                                            <Card.Body flex="1" bg="gray.700">
-                                                <Flex>
-                                                    <Stack gap="0px" flex="1" alignItems="center">
-                                                        <Text
-                                                            textStyle="md"
-                                                            padding="8px"
-                                                            color="gray.200"
-                                                        >
-                                                            {match.player1Name}
-                                                        </Text>
-                                                        <Text
-                                                            textStyle="xs"
-                                                            padding="8px"
-                                                            color="gray.200"
-                                                        >
-                                                            {match.player1Char}
-                                                        </Text>
-                                                        <RenderSuperArt code={match.player1Super} />
-                                                    </Stack>
-                                                    <Flex flex="1" justifyContent="center">
-                                                        <Text
-                                                            textStyle="md"
-                                                            padding="8px"
-                                                            color="gray.200"
-                                                        >
-                                                            {match.results === '1' ? 1 : 0}
-                                                        </Text>
-                                                        <Text
-                                                            textStyle="md"
-                                                            padding="8px"
-                                                            color="gray.200"
-                                                        >
-                                                            VS
-                                                        </Text>
-                                                        <Text
-                                                            textStyle="md"
-                                                            padding="8px"
-                                                            color="gray.200"
-                                                        >
-                                                            {match.results === '2' ? 1 : 0}
-                                                        </Text>
-                                                    </Flex>
-                                                    <Stack gap="0px" flex="1" alignItems="center">
-                                                        <Text
-                                                            textStyle="md"
-                                                            padding="8px"
-                                                            color="gray.200"
-                                                        >
-                                                            {match.player2Name || 'Unknown User'}
-                                                        </Text>
-                                                        <Text
-                                                            textStyle="xs"
-                                                            padding="8px"
-                                                            color="gray.200"
-                                                        >
-                                                            {match.player2Char}
-                                                        </Text>
-                                                        <RenderSuperArt code={match.player2Super} />
-                                                    </Stack>
-                                                </Flex>
-                                            </Card.Body>
-                                            <Card.Footer />
-                                        </Card.Root>
+                        <Box display="flex" width={'100%'}>
+                            {Object.keys(userData?.playerStatSet?.characters || {}).length && (
+                                <BarList.Root
+                                    chart={chart}
+                                    bg="none"
+                                    pointerEvents={'none'}
+                                    flex="1"
+                                >
+                                    <BarList.Content>
+                                        <Box display="flex" width={'100%'}>
+                                            <BarList.Label title="Character Choice" flex="1">
+                                                <BarList.Bar
+                                                    bg={'none'}
+                                                    color={theme.colors.main.text}
+                                                />
+                                            </BarList.Label>
+                                            <BarList.Label
+                                                title="Pick Rate"
+                                                minW="16"
+                                                titleAlignment="end"
+                                            >
+                                                <BarList.Value color={theme.colors.main.text} />
+                                            </BarList.Label>
+
+                                            <BarList.Label
+                                                title="Overall %"
+                                                minW="16"
+                                                titleAlignment="end"
+                                            >
+                                                <BarList.Value
+                                                    color={theme.colors.main.text}
+                                                    valueFormatter={(value) =>
+                                                        `${getPercent(value)}%`
+                                                    }
+                                                />
+                                            </BarList.Label>
+                                            <BarList.Label
+                                                title=""
+                                                minW="16"
+                                                titleAlignment="end"
+                                            ></BarList.Label>
+                                        </Box>
+                                    </BarList.Content>
+                                </BarList.Root>
+                            )}
+                            <Stack gap="28px" marginTop={'34px'}>
+                                {userData?.playerStatSet
+                                    ? getSortedObjectData(userData?.playerStatSet?.characters)?.map(
+                                          (char) => {
+                                              return (
+                                                  <GeneratedCharacterDonut
+                                                      characterName={char[0]}
+                                                  />
+                                              )
+                                          }
+                                      )
+                                    : null}
+                            </Stack>
+                        </Box>
+                    </Box>
+                )}
+
+                {currentTab === 1 && (
+                    <Box>
+                        <Stack>
+                            <Stack>
+                                <Heading flex="0" size="md" color={theme.colors.main.textSubdued}>
+                                    Recent Matches
+                                </Heading>
+                                {matchTotal && (
+                                    <Box>
+                                        <Text
+                                            textStyle="md"
+                                            padding="8px"
+                                            color={theme.colors.main.textMedium}
+                                        >
+                                            Total Matches Played: {matchTotal}
+                                        </Text>
+                                        <Pagination.Root
+                                            color={theme.colors.main.action}
+                                            count={matchTotal}
+                                            pageSize={10}
+                                            defaultPage={1}
+                                            onPageChange={(event) => {
+                                                setIsLoading(true)
+                                                if (event.page <= 1) {
+                                                    setLastMatch(null)
+                                                } else if (pageNumber > event.page) {
+                                                    setIsBack(true)
+                                                }
+                                                setPageNumber(event.page)
+                                            }}
+                                        >
+                                            <ButtonGroup gap="4" size="sm" variant="ghost">
+                                                <Pagination.PrevTrigger asChild>
+                                                    <IconButton color={theme.colors.main.action}>
+                                                        <ChevronLeft />
+                                                    </IconButton>
+                                                </Pagination.PrevTrigger>
+                                                <Text textStyle="md" padding="8px">
+                                                    {pageNumber} of {pageCount}
+                                                </Text>
+                                                <Pagination.NextTrigger asChild>
+                                                    <IconButton color={theme.colors.main.action}>
+                                                        <ChevronRight />
+                                                    </IconButton>
+                                                </Pagination.NextTrigger>
+                                            </ButtonGroup>
+                                        </Pagination.Root>
+                                    </Box>
+                                )}
+                                {recentMatches &&
+                                    recentMatches.map((match, index) => {
+                                        return (
+                                            <MatchSetCard
+                                                recentMatches={recentMatches}
+                                                key={index}
+                                                match={match}
+                                                index={index}
+                                                isLoading={isLoading}
+                                                RenderSuperArt={RenderSuperArt}
+                                                selectedMatchDetails={selectedMatchDetails}
+                                            />
+                                        )
+                                    })}
+                            </Stack>
+                        </Stack>
+                    </Box>
+                )}
+                {currentTab === 2 && (
+                    <Box>
+                        <Box color={theme.colors.main.actionSecondary} display="flex" gap="12px">
+                            <Construction />
+                            Under Construction
+                        </Box>
+                    </Box>
+                )}
+
+                {currentTab === 3 && (
+                    <Box>
+                        <Text textStyle="xs" color={theme.colors.main.textMedium}>
+                            Profile changes are not visible to others until the next time you log
+                            in.
+                        </Text>
+                        <Editable.Root
+                            defaultValue={userData?.userName}
+                            maxLength={16}
+                            onEditChange={(e) => setIsEditName(e.edit)}
+                            onValueCommit={(e) => {
+                                const censor = new TextCensor()
+                                const nameMatch = e.value
+                                const matches = matcher.getAllMatches(nameMatch)
+                                const censoredMessage = censor.applyTo(nameMatch, matches)
+                                setEditedUserName(censoredMessage)
+                                updateUserState({ ...userState, name: censoredMessage })
+                                window.api.changeUserData({ userName: censoredMessage })
+                            }}
+                            onValueChange={(e) => setEditedUserName(e.value)}
+                            onValueRevert={(e) => {
+                                setEditedUserName(e.value)
+                                updateUserState({ ...userState, name: e.value })
+                            }}
+                            value={editedUserName}
+                            invalid={editedUserName && editedUserName.length <= 1 && nameInvalid}
+                        >
+                            {!isEditName && (
+                                <Heading
+                                    flex="1"
+                                    size="lg"
+                                    color={theme.colors.main.actionSecondary}
+                                    width="100px"
+                                    height="36px"
+                                >
+                                    {editedUserName || userData?.userName ? (
+                                        editedUserName || userData?.userName
+                                    ) : (
+                                        <Skeleton height="24px" />
                                     )}
-                                </>
-                            )
-                        })}
-                </Stack>
+                                </Heading>
+                            )}
+
+                            <Editable.Input
+                                id="test"
+                                bg={theme.colors.main.textSubdued}
+                                height="36px"
+                                value={editedUserName}
+                            />
+                            {userData?.uid === userState.uid && (
+                                <Editable.Control>
+                                    <Editable.EditTrigger asChild>
+                                        <IconButton
+                                            variant="ghost"
+                                            size="xs"
+                                            color={theme.colors.main.action}
+                                        >
+                                            <Pencil />
+                                        </IconButton>
+                                    </Editable.EditTrigger>
+                                    <Editable.CancelTrigger asChild>
+                                        <IconButton
+                                            variant="outline"
+                                            size="xs"
+                                            color={theme.colors.main.action}
+                                        >
+                                            <X />
+                                        </IconButton>
+                                    </Editable.CancelTrigger>
+                                    <Editable.SubmitTrigger asChild>
+                                        <IconButton
+                                            variant="outline"
+                                            size="xs"
+                                            color={theme.colors.main.action}
+                                        >
+                                            <Check />
+                                        </IconButton>
+                                    </Editable.SubmitTrigger>
+                                </Editable.Control>
+                            )}
+                        </Editable.Root>
+                        <TitleBadge title={userState?.userTitle || userData?.userTitle} />
+                        <Field
+                            marginTop={'8px'}
+                            label=""
+                            helperText="Title flair to display to other users"
+                            color={theme.colors.main.textMedium}
+                        >
+                            <SelectRoot
+                                color={theme.colors.main.actionSecondary}
+                                collection={titleList || []}
+                                value={selectedTitle}
+                                onValueChange={(e) => setSelectedTitle(e.value)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValueText placeholder="Change Title" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {titleList?.items.map((title) => (
+                                        <SelectItem item={title} key={title.value}>
+                                            {title.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </SelectRoot>
+                        </Field>
+                    </Box>
+                )}
+
+                {isLoading && (
+                    <Box pos="absolute" inset="0" bg={theme.colors.main.bg} opacity="50%">
+                        <Center h="full">
+                            <Spinner color={theme.colors.main.action} />
+                        </Center>
+                    </Box>
+                )}
             </Stack>
-            {isLoading && (
-                <Box pos="absolute" inset="0" bg="gray.800" opacity="50%">
-                    <Center h="full">
-                        <Spinner color="red.500" />
-                    </Center>
-                </Box>
-            )}
-        </Stack>
+        </Box>
     )
 }

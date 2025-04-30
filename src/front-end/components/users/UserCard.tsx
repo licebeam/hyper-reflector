@@ -19,8 +19,11 @@ import {
     Popover,
 } from '@chakra-ui/react'
 import { Crown } from 'lucide-react'
+import TitleBadge from './TitleBadge'
 
 export default function UserCard({ user }) {
+    const theme = useLayoutStore((state) => state.appTheme)
+    const [userPopOpen, setUserPopOpen] = useState(false)
     const [isInMatch, setIsInMatch] = useState(false)
     const [isUserChallenging, setIsUserChallenging] = useState(false)
     const userState = useLoginStore((state) => state.userState)
@@ -39,8 +42,9 @@ export default function UserCard({ user }) {
         })
     }, [callData, user.uid])
 
+    //TODO: modify this to not use a time out maybe?
     const handleEndMatch = () => {
-        updateUserState({ isFighting: false })
+        updateUserState({ ...userState, isFighting: false })
         setTimeout(() => {
             setIsInMatch(false)
             clearCallData()
@@ -75,7 +79,7 @@ export default function UserCard({ user }) {
                     <Icon size="md" color="yellow.400">
                         <Crown />
                     </Icon>
-                    <Text textStyle="xs" fontWeight="bold" color="gray.100">
+                    <Text textStyle="xs" fontWeight="bold" color={theme.colors.main.text}>
                         {elo}
                     </Text>
                 </Box>
@@ -84,18 +88,23 @@ export default function UserCard({ user }) {
     }
 
     return (
-        <Popover.Root positioning={{ sameWidth: true, offset: { crossAxis: 0, mainAxis: -4 } }}>
+        <Popover.Root
+            open={userPopOpen}
+            onOpenChange={(e) => setUserPopOpen(e.open)}
+            positioning={{ sameWidth: true, offset: { crossAxis: 0, mainAxis: -4 } }}
+        >
             <Popover.Trigger asChild>
                 <Box
+                    minW="260px"
                     minH="60px"
                     maxH="60px"
-                    background={'cyan.800'}
-                    borderRadius="8px"
+                    background={theme.colors.main.card}
+                    borderRadius="4px"
                     padding="8px"
                     height="100%"
                     borderWidth="2px"
-                    borderColor={'cyan.900'}
-                    _hover={{ bg: 'cyan.700', cursor: 'pointer' }}
+                    borderColor={theme.colors.main.cardDark}
+                    _hover={{ bg: theme.colors.main.cardLight, cursor: 'pointer' }}
                 >
                     <Flex gap="12px">
                         <Box>
@@ -103,52 +112,47 @@ export default function UserCard({ user }) {
                                 <Avatar.Fallback name={user.name} />
                                 <Float placement="bottom-end" offsetX="1" offsetY="1">
                                     <Circle
-                                        bg="green.500"
+                                        bg="green.500" // offline online stuff
                                         size="8px"
                                         outline="0.2em solid"
-                                        outlineColor="cyan.900"
+                                        outlineColor={theme.colors.main.cardDark}
                                     />
                                 </Float>
                             </Avatar.Root>
                         </Box>
                         <Stack gap="0px">
                             <Flex>
-                                <Text textStyle="sm" fontWeight="bold" color="gray.100">
+                                <Text
+                                    textStyle="sm"
+                                    fontWeight="bold"
+                                    color={theme.colors.main.text}
+                                >
                                     {user.name}
                                 </Text>
                             </Flex>
-                            <Box minH="16px">
-                                {user.userTitle && (
-                                    <Badge size="xs" variant="subtle" colorPalette="red">
-                                        {user.userTitle}
-                                    </Badge>
-                                )}
-                            </Box>
+                            <TitleBadge title={user.userTitle || null} />
                         </Stack>
                         {/* eventually we'll display user account ranks here. */}
-                        <RankDisplay elo={user.elo} />
+                        <Box marginLeft={'12px'}>
+                            <RankDisplay elo={user.elo} />
+                        </Box>
                         <Box>{/* eventually we will display ping here */}</Box>
                     </Flex>
                 </Box>
             </Popover.Trigger>
             <Portal>
                 <Popover.Positioner>
-                    <Popover.Content width="auto" backgroundColor="gray.700">
+                    <Popover.Content width="auto" backgroundColor={theme.colors.main.tertiary}>
                         <Popover.Arrow />
                         <Popover.Body>
                             <Flex gap="8px">
                                 {!isUserChallenging && user.uid !== userState.uid && (
                                     <Button
-                                        bg="red.500"
+                                        bg={theme.colors.main.action}
                                         disabled={isInMatch}
                                         onClick={() => {
+                                            setUserPopOpen(false)
                                             setIsInMatch(true)
-                                            console.log(
-                                                'trying to call someone from: ',
-                                                userState.uid,
-                                                ' to => ',
-                                                user.uid
-                                            )
                                             window.api.callUser({
                                                 callerId: userState.uid,
                                                 calleeId: user.uid,
@@ -159,8 +163,9 @@ export default function UserCard({ user }) {
                                     </Button>
                                 )}
                                 <Button
-                                    bg="blue.500"
+                                    bg={theme.colors.main.actionSecondary}
                                     onClick={async () => {
+                                        setUserPopOpen(false)
                                         await setLayoutTab('profile')
                                         navigate({ to: `/profile/${user.uid || ''}` })
                                     }}

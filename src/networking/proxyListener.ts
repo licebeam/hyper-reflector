@@ -3,22 +3,17 @@ let proxyListener: null | any = null // This is a socket server that is used to 
 let currentTargetIp = '127.0.0.1' // We change this if we get a message from player and try to target that ip.
 let currentTargetPort = 7000 // We change this when we recieve a message from a player on a different port, this means one is not using upnp.
 
-export default async function startProxyListener(
-    proxyPort: number,
-    mainWindow: any,
-) {
+export default async function startProxyListener(proxyPort: number, mainWindow: any) {
     mainWindow.webContents.send('message-from-main', `attempting proxy listener`)
     proxyListener = dgram.createSocket('udp4')
     mainWindow.webContents.send('message-from-main', `socket created`)
 
     proxyListener.bind(proxyPort, () => {
-        console.log(`proxy listening on port ${proxyPort}...`)
         mainWindow.webContents.send('message-from-main', `proxy listening on port ${proxyPort}...`)
     })
 
     // we use this to send traffic from 7000 to 7001
     proxyListener.on('message', (msg, rinfo) => {
-        console.log('proxy listener got a message')
         if (!rinfo) return
         // we should check that we aren't getting requests from random IPs
 

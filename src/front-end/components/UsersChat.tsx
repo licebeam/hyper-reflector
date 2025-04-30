@@ -22,7 +22,6 @@ export default function UsersChat() {
     }
 
     const handleUserJoin = (user) => {
-        console.log(user)
         addUser(user)
     }
 
@@ -32,7 +31,6 @@ export default function UsersChat() {
     }
 
     const handleReceiveCall = (data) => {
-        console.log('RECIEVED CALL')
         if (!callData.find((c) => c.callerId === data.callerId)) {
             setCallData(data)
         }

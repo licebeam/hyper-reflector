@@ -1,14 +1,5 @@
-import { useEffect, useState } from 'react'
-import {
-    Button,
-    Stack,
-    Input,
-    Text,
-    Heading,
-    createListCollection,
-    Box,
-    Flex,
-} from '@chakra-ui/react'
+import { useEffect, useState, useRef } from 'react'
+import { Button, Stack, Text, Heading, createListCollection, Box } from '@chakra-ui/react'
 import {
     SelectContent,
     SelectItem,
@@ -16,13 +7,22 @@ import {
     SelectTrigger,
     SelectValueText,
 } from '../components/chakra/ui/select'
-import { Field } from '../components/chakra/ui/field'
-import { useLoginStore } from '../state/store'
+import { toaster } from '../components/chakra/ui/toaster'
+import { useLayoutStore, useLoginStore } from '../state/store'
+import { getThemeNameList } from '../utils/theme'
+import SideBar from '../components/general/SideBar'
+import { AlertCircle, Settings, Settings2 } from 'lucide-react'
 
 export default function SettingsPage() {
+    const theme = useLayoutStore((state) => state.appTheme)
+    const setTheme = useLayoutStore((state) => state.setTheme)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
+    const [currentTab, setCurrentTab] = useState<number>(0)
     const [currentEmuPath, setCurrentEmuPath] = useState('')
     const [currentDelay, setCurrentDelay] = useState('')
+    const [currentTheme, setCurrentTheme] = useState('')
+    const prevEmuPathRef = useRef('')
+    const hasMounted = useRef(false)
 
     const delays = createListCollection({
         items: [
@@ -37,106 +37,226 @@ export default function SettingsPage() {
         ],
     })
 
+    const themes = createListCollection({
+        items: [
+            ...getThemeNameList().map((t, index) => {
+                return { label: t, value: index }
+            }),
+        ],
+    })
+
     const handleSetPath = (path: string) => {
         setCurrentEmuPath(path)
     }
 
     const handleSetDelay = (delay: string) => {
-        console.log(delay)
         setCurrentDelay(delay)
     }
 
+    const handleSetTheme = (themeIndex: string) => {
+        console.log(themeIndex, currentTheme)
+        setCurrentTheme(themeIndex)
+        const themeToSet = themes.items[parseInt(themeIndex)].label
+        setTheme(themeToSet)
+    }
+
     useEffect(() => {
-        console.log('re-rendered')
-        window.api.getEmulatorDelay()
         window.api.getEmulatorPath()
+        window.api.getEmulatorDelay()
+        window.api.getAppTheme()
     }, [])
 
     useEffect(() => {
-        // Listen for updates from Electron
+        if (prevEmuPathRef.current !== '') {
+            console.log('Previous count:', prevEmuPathRef.current)
+            toaster.success({
+                title: 'Path Set!',
+                // description: `${currentEmuPath}`,
+            })
+        }
+
+        if (prevEmuPathRef.current === currentEmuPath && hasMounted.current) {
+            console.log('prev path:', prevEmuPathRef.current)
+            toaster.error({
+                title: 'Path setting failed!',
+                // description: `${currentEmuPath}`,
+            })
+        }
+
+        prevEmuPathRef.current = currentEmuPath
+        hasMounted.current = true
+    }, [currentEmuPath])
+
+    useEffect(() => {
         window.api.removeExtraListeners('emulatorPath', handleSetPath)
         window.api.on('emulatorPath', handleSetPath)
 
         window.api.removeExtraListeners('emulatorDelay', handleSetDelay)
         window.api.on('emulatorDelay', handleSetDelay)
 
+        window.api.removeExtraListeners('appTheme', handleSetTheme)
+        window.api.on('appTheme', handleSetTheme)
+
         return () => {
             window.api.removeListener('emulatorPath', handleSetPath)
             window.api.removeListener('emulatorDelay', handleSetDelay)
+            window.api.removeListener('appTheme', handleSetTheme)
         }
     }, [])
 
     return (
-        <Stack minH="100%">
-            <Heading flex="0" size="md" color="gray.200">
-                Application Settings
-            </Heading>
-            <Stack flex="1">
-                <Text textStyle="xs" color="gray.400">
-                    This is where we can set our emulator path and other setting
-                </Text>
-                <Text textStyle="xs" color="gray.300">
-                    Current Path: {currentEmuPath}
-                </Text>
+        <Box display="flex" gap="12px">
+            <SideBar width="160px">
                 <Button
-                    bg="blue.500"
-                    onClick={() => {
-                        window.api.setEmulatorPath()
-                    }}
+                    disabled={currentTab === 0}
+                    justifyContent="flex-start"
+                    bg={theme.colors.main.secondary}
+                    onClick={() => setCurrentTab(0)}
                 >
-                    Set Emulator Path
+                    <Settings />
+                    Application
                 </Button>
-            </Stack>
-            <Stack flex="1">
-                <Text textStyle="xs" color="gray.300">
-                    Current delay: {currentDelay}
-                </Text>
-                <Field label="Online Delay" helperText="" color="gray.300">
-                    <SelectRoot
-                        color="blue.400"
-                        collection={delays}
-                        value={[currentDelay]}
-                        onValueChange={(e) => {
-                            handleSetDelay(e.value[0])
-                            window.api.setEmulatorDelay(e.value[0])
-                        }}
-                    >
-                        <SelectTrigger>
-                            <SelectValueText placeholder="Select Delay" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {delays.items.map((delay) => (
-                                <SelectItem item={delay} key={delay.value}>
-                                    {delay.label}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </SelectRoot>
-                </Field>
-            </Stack>
-            <Stack flex="1" justifyContent="flex-end">
-                <Box display="flex">
-                    {isLoggedIn && (
-                        <>
-                            <Text textStyle="xs" flex="1" color="gray.400">
+
+                <Button
+                    disabled={currentTab === 1}
+                    justifyContent="flex-start"
+                    bg={theme.colors.main.secondary}
+                    onClick={() => setCurrentTab(1)}
+                >
+                    <Settings2 />
+                    Online Settings
+                </Button>
+
+                <Button
+                    disabled={currentTab === 2}
+                    justifyContent="flex-start"
+                    bg={theme.colors.main.secondary}
+                    onClick={() => setCurrentTab(2)}
+                >
+                    <AlertCircle />
+                    Danger
+                </Button>
+            </SideBar>
+            <Stack flex="1" maxWidth={'600px'}>
+                {currentTab === 0 && (
+                    <Box>
+                        <Heading flex="0" size="md" color={theme.colors.main.textSubdued}>
+                            Application Settings
+                        </Heading>
+                        <Stack>
+                            <Text textStyle="xs" color={theme.colors.main.textMedium}>
+                                This is where we can set our emulator path and other setting
+                            </Text>
+                            <Button
+                                bg={theme.colors.main.actionSecondary}
+                                onClick={() => {
+                                    try {
+                                        window.api.setEmulatorPath()
+                                    } catch (error) {
+                                        toaster.error({
+                                            title: 'Update successful',
+                                            description: 'File saved successfully to the server',
+                                        })
+                                    }
+                                }}
+                            >
+                                Set Emulator Path
+                            </Button>
+                            <Text textStyle="xs" color={theme.colors.main.textMedium}>
+                                Current Path: {currentEmuPath}
+                            </Text>
+                            <Text textStyle="md" color={theme.colors.main.text}>
+                                Theme
+                            </Text>
+                            <SelectRoot
+                                key="theme-select"
+                                color={theme.colors.main.actionSecondary}
+                                collection={themes}
+                                value={[currentTheme]}
+                                onValueChange={(e) => {
+                                    handleSetTheme(e.value[0])
+                                    window.api.setAppTheme(e.value[0])
+                                    toaster.success({
+                                        title: 'Theme Changed',
+                                    })
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValueText placeholder="Select Theme" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {themes.items.map((theme) => (
+                                        <SelectItem item={theme} key={theme.value}>
+                                            {theme.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </SelectRoot>
+                        </Stack>
+                    </Box>
+                )}
+                {currentTab === 1 && (
+                    <Box>
+                        <Heading flex="0" size="md" color={theme.colors.main.textSubdued}>
+                            Online Settings
+                        </Heading>
+                        <Stack>
+                            <Text textStyle="xs" color={theme.colors.main.textMedium}>
+                                Online Delay
+                            </Text>
+                            <SelectRoot
+                                color={theme.colors.main.actionSecondary}
+                                collection={delays}
+                                value={[currentDelay]}
+                                onValueChange={(e) => {
+                                    handleSetDelay(e.value[0])
+                                    window.api.setEmulatorDelay(e.value[0])
+                                    toaster.success({
+                                        title: 'Delay Set',
+                                        description: `Successfully Set Delay to: ${e.value[0]}`,
+                                    })
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValueText placeholder="Select Delay" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {delays.items.map((delay) => (
+                                        <SelectItem item={delay} key={delay.value}>
+                                            {delay.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </SelectRoot>
+                            <Text textStyle="xs" color={theme.colors.main.textMedium}>
+                                Current delay: {currentDelay}
+                            </Text>
+                        </Stack>
+                    </Box>
+                )}
+                {currentTab === 2 && isLoggedIn && (
+                    <Box>
+                        <Heading flex="0" size="md" color={theme.colors.main.textSubdued}>
+                            Danger Settings
+                        </Heading>
+                        <Stack>
+                            <Text textStyle="xs" color={theme.colors.main.textMedium}>
                                 Log out user, this will also make it so you do not automaitcally log
                                 in on start next time.
                             </Text>
+
                             <Button
                                 colorPalette="red"
-                                flex="1"
-                                alignSelf="center"
                                 onClick={() => {
-                                    console.log('trying to log out')
                                     window.api.logOutUser()
                                 }}
                             >
                                 Log Out
                             </Button>
-                        </>
-                    )}
-                </Box>
+                        </Stack>
+                    </Box>
+                )}
             </Stack>
-        </Stack>
+        </Box>
     )
 }

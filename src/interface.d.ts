@@ -13,16 +13,26 @@ export interface IElectronAPI {
     logOutUser: any
     getLoggedInUser: any
     sendMessage: any
+    sendAlert: any
     sendRoomMessage: any
+    getChallengeQueue: any
     addUserToRoom: any
     removeUserFromRoom: any
     addUserGroupToRoom: any
+    //lobbies
+    createNewLobby: any
+    userChangeLobby: any
+    updateLobbyStats: any
     handShake: any
     sendDataChannel: any
+    // settings
     setEmulatorPath: any
     getEmulatorPath: any
     setEmulatorDelay: any
     getEmulatorDelay: any
+    setAppTheme: any
+    getAppTheme: any
+    // -
     endMatch: any
     endMatchUI: any
     killEmulator: any

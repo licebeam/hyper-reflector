@@ -1,7 +1,7 @@
 const { spawn } = require('child_process')
 import { Config } from './config'
 
-export function launchGGPOSpawn(command: string, callBack: () => any) {
+export function launchGGPOSpawn(command: string, callBack: (isOnOpen?: boolean) => any) {
     try {
         const [cmd, ...args] = command.split(' ')
         let child
@@ -15,18 +15,22 @@ export function launchGGPOSpawn(command: string, callBack: () => any) {
         // Capture stderr (errors)
         child.stderr.on('data', (data) => {
             console.error(`[Fightcade-FBNeo Error]: ${data.toString()}`)
+            return 'test error'
         })
 
         // Listen for process exit
         child.on('exit', (code, signal) => {
             // call the kill code
             if (callBack) {
-                console.log('emulator callback', callBack)
+                console.log('emulator callback', callBack, code, signal)
                 callBack()
             }
 
             if (code !== null) {
                 console.log(`FBNeo exited with code ${code}`)
+                if (code === 1 && callBack) {
+                    callBack(true) // failed to open
+                }
             } else {
                 console.log(`FBNeo terminated by signal ${signal}`)
             }
@@ -76,7 +80,7 @@ export function startPlayingOnline({
     player: number
     delay: number
     isTraining: boolean
-    callBack: () => any
+    callBack: (isOnOpen?: boolean) => any
 }) {
     let luaPath = config.emulator.luaPath
     if (isTraining) {
@@ -93,7 +97,13 @@ export function startPlayingOnline({
     }
 }
 
-export function startSoloMode({ config, callBack }: { config: Config; callBack: () => any }) {
+export function startSoloMode({
+    config,
+    callBack,
+}: {
+    config: Config
+    callBack: (isOnOpen?: boolean) => any
+}) {
     const directCommand = `${fightcadeCmd(config)} -game sfiii3nr1 ${config.emulator.trainingLuaPath}`
     return launchGGPOSpawn(directCommand, callBack)
 }

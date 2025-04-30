@@ -1,11 +1,24 @@
-import { Bleed, Box, Heading, Stack, Text, Flex } from '@chakra-ui/react'
+import { useEffect, useState } from 'react'
+import { Box, Heading, Stack, Text } from '@chakra-ui/react'
+import { BarList, Chart, type BarListData, useChart } from '@chakra-ui/charts'
+import { Cell, Pie, PieChart, Tooltip } from 'recharts'
 import BlogPost from '../components/BlogPost'
+import { useLayoutStore, useLoginStore } from '../state/store'
 
 const blogsArray = [
     {
+        title: 'Update Version 0.3.0a',
+        date: '4/30/2025',
+        content: `
+         This is the first major update for hyper reflector!
+         In addition to bug fixes, performance improvements: This update adds player flair, app themes, private and public lobby creation, matches are now saved as sets which can be browsed for statistics (coming soon).
+         Additionally, global and personal stat tracking is here!, characters played, matches, win rates, check your profile after a few matches! - Full notes on github and discord.
+        `,
+    },
+    {
         title: 'Update Version 0.2.2a',
         date: '3/25/2025',
-        content: 'hot fixes lua sorry + Small bug fixes from 0.2.0 -- edit: more hotixes...',
+        content: 'hot fixes lua sorry + Small bug fixes from 0.2.0 -- edit: more hotfixes...',
     },
     {
         title: 'Update Version 0.1.9a',
@@ -33,16 +46,204 @@ const blogsArray = [
 ]
 
 export default function NewsPage() {
+    const theme = useLayoutStore((state) => state.appTheme)
+    const userState = useLoginStore((state) => state.userState)
+    const [globalStats, setGlobalStats] = useState(undefined)
+
+    const handleFillGlobalStats = (stats) => {
+        console.log('stats', stats)
+        setGlobalStats(stats.globalStatSet)
+    }
+
+    useEffect(() => {
+        window.api.getGlobalStats({ userId: userState })
+        window.api.removeExtraListeners('fillGlobalStats', handleFillGlobalStats)
+        window.api.on('fillGlobalStats', handleFillGlobalStats)
+
+        return () => {
+            window.api.removeListener('fillGlobalStats', handleFillGlobalStats)
+        }
+    }, [])
+
+    const getCharacterData = () => {
+        if (!globalStats?.globalCharacterChoice) return
+        const charKeys = Object.keys(globalStats?.globalCharacterChoice)
+        const data = charKeys.map((char) => {
+            return {
+                name: char,
+                value: globalStats?.globalCharacterChoice[char].picks,
+                test: 'poo',
+            }
+        })
+        return data
+    }
+
+    const chart = useChart<BarListData>({
+        sort: { by: 'value', direction: 'desc' },
+        data: getCharacterData() || [{ name: 'unknown', value: 0, test: 'poop' }],
+        series: [{ name: 'name', color: theme.colors.main.actionSecondary }],
+    })
+
+    const getPercent = (value: number) => chart.getValuePercent('value', value).toFixed(2)
+
+    const GeneratedCharacterDonut = ({ characterName }) => {
+        if (!globalStats.globalCharacterChoice) return null
+        const character = globalStats.globalCharacterChoice[characterName]
+        if (!character) return null
+        console.log(character)
+        const sa1Picks = character?.superChoice[0]?.wins + character?.superChoice[0]?.losses || 0
+        const sa2Picks = character?.superChoice[1]?.wins + character?.superChoice[1]?.losses || 0
+        const sa3Picks = character?.superChoice[2]?.wins + character?.superChoice[2]?.losses || 0
+        console.log('making a donut', sa1Picks, sa2Picks, sa3Picks)
+        const superDonut = useChart({
+            data: [
+                { name: 'SA I', value: sa1Picks, color: theme.colors.main.sa1 },
+                { name: 'SA II', value: sa2Picks, color: theme.colors.main.sa2 },
+                { name: 'SA III', value: sa3Picks, color: theme.colors.main.sa3 },
+            ],
+        })
+
+        return (
+            <Chart.Root boxSize="20px" chart={superDonut} mx="-160px">
+                <PieChart>
+                    <Tooltip
+                        cursor={false}
+                        animationDuration={100}
+                        content={<Chart.Tooltip hideLabel />}
+                    />
+                    <Pie
+                        innerRadius={10}
+                        outerRadius={22}
+                        isAnimationActive={false}
+                        data={superDonut.data}
+                        dataKey={superDonut.key('value')}
+                    >
+                        {superDonut.data.map((item) => (
+                            <Cell key={item.name} fill={superDonut.color(item.color)} />
+                        ))}
+                    </Pie>
+                </PieChart>
+            </Chart.Root>
+        )
+    }
+
+    const getSortedObjectData = (data) => {
+        const sorted = Object.entries(data).sort(([, a], [, b]) => b.picks - a.picks)
+        return sorted
+    }
+
+    const PlayerWinRateDonut = (data) => {
+        if (!globalStats?.globalWinCount) return null
+        const p1Wins = globalStats?.globalWinCount['1'] || 0
+        const p2Wins = globalStats?.globalWinCount['2'] || 0
+        const playerWinDonut = useChart({
+            data: [
+                { name: 'Player 1 Wins', value: p1Wins, color: theme.colors.main.action },
+                { name: 'Player 1 Losses', value: p2Wins, color: theme.colors.main.actionDark },
+                { name: 'Player 2 Wins', value: p2Wins, color: theme.colors.main.actionSecondary },
+                {
+                    name: 'Player 1 Losses',
+                    value: p1Wins,
+                    color: theme.colors.main.actionSecondaryDark,
+                },
+            ],
+        })
+        return (
+            <Chart.Root boxSize="200px" chart={playerWinDonut} mx="auto">
+                <PieChart>
+                    <Tooltip
+                        cursor={false}
+                        animationDuration={100}
+                        content={<Chart.Tooltip hideLabel />}
+                    />
+                    <Pie
+                        innerRadius={80}
+                        outerRadius={100}
+                        isAnimationActive={false}
+                        data={playerWinDonut.data}
+                        dataKey={playerWinDonut.key('value')}
+                        nameKey="value"
+                        labelLine={{ strokeWidth: 1 }}
+                        label={{
+                            fill: playerWinDonut.color(theme.colors.main.action),
+                        }}
+                    >
+                        {playerWinDonut.data.map((item) => (
+                            <Cell
+                                strokeWidth={2}
+                                key={item.name}
+                                fill={playerWinDonut.color(item.color)}
+                            />
+                        ))}
+                    </Pie>
+                </PieChart>
+            </Chart.Root>
+        )
+    }
+
     return (
-        <Stack gap="2">
-            <Heading size="md" color="gray.200">
-                Updates
-            </Heading>
-            <Stack>
-                {blogsArray.map((blog) => (
-                    <BlogPost blog={blog} />
-                ))}
+        <Box display="flex" gap="32px">
+            <Stack gap="12px" flex="2">
+                <Heading size="md" color={theme.colors.main.textSubdued}>
+                    News
+                </Heading>
+                <Stack>
+                    {blogsArray.map((blog, index) => (
+                        <BlogPost blog={blog} key={`blog-post-${index}`} />
+                    ))}
+                </Stack>
             </Stack>
-        </Stack>
+            <Stack flex="4" gap="12px">
+                <Heading size="md" color={theme.colors.main.textSubdued}>
+                    Hyper Reflector
+                </Heading>
+                <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                    Total Matches: {globalStats?.globalNumberOfMatches || 0}
+                </Text>
+                <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                    Win Rates:
+                </Text>
+                <Box>
+                    <PlayerWinRateDonut />
+                </Box>
+                <Box display="flex">
+                    {Object.keys(globalStats?.globalCharacterChoice || {}).length && (
+                        <BarList.Root chart={chart} bg="none" pointerEvents={'none'} flex="1">
+                            <BarList.Content>
+                                <Box display="flex" width={'80%'}>
+                                    <BarList.Label title="Character Choice" flex="1">
+                                        <BarList.Bar bg={'none'} color={theme.colors.main.text} />
+                                    </BarList.Label>
+                                    <BarList.Label title="Pick Rate" minW="16" titleAlignment="end">
+                                        <BarList.Value color={theme.colors.main.text} />
+                                    </BarList.Label>
+
+                                    <BarList.Label title="Overall %" minW="16" titleAlignment="end">
+                                        <BarList.Value
+                                            color={theme.colors.main.text}
+                                            valueFormatter={(value) => `${getPercent(value)}%`}
+                                        />
+                                    </BarList.Label>
+                                    <BarList.Label
+                                        title=""
+                                        minW="16"
+                                        titleAlignment="end"
+                                    ></BarList.Label>
+                                </Box>
+                            </BarList.Content>
+                        </BarList.Root>
+                    )}
+                    <Stack gap="28px" marginTop={'34px'}>
+                        {globalStats?.globalCharacterChoice
+                            ? getSortedObjectData(globalStats?.globalCharacterChoice)?.map(
+                                  (char) => {
+                                      return <GeneratedCharacterDonut characterName={char[0]} />
+                                  }
+                              )
+                            : null}
+                    </Stack>
+                </Box>
+            </Stack>
+        </Box>
     )
 }

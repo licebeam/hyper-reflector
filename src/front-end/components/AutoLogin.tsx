@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useLoginStore, useMessageStore } from '../state/store'
+import { useLayoutStore, useLoginStore, useMessageStore } from '../state/store'
 import { Stack, Box, Center, Spinner, Text } from '@chakra-ui/react'
 
 export default function Autologin() {
+    const theme = useLayoutStore((state) => state.appTheme)
     const [isLoading, setIsLoading] = useState(true)
     const failedLogin = useLoginStore((state) => state.failedLogin)
     const successLogin = useLoginStore((state) => state.successLogin)
@@ -18,18 +19,15 @@ export default function Autologin() {
     }
 
     const handleAutoLoginFail = () => {
-        console.log('auto log failed')
         navigate({ to: '/' })
     }
 
     const handleLogIn = (loginInfo) => {
-        console.log(loginInfo)
         setUserState(loginInfo)
         addUser(loginInfo)
         successLogin()
         setIsLoading(false)
         navigate({ to: '/chat' })
-        // handle do some funky stateful call for logging in redirect etc
     }
 
     const handleLoginFail = (event) => {
@@ -64,15 +62,15 @@ export default function Autologin() {
     return (
         <>
             {isLoading && (
-                <Box pos="absolute" inset="0" bg="gray.800" opacity="50%">
+                <Box pos="absolute" inset="0" bg={theme.colors.main.bg} opacity="50%">
                     <Center h="full">
-                        <Spinner color="red.500" />
+                        <Spinner color={theme.colors.main.action} />
                     </Center>
                 </Box>
             )}
             <Stack justifySelf="center">
                 <Box>
-                    <Text textStyle="4xl" color="red.600">
+                    <Text textStyle="4xl" color={theme.colors.main.action}>
                         Logging you in!
                     </Text>
                 </Box>

@@ -154,19 +154,14 @@ Device.prototype.run = function run(action, args, callback) {
                 responseType: 'text',
             })
             .then((res) => {
-                // console.log('Raw Response:', res.data);
-
                 const xmlString = Buffer.isBuffer(res.data) ? res.data.toString() : res.data
                 const parser = new XMLParser({ ignoreAttributes: false, trimValues: true })
                 const parsedData = parser.parse(xmlString)
-
-                // console.log('Parsed XML:', JSON.stringify(parsedData, null, 2));
 
                 var soapns = nat.utils.getNamespace(
                     parsedData['s:Envelope'],
                     'http://schemas.xmlsoap.org/soap/envelope/'
                 )
-                // console.log('SOAP Namespace:', soapns);
 
                 if (!soapns) {
                     return callback(new Error('SOAP namespace not found in response'))
@@ -175,7 +170,6 @@ Device.prototype.run = function run(action, args, callback) {
                 callback(null, parsedData['s:Envelope'][soapns + 'Body'])
             })
             .catch((err) => {
-                // console.log('Error in run:', err);
                 return callback(new Error('Request failed: ' + err.message))
             })
     })

@@ -18,22 +18,41 @@ contextBridge.exposeInMainWorld('api', {
     logOutUser: () => ipcRenderer.send('logOutUser'),
     getLoggedInUser: (uid: string) => ipcRenderer.send('getLoggedInUser', uid),
     // room related
-    sendMessage: (text: string) => ipcRenderer.send('sendMessage', text),
+    sendMessage: (messageObject: { text: string; user: any }) =>
+        ipcRenderer.send('sendMessage', messageObject),
+    sendAlert: (alertObject: { type: string; message: { title: string; description: string } }) =>
+        ipcRenderer.send('sendMessage', alertObject),
     sendRoomMessage: (text: string) => ipcRenderer.send('sendRoomMessage', text),
+    getChallengeQueue: (text: string) => ipcRenderer.send('getChallengeQueue', text),
     addUserToRoom: (user: any) => ipcRenderer.send('addUserToRoom', user),
     removeUserFromRoom: (user: any) => ipcRenderer.send('removeUserFromRoom', user),
     addUserGroupToRoom: (users: [any]) => ipcRenderer.send('addUserGroupToRoom', users),
     handShake: (type: string) => ipcRenderer.send('hand-shake-users', type),
     sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
+    //lobbies
+    createNewLobby: (lobbyData: { name: string; pass: string; user: any; private: boolean }) =>
+        ipcRenderer.send('createNewLobby', lobbyData),
+    userChangeLobby: (lobbyData: {
+        newLobbyId: string
+        pass: string
+        user: any
+        private: boolean
+    }) => ipcRenderer.send('userChangeLobby', lobbyData),
+    updateLobbyStats: (lobbyArray: any) => ipcRenderer.send('updateLobbyStats', lobbyArray),
     // user profile
     getUserMatches: (matches: any) => ipcRenderer.send('getUserMatches', matches),
+    getGlobalSet: (matches: any) => ipcRenderer.send('getGlobalSet', matches),
+    getAllTitles: (titles: any) => ipcRenderer.send('getAllTitles', titles),
     getUserData: (user: any) => ipcRenderer.send('getUserData', user),
+    getGlobalStats: (stats: any) => ipcRenderer.send('getGlobalStats', stats),
     changeUserData: (userData: any) => ipcRenderer.send('changeUserData', userData),
     // match
     setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
     setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),
     getEmulatorDelay: (delay: number) => ipcRenderer.send('getEmulatorDelay', delay),
+    setAppTheme: (themeIndex: number) => ipcRenderer.send('setAppTheme', themeIndex),
+    getAppTheme: (themeIndex: number) => ipcRenderer.send('getAppTheme', themeIndex),
     endMatch: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     endMatchUI: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     killEmulator: () => ipcRenderer.send('killEmulator'),
@@ -44,7 +63,7 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.send('serveMatch', { ip, port, player, delay, myPort }),
     startGameOnline: (opponentUID: string, player: number, myId?: string) =>
         ipcRenderer.send('startGameOnline', { opponentUID, player, myId }),
-    startSoloTraining: () => ipcRenderer.send('start-solo-mode'),
+    startSoloTraining: () => ipcRenderer.send('startTrainingMode'),
     // ipc call stuff
     on: (channel, callback) => {
         ipcRenderer.on(channel, (event, ...args) => callback(...args))
@@ -56,31 +75,25 @@ contextBridge.exposeInMainWorld('api', {
         ipcRenderer.removeAllListeners(channel, callback)
     },
     removeExtraListeners: (channel, callback) => {
-        console.log(
-            'we have this many listeners on ',
-            channel,
-            ipcRenderer.rawListeners(channel).length
-        )
         ipcRenderer.rawListeners(channel).forEach((listener, index) => {
-            console.log(listener)
             if (ipcRenderer.rawListeners(channel).length > 1) {
                 // we need to make sure we always keep alive our first index here, its the one we use in renderer.ts
                 if (index === 0) return
                 return ipcRenderer.removeListener(channel, listener)
             }
-            return console.log('saving last listener')
+            return console.info('saving last listener')
         })
     },
 })
 
 ipcRenderer.on('message-from-main', (event, message) => {
-    console.log('Stats to update the UI with:', message)
+    console.info('Stats to update the UI with:', message)
 })
 
 ipcRenderer.on('stats-from-main', (event, message) => {
-    console.log('Stats to update the UI with:', message)
+    console.info('Stats to update the UI with:', message)
 })
 
 ipcRenderer.on('send-log', (event, message) => {
-    console.log('-main- ', message)
+    console.info('-main- ', message)
 })

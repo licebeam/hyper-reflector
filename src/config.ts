@@ -5,6 +5,7 @@ const fs = require('fs')
 export type AppConfig = {
     emuPath: string
     emuDelay: string
+    appTheme: string
     filePathBase: string
     isDev: boolean
 }
@@ -43,6 +44,7 @@ function getAppConfig(): AppConfig {
     return {
         emuPath: configFileMap.emuPath,
         emuDelay: configFileMap.emuDelay,
+        appTheme: configFileMap.appTheme,
         filePathBase,
         isDev,
     }

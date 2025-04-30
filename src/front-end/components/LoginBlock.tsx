@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from '@tanstack/react-router'
-import { useLoginStore, useMessageStore } from '../state/store'
+import { useLayoutStore, useLoginStore, useMessageStore } from '../state/store'
 import { Button, Stack, Input, Box, Center, Spinner, Text, Heading, Flex } from '@chakra-ui/react'
 import { PasswordInput } from './chakra/ui/password-input'
 import { Field } from './chakra/ui/field'
-import { Camera, Hammer } from 'lucide-react'
+import { Hammer } from 'lucide-react'
 
 export default function LoginBlock() {
+    const theme = useLayoutStore((state) => state.appTheme)
     const [isLoading, setIsLoading] = useState(false)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const failedLogin = useLoginStore((state) => state.failedLogin)
@@ -27,7 +28,6 @@ export default function LoginBlock() {
         successLogin()
         setIsLoading(false)
         navigate({ to: '/chat' })
-        // handle do some funky stateful call for logging in redirect etc
     }
 
     const handleLoginFail = (event) => {
@@ -53,25 +53,27 @@ export default function LoginBlock() {
     return (
         <>
             {isLoading && (
-                <Box pos="absolute" inset="0" bg="gray.800" opacity="50%">
+                <Box pos="absolute" inset="0" bg={theme.colors.main.bg} opacity="50%">
                     <Center h="full">
-                        <Spinner color="red.500" />
+                        <Spinner color={theme.colors.main.action} />
                     </Center>
                 </Box>
             )}
             <Stack gap={2}>
                 {!isLoading && (
-                    <Heading size="md" color="gray.300">
+                    <Heading size="md" color={theme.colors.main.textMedium}>
                         Sign In
                     </Heading>
                 )}
                 <Box>
                     {!isLoading && !isLoggedIn && (
                         <Stack gap={6}>
-                            <Field label="Email" required color="gray.400">
+                            <Field label="Email" required color={theme.colors.main.textMedium}>
                                 <Input
-                                    bg="gray.200"
-                                    color="gray.900"
+                                    bg={theme.colors.main.textSubdued}
+                                    color={theme.colors.main.bg}
+                                    maxLength={50}
+                                    minLength={1}
                                     placeholder="bobby@example.com"
                                     disabled={isLoading}
                                     onChange={(e) =>
@@ -91,10 +93,12 @@ export default function LoginBlock() {
                                     }}
                                 />
                             </Field>
-                            <Field label="Password" required color="gray.400">
+                            <Field label="Password" required color={theme.colors.main.textMedium}>
                                 <PasswordInput
-                                    bg="gray.200"
-                                    color="gray.900"
+                                    bg={theme.colors.main.textSubdued}
+                                    color={theme.colors.main.bg}
+                                    maxLength={160}
+                                    minLength={1}
                                     placeholder="password"
                                     disabled={isLoading}
                                     onChange={(e) =>
@@ -116,7 +120,7 @@ export default function LoginBlock() {
                             </Field>
                             <Stack>
                                 <Button
-                                    bg="blue.500"
+                                    bg={theme.colors.main.actionSecondary}
                                     disabled={isLoading || !login.pass || !login.email}
                                     id="login-btn"
                                     onClick={() => {
@@ -126,10 +130,10 @@ export default function LoginBlock() {
                                 >
                                     Log In
                                 </Button>
-                                <Text textStyle="sm" color="gray.400">
+                                <Text textStyle="sm" color={theme.colors.main.textMedium}>
                                     <Link to="/create" className="[&.active]:font-bold">
                                         <Flex gap="1">
-                                            <p> Create New Account </p>
+                                            <div> Create New Account </div>
                                             <Hammer size={18} />
                                         </Flex>
                                     </Link>

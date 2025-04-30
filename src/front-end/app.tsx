@@ -1,4 +1,3 @@
-// import { ChakraProvider } from '@chakra-ui/react'
 import { createRoot } from 'react-dom/client'
 import {
     Outlet,
@@ -20,11 +19,14 @@ import CreateAccountPage from './pages/CreateAccountPage'
 import ErrorBoundary from './ErrorBoundary'
 import Layout from './layout/Layout'
 import Autologin from './components/AutoLogin'
+import theme from './utils/theme'
+import { Toaster } from './components/chakra/ui/toaster'
 
 const rootRoute = createRootRoute({
     component: () => (
         <>
             <Layout>
+                <Toaster />
                 <Outlet />
             </Layout>
             {/* <TanStackRouterDevtools /> */}
@@ -120,29 +122,19 @@ declare module '@tanstack/react-router' {
     }
 }
 
-const customConfig = defineConfig({
+const config = defineConfig({
     theme: {
-        tokens: {
-            colors: {
-                brand: {
-                    50: { value: '#e6f2ff' },
-                    100: { value: '#e6f2ff' },
-                    200: { value: '#bfdeff' },
-                    300: { value: '#99caff' },
-                    950: { value: '#001a33' },
-                },
-            },
-        },
+        // animationStyles,
     },
 })
 
-export const system = createSystem(defaultConfig, customConfig)
+export const system = createSystem(defaultConfig, config)
 
 const root = createRoot(document.body)
 root.render(
     <ErrorBoundary>
         <ChakraProvider value={system}>
-            <Box backgroundColor="gray.900">
+            <Box backgroundColor={theme.colors.main.bg}>
                 <RouterProvider router={router} />
             </Box>
         </ChakraProvider>
