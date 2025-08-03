@@ -23,6 +23,7 @@ export default function Autologin() {
     }
 
     const handleLogIn = (loginInfo) => {
+        // console.log('login info', loginInfo)
         setUserState(loginInfo)
         addUser(loginInfo)
         successLogin()

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, memo, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { BarList, Chart, type BarListData, useChart } from '@chakra-ui/charts'
 import { Cell, Pie, PieChart, Tooltip } from 'recharts'
@@ -16,6 +16,10 @@ import {
     Editable,
     Button,
     createListCollection,
+    Flex,
+    Avatar,
+    Float,
+    Circle,
 } from '@chakra-ui/react'
 import {
     SelectContent,
@@ -32,6 +36,7 @@ import {
     Construction,
     Joystick,
     Pencil,
+    RefreshCcw,
     UserRound,
     Wrench,
     X,
@@ -50,6 +55,7 @@ import {
 import SideBar from '../components/general/SideBar'
 import MatchSetCard from '../components/users/MatchSetCard'
 import TitleBadge from '../components/users/TitleBadge'
+import GravatarInput from '../components/profile/GravatarInput'
 
 const matcher = new RegExpMatcher({
     ...englishDataset.build(),
@@ -64,9 +70,12 @@ export default function PlayerProfilePage() {
     const updateUserState = useLoginStore((state) => state.updateUserState)
     const [currentTab, setCurrentTab] = useState<number>(0)
     const [editedUserName, setEditedUserName] = useState(undefined)
+    const [editedGravEmail, setEditedGravEmail] = useState(undefined)
     const [isEditName, setIsEditName] = useState(false)
     const [nameInvalid, setNameInvalid] = useState(false)
+    const [emailInvalid, setEmailInvalid] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
+    const [isLoadingUserData, setIsLoadingUserData] = useState(true)
     const [recentMatches, setRecentMatches] = useState([])
     const [userData, setUserData] = useState([])
     const [lastMatch, setLastMatch] = useState(null)
@@ -89,6 +98,7 @@ export default function PlayerProfilePage() {
         setLastMatch(null)
         setRecentMatches([])
         setEditedUserName(undefined)
+        setEditedGravEmail(undefined)
         setIsEditName(false)
         setSelectedMatchDetails(undefined)
     }
@@ -109,19 +119,22 @@ export default function PlayerProfilePage() {
     const handleSetUserData = (data) => {
         setUserData(data)
         setEditedUserName(data.userName)
+        setEditedGravEmail(data.gravEmail)
     }
 
     useEffect(() => {
         // use effects when we switch tabs
         // public profile
         if (currentTab === 0) {
+            setIsLoading(false)
             window.api.getAllTitles({ userId })
-            setIsLoading(true)
-            window.api.getUserData(userId)
+            if (!userData?.userName) {
+                window.api.getUserData(userId)
+            }
         }
         // recent matches
         if (currentTab === 1) {
-            setIsLoading(true)
+            // setIsLoading(true)
             // window.api.getUserMatches({ userId, lastMatchId: lastMatch })
             if (isBack) {
                 window.api.getUserMatches({ userId, firstMatchId: firstMatch })
@@ -133,14 +146,14 @@ export default function PlayerProfilePage() {
         }
         // public profile
         if (currentTab === 2) {
-            setIsLoading(true)
+            //setIsLoading(true)
             setIsLoading(false)
         }
     }, [currentTab, pageNumber])
 
     useEffect(() => {
         if (currentTab === 0 || currentTab === 3) {
-            setIsLoading(false)
+            setIsLoadingUserData(false)
         }
     }, [userData])
 
@@ -240,6 +253,10 @@ export default function PlayerProfilePage() {
         setNameInvalid(true)
     }, [editedUserName])
 
+    useEffect(() => {
+        setEmailInvalid(true)
+    }, [editedGravEmail])
+
     const getCharacterData = () => {
         if (!userData?.playerStatSet?.characters) return
         const charKeys = Object.keys(userData?.playerStatSet?.characters)
@@ -255,14 +272,13 @@ export default function PlayerProfilePage() {
 
     const chart = useChart<BarListData>({
         sort: { by: 'value', direction: 'desc' },
-        data: getCharacterData() || [{ name: 'unknown', value: 0, test: 'poop' }],
+        data: getCharacterData() || [{ name: 'unknown', value: 0, test: 'cool' }],
         series: [{ name: 'name', color: theme.colors.main.actionSecondary }],
     })
 
     const getPercent = (value: number) => chart.getValuePercent('value', value).toFixed(2)
 
     const getWinRate = (): number => {
-        console.log(userData)
         if (userData?.playerStatSet?.totalWins > 0) {
             return (
                 (userData?.playerStatSet?.totalWins / userData?.playerStatSet?.totalGames) *
@@ -275,11 +291,9 @@ export default function PlayerProfilePage() {
         if (!userData?.playerStatSet?.characters) return null
         const character = userData?.playerStatSet?.characters[characterName]
         if (!character) return null
-        console.log(character)
         const sa1Picks = character?.superChoice[0]?.wins + character?.superChoice[0]?.losses || 0
         const sa2Picks = character?.superChoice[1]?.wins + character?.superChoice[1]?.losses || 0
         const sa3Picks = character?.superChoice[2]?.wins + character?.superChoice[2]?.losses || 0
-        console.log('making a donut', sa1Picks, sa2Picks, sa3Picks)
         const superDonut = useChart({
             data: [
                 { name: 'SA I', value: sa1Picks, color: theme.colors.main.sa1 },
@@ -316,6 +330,36 @@ export default function PlayerProfilePage() {
         const sorted = Object.entries(data).sort(([, a], [, b]) => b.picks - a.picks)
         return sorted
     }
+
+    const UserProfileHeader = memo(function UserProfileHeader({ userData }) {
+        return (
+            <Box display="flex" alignItems="center">
+                <Box flex={1} display={'flex'} alignContent={'center'} verticalAlign={'center'}>
+                    <Box>
+                        <Avatar.Root bg={theme.colors.main.bg} variant="solid" size={'2xl'}>
+                            <Avatar.Fallback name={userData.name} />
+                            <Avatar.Image src={userData.userProfilePic} />
+                        </Avatar.Root>
+                    </Box>
+                    <Box>
+                        <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
+                            {userData?.userName || 'Unknown User'}
+                        </Text>
+                        <TitleBadge title={userData?.userTitle} />
+                    </Box>
+                </Box>
+                <Box flex={1} textAlign={'right'}>
+                    <Button
+                        justifyContent="flex-start"
+                        bg={theme.colors.main.secondary}
+                        onClick={() => window.api.getUserData(userData.uid)}
+                    >
+                        <RefreshCcw />
+                    </Button>
+                </Box>
+            </Box>
+        )
+    })
 
     return (
         <Box display="flex" gap="12px">
@@ -368,17 +412,14 @@ export default function PlayerProfilePage() {
             </SideBar>
 
             <Stack minH="100%" maxWidth={'600px'} flex={1}>
+                <UserProfileHeader userData={userData} />
                 {currentTab === 0 && (
                     <Box>
                         <Box color={theme.colors.main.actionSecondary} display="flex" gap="12px">
                             <Construction /> Under Construction
                         </Box>
-                        {/* <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
-                            {JSON.stringify(userData)}
-                        </Text> */}
                         <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
-                            {userData?.userName || 'Unknown User'}
-                            <TitleBadge title={userState?.userTitle || userData?.userTitle} />
+                            Current Elo: {userData?.playerStatSet?.accountElo}
                         </Text>
                         <Text textStyle="md" padding="8px" color={theme.colors.main.textMedium}>
                             Overall win rate: {getWinRate()}%
@@ -444,9 +485,10 @@ export default function PlayerProfilePage() {
                             <Stack gap="28px" marginTop={'34px'}>
                                 {userData?.playerStatSet
                                     ? getSortedObjectData(userData?.playerStatSet?.characters)?.map(
-                                          (char) => {
+                                          (char, index) => {
                                               return (
                                                   <GeneratedCharacterDonut
+                                                      key={`char-${index}`}
                                                       characterName={char[0]}
                                                   />
                                               )
@@ -535,112 +577,132 @@ export default function PlayerProfilePage() {
                 )}
 
                 {currentTab === 3 && (
-                    <Box>
-                        <Text textStyle="xs" color={theme.colors.main.textMedium}>
+                    <Stack gap={4}>
+                        <Text textStyle="xs" color={theme.colors.main.warning}>
                             Profile changes are not visible to others until the next time you log
                             in.
                         </Text>
-                        <Editable.Root
-                            defaultValue={userData?.userName}
-                            maxLength={16}
-                            onEditChange={(e) => setIsEditName(e.edit)}
-                            onValueCommit={(e) => {
-                                const censor = new TextCensor()
-                                const nameMatch = e.value
-                                const matches = matcher.getAllMatches(nameMatch)
-                                const censoredMessage = censor.applyTo(nameMatch, matches)
-                                setEditedUserName(censoredMessage)
-                                updateUserState({ ...userState, name: censoredMessage })
-                                window.api.changeUserData({ userName: censoredMessage })
-                            }}
-                            onValueChange={(e) => setEditedUserName(e.value)}
-                            onValueRevert={(e) => {
-                                setEditedUserName(e.value)
-                                updateUserState({ ...userState, name: e.value })
-                            }}
-                            value={editedUserName}
-                            invalid={editedUserName && editedUserName.length <= 1 && nameInvalid}
-                        >
-                            {!isEditName && (
-                                <Heading
-                                    flex="1"
-                                    size="lg"
-                                    color={theme.colors.main.actionSecondary}
-                                    width="100px"
-                                    height="36px"
-                                >
-                                    {editedUserName || userData?.userName ? (
-                                        editedUserName || userData?.userName
-                                    ) : (
-                                        <Skeleton height="24px" />
-                                    )}
-                                </Heading>
-                            )}
-
-                            <Editable.Input
-                                id="test"
-                                bg={theme.colors.main.textSubdued}
-                                height="36px"
+                        <Stack>
+                            <Text textStyle="xs" color={theme.colors.main.textMedium}>
+                                User Name
+                            </Text>
+                            <Editable.Root
+                                defaultValue={userData?.userName}
+                                maxLength={16}
+                                onEditChange={(e) => setIsEditName(e.edit)}
+                                onValueCommit={(e) => {
+                                    const censor = new TextCensor()
+                                    const nameMatch = e.value
+                                    const matches = matcher.getAllMatches(nameMatch)
+                                    const censoredMessage = censor.applyTo(nameMatch, matches)
+                                    setEditedUserName(censoredMessage)
+                                    updateUserState({ ...userState, name: censoredMessage })
+                                    window.api.changeUserData({ userName: censoredMessage })
+                                }}
+                                onValueChange={(e) => setEditedUserName(e.value)}
+                                onValueRevert={(e) => {
+                                    setEditedUserName(e.value)
+                                    updateUserState({ ...userState, name: e.value })
+                                }}
                                 value={editedUserName}
-                            />
-                            {userData?.uid === userState.uid && (
-                                <Editable.Control>
-                                    <Editable.EditTrigger asChild>
-                                        <IconButton
-                                            variant="ghost"
-                                            size="xs"
-                                            color={theme.colors.main.action}
-                                        >
-                                            <Pencil />
-                                        </IconButton>
-                                    </Editable.EditTrigger>
-                                    <Editable.CancelTrigger asChild>
-                                        <IconButton
-                                            variant="outline"
-                                            size="xs"
-                                            color={theme.colors.main.action}
-                                        >
-                                            <X />
-                                        </IconButton>
-                                    </Editable.CancelTrigger>
-                                    <Editable.SubmitTrigger asChild>
-                                        <IconButton
-                                            variant="outline"
-                                            size="xs"
-                                            color={theme.colors.main.action}
-                                        >
-                                            <Check />
-                                        </IconButton>
-                                    </Editable.SubmitTrigger>
-                                </Editable.Control>
-                            )}
-                        </Editable.Root>
-                        <TitleBadge title={userState?.userTitle || userData?.userTitle} />
-                        <Field
-                            marginTop={'8px'}
-                            label=""
-                            helperText="Title flair to display to other users"
-                            color={theme.colors.main.textMedium}
-                        >
-                            <SelectRoot
-                                color={theme.colors.main.actionSecondary}
-                                collection={titleList || []}
-                                value={selectedTitle}
-                                onValueChange={(e) => setSelectedTitle(e.value)}
+                                invalid={
+                                    editedUserName && editedUserName.length <= 1 && nameInvalid
+                                }
                             >
-                                <SelectTrigger>
-                                    <SelectValueText placeholder="Change Title" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {titleList?.items.map((title) => (
-                                        <SelectItem item={title} key={title.value}>
-                                            {title.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </SelectRoot>
-                        </Field>
-                    </Box>
+                                {!isEditName && (
+                                    <Heading
+                                        flex="1"
+                                        size="lg"
+                                        color={theme.colors.main.actionSecondary}
+                                        width="100px"
+                                        height="36px"
+                                    >
+                                        {editedUserName || userData?.userName ? (
+                                            editedUserName || userData?.userName
+                                        ) : (
+                                            <Skeleton height="24px" />
+                                        )}
+                                    </Heading>
+                                )}
+
+                                <Editable.Input
+                                    id="test"
+                                    bg={theme.colors.main.textSubdued}
+                                    height="36px"
+                                    value={editedUserName}
+                                />
+                                {userData?.uid === userState.uid && (
+                                    <Editable.Control>
+                                        <Editable.EditTrigger asChild>
+                                            <IconButton
+                                                variant="ghost"
+                                                size="xs"
+                                                color={theme.colors.main.action}
+                                            >
+                                                <Pencil />
+                                            </IconButton>
+                                        </Editable.EditTrigger>
+                                        <Editable.CancelTrigger asChild>
+                                            <IconButton
+                                                variant="outline"
+                                                size="xs"
+                                                color={theme.colors.main.action}
+                                            >
+                                                <X />
+                                            </IconButton>
+                                        </Editable.CancelTrigger>
+                                        <Editable.SubmitTrigger asChild>
+                                            <IconButton
+                                                variant="outline"
+                                                size="xs"
+                                                color={theme.colors.main.action}
+                                            >
+                                                <Check />
+                                            </IconButton>
+                                        </Editable.SubmitTrigger>
+                                    </Editable.Control>
+                                )}
+                            </Editable.Root>
+                        </Stack>
+                        <GravatarInput
+                            userData={userData}
+                            userState={userState}
+                            editedGravEmail={editedGravEmail}
+                            setEditedGravEmail={setEditedGravEmail}
+                            updateUserState={updateUserState}
+                            emailInvalid={emailInvalid}
+                        />
+                        <Stack>
+                            <Text textStyle="xs" color={theme.colors.main.textMedium}>
+                                User Flair
+                            </Text>
+                            <TitleBadge title={userState?.userTitle || userData?.userTitle} />
+                            <Field
+                                marginTop={'8px'}
+                                label=""
+                                helperText="Title flair to display to other users"
+                                color={theme.colors.main.textMedium}
+                            >
+                                <SelectRoot
+                                    color={theme.colors.main.actionSecondary}
+                                    collection={titleList || []}
+                                    value={selectedTitle}
+                                    onValueChange={(e) => setSelectedTitle(e.value)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValueText placeholder="Change Title" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {titleList?.items.map((title) => (
+                                            <SelectItem item={title} key={title.value}>
+                                                {title?.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </SelectRoot>
+                            </Field>
+                        </Stack>
+                    </Stack>
                 )}
 
                 {isLoading && (

@@ -27,10 +27,13 @@ export interface IElectronAPI {
     sendDataChannel: any
     // settings
     setEmulatorPath: any
+    openEmulatorFolder: any
     getEmulatorPath: any
     setEmulatorDelay: any
     getEmulatorDelay: any
     setAppTheme: any
+    setConfigValue: (key: string, value: string | number | boolean) => any
+    getConfigValue: (key: string) => any
     getAppTheme: any
     // -
     endMatch: any

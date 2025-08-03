@@ -25,6 +25,8 @@ const hrTheme = {
             sa1: 'yellow.500',
             sa2: 'orange.500',
             sa3: 'blue.500',
+            active: 'green.500',
+            away: 'orange.500',
         },
     },
 }
@@ -56,6 +58,8 @@ const slimeTheme = {
             sa1: 'yellow.500',
             sa2: 'orange.500',
             sa3: 'blue.500',
+            active: 'green.500',
+            away: 'orange.500',
         },
     },
 }
@@ -87,6 +91,8 @@ const orangeTheme = {
             sa1: 'yellow.500',
             sa2: 'orange.500',
             sa3: 'blue.500',
+            active: 'green.500',
+            away: 'orange.500',
         },
     },
 }
@@ -118,6 +124,8 @@ const pinkTheme = {
             sa1: 'yellow.500',
             sa2: 'orange.500',
             sa3: 'blue.500',
+            active: 'green.500',
+            away: 'orange.500',
         },
     },
 }
@@ -149,6 +157,8 @@ const purpleTheme = {
             sa1: 'yellow.500',
             sa2: 'orange.500',
             sa3: 'blue.500',
+            active: 'green.500',
+            away: 'orange.500',
         },
     },
 }
@@ -180,6 +190,8 @@ const greenTheme = {
             sa1: 'yellow.500',
             sa2: 'orange.500',
             sa3: 'blue.500',
+            active: 'green.500',
+            away: 'orange.500',
         },
     },
 }
@@ -211,6 +223,8 @@ const greenTheme2 = {
             sa1: 'yellow.500',
             sa2: 'orange.500',
             sa3: 'blue.500',
+            active: 'green.500',
+            away: 'orange.500',
         },
     },
 }
@@ -242,6 +256,8 @@ const evilTheme = {
             sa1: 'yellow.500',
             sa2: 'orange.500',
             sa3: 'blue.500',
+            active: 'green.500',
+            away: 'orange.500',
         },
     },
 }

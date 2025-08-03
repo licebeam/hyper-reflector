@@ -6,12 +6,14 @@ export type AppConfig = {
     emuPath: string
     emuDelay: string
     appTheme: string
+    appSoundOn: string
+    isAway: string
     filePathBase: string
     isDev: boolean
 }
 
 export type EmulatorConfig = {
-    fightcadePath: string
+    fbNeoPath: string
     luaPath: string
     trainingLuaPath: string
 }
@@ -40,19 +42,23 @@ function getAppConfig(): AppConfig {
     const filePathBase = isDev ? path.join(app.getAppPath(), 'src') : process.resourcesPath
 
     const configFileMap = getConfigFileMap(filePathBase)
-
     return {
         emuPath: configFileMap.emuPath,
         emuDelay: configFileMap.emuDelay,
         appTheme: configFileMap.appTheme,
+        appSoundOn: configFileMap.appSoundOn,
+        isAway: configFileMap.isAway,
         filePathBase,
         isDev,
     }
 }
 
 function getEmulatorConfig({ emuPath, filePathBase }: AppConfig) {
+    console.log(filePathBase, emuPath)
+    const isHyper = emuPath && path.basename(emuPath) === 'hyper-screw-fbneo'
+    //console.log(isHyper)
     return {
-        fightcadePath: path.join(emuPath || filePathBase, 'fcadefbneo.exe'),
+        fbNeoPath: isHyper ? path.join(emuPath || filePathBase, 'fs-fbneo.exe') : path.join(emuPath || filePathBase, 'fcadefbneo.exe'),
         luaPath: path.join(filePathBase, 'lua', '3rd_training_lua', 'hyper_reflector.lua'),
         trainingLuaPath: path.join(filePathBase, 'lua', '3rd_training_lua', '3rd_training.lua'),
     }

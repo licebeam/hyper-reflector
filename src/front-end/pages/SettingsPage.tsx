@@ -8,15 +8,17 @@ import {
     SelectValueText,
 } from '../components/chakra/ui/select'
 import { toaster } from '../components/chakra/ui/toaster'
-import { useLayoutStore, useLoginStore } from '../state/store'
+import { useConfigStore, useLayoutStore, useLoginStore } from '../state/store'
 import { getThemeNameList } from '../utils/theme'
 import SideBar from '../components/general/SideBar'
-import { AlertCircle, Settings, Settings2 } from 'lucide-react'
+import { AlertCircle, Settings, Settings2, Volume2, VolumeX } from 'lucide-react'
 
 export default function SettingsPage() {
     const theme = useLayoutStore((state) => state.appTheme)
     const setTheme = useLayoutStore((state) => state.setTheme)
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
+    const configState = useConfigStore((state) => state.configState)
+    const updateConfigState = useConfigStore((state) => state.updateConfigState)
     const [currentTab, setCurrentTab] = useState<number>(0)
     const [currentEmuPath, setCurrentEmuPath] = useState('')
     const [currentDelay, setCurrentDelay] = useState('')
@@ -54,7 +56,6 @@ export default function SettingsPage() {
     }
 
     const handleSetTheme = (themeIndex: string) => {
-        console.log(themeIndex, currentTheme)
         setCurrentTheme(themeIndex)
         const themeToSet = themes.items[parseInt(themeIndex)].label
         setTheme(themeToSet)
@@ -64,11 +65,11 @@ export default function SettingsPage() {
         window.api.getEmulatorPath()
         window.api.getEmulatorDelay()
         window.api.getAppTheme()
+        window.api.getConfigValue('appSoundOn')
     }, [])
 
     useEffect(() => {
         if (prevEmuPathRef.current !== '') {
-            console.log('Previous count:', prevEmuPathRef.current)
             toaster.success({
                 title: 'Path Set!',
                 // description: `${currentEmuPath}`,
@@ -76,7 +77,6 @@ export default function SettingsPage() {
         }
 
         if (prevEmuPathRef.current === currentEmuPath && hasMounted.current) {
-            console.log('prev path:', prevEmuPathRef.current)
             toaster.error({
                 title: 'Path setting failed!',
                 // description: `${currentEmuPath}`,
@@ -88,6 +88,7 @@ export default function SettingsPage() {
     }, [currentEmuPath])
 
     useEffect(() => {
+        //TODO remove the old ones and only use getConfigValue
         window.api.removeExtraListeners('emulatorPath', handleSetPath)
         window.api.on('emulatorPath', handleSetPath)
 
@@ -144,26 +145,54 @@ export default function SettingsPage() {
                             Application Settings
                         </Heading>
                         <Stack>
-                            <Text textStyle="xs" color={theme.colors.main.textMedium}>
-                                This is where we can set our emulator path and other setting
-                            </Text>
                             <Button
                                 bg={theme.colors.main.actionSecondary}
                                 onClick={() => {
+                                    window.api.openEmulatorFolder()
+                                }}
+                            >
+                                Open Rom Folder
+                            </Button>
+                            <Text textStyle="md" color={theme.colors.main.text}>
+                                Sound Settings
+                            </Text>
+                            <Button
+                                // Also terrible logic that we should fix
+                                bg={
+                                    configState?.appSoundOn === 'true' ||
+                                    configState?.appSoundOn === undefined
+                                        ? theme.colors.main.success
+                                        : theme.colors.main.warning
+                                }
+                                onClick={() => {
+                                    const value =
+                                        configState?.appSoundOn === 'true' ||
+                                        configState?.appSoundOn === undefined
+                                            ? 'false'
+                                            : 'true'
                                     try {
-                                        window.api.setEmulatorPath()
+                                        window.api.setConfigValue('appSoundOn', value)
+                                        updateConfigState({ appSoundOn: value })
                                     } catch (error) {
                                         toaster.error({
-                                            title: 'Update successful',
-                                            description: 'File saved successfully to the server',
+                                            title: 'Error',
                                         })
                                     }
                                 }}
                             >
-                                Set Emulator Path
+                                {configState?.appSoundOn === 'true' ||
+                                configState?.appSoundOn === undefined ? (
+                                    <Volume2 />
+                                ) : (
+                                    <VolumeX />
+                                )}
                             </Button>
                             <Text textStyle="xs" color={theme.colors.main.textMedium}>
-                                Current Path: {currentEmuPath}
+                                Sound:{' '}
+                                {configState?.appSoundOn === 'true' ||
+                                configState?.appSoundOn === undefined
+                                    ? 'On'
+                                    : 'Off'}
                             </Text>
                             <Text textStyle="md" color={theme.colors.main.text}>
                                 Theme
@@ -240,6 +269,42 @@ export default function SettingsPage() {
                             Danger Settings
                         </Heading>
                         <Stack>
+                            <Text textStyle="xs" color={theme.colors.main.textMedium}>
+                                Current Path: {currentEmuPath}
+                            </Text>
+                            <Button
+                                bg={theme.colors.main.actionSecondary}
+                                onClick={() => {
+                                    try {
+                                        window.api.setEmulatorPath(true)
+                                    } catch (error) {
+                                        toaster.error({
+                                            title: 'Error',
+                                            description: 'Failed to reset or use path.',
+                                        })
+                                    }
+                                }}
+                            >
+                                Use Default Emulator
+                            </Button>
+                            <Text textStyle="xs" color={theme.colors.main.warning}>
+                                Not recommended
+                            </Text>
+                            <Button
+                                bg={theme.colors.main.warning}
+                                onClick={() => {
+                                    try {
+                                        window.api.setEmulatorPath()
+                                    } catch (error) {
+                                        toaster.error({
+                                            title: 'Error',
+                                            description: 'Failed to update path.',
+                                        })
+                                    }
+                                }}
+                            >
+                                Set Custom Emulator Path
+                            </Button>
                             <Text textStyle="xs" color={theme.colors.main.textMedium}>
                                 Log out user, this will also make it so you do not automaitcally log
                                 in on start next time.

@@ -9,9 +9,13 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses'
 
 const config: ForgeConfig = {
     packagerConfig: {
+        icon: './icons/favicon.ico',
         asar: true,
         ignore: [/\/\.(?!vite)/],
         extraResource: [
+            './public',
+            './icons',
+            './emu', // include the emulator seperately
             './src/lua',
             './src/hyper_write_commands.txt',
             './src/hyper_read_commands.txt',
@@ -70,7 +74,7 @@ const config: ForgeConfig = {
             name: '@electron-forge/publisher-github',
             config: {
                 repository: {
-                    owner: 'licebeam',
+                    owner: 'Hyper-Reflector-Team',
                     name: 'hyper-reflector',
                 },
                 prerelease: false,

@@ -172,7 +172,7 @@ function MatchSetCard({
                                         selectedMatchDetails?.matches?.length > 0 &&
                                         selectedMatchDetails.matches.map((match, index) => {
                                             const parsedData = parseMatchData(match?.matchData?.raw)
-                                            console.log(parsedMatchData)
+                                            if (!parseMatchData) return
                                             return (
                                                 <Collapsible.Root>
                                                     <Collapsible.Trigger width={'100%'}>

@@ -6,7 +6,7 @@ function TitleBadge(titleObj: any) {
     const { title, bgColor, border, color } = titleObj.title
 
     return (
-        <Box width={20} height={'24px'}>
+        <Box width={20} height={'24px'} marginTop={'18px'}>
             <Badge size="xs" bg={bgColor || ''} color={color || ''} border={`1px solid ${border}`}>
                 {title || ''}
             </Badge>

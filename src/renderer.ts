@@ -2,101 +2,34 @@ import keys from './private/keys'
 import './index.css'
 // Load the react application
 import './front-end/app'
+import {
+    answerCall,
+    closeAllPeers,
+    declineCall,
+    initWebRTC,
+    pingUser,
+    sendDataChannelMessage,
+    startCall,
+    webCheckData,
+} from './webRTC/WebPeer'
 
 let signalServerSocket: WebSocket = null // socket reference
 let candidateList = []
 let callerIdState = null
 let userName: string | null = null
+let myUserData: any | null = null
 let myUID: string | null = null
 let opponentUID: string | null = null
 let playerNum: number | null = null
+let currentLobbyID: string | null = 'Hyper Reflector' // set to default lobby at start
 
-// const SOCKET_ADDRESS = `ws://127.0.0.1:3001` // debug
-const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3001`
+let peerConnection: RTCPeerConnection = null
+let currentUsers: any[] = [] // we use this to map through all users in a room
 
-// handle connection to remote turn server
-const googleStuns = [
-    'stun:stun.l.google.com:19302',
-    'stun:stun.l.google.com:5349',
-    'stun:stun1.l.google.com:3478',
-    'stun:stun1.l.google.com:5349',
-    'stun:stun2.l.google.com:19302',
-    'stun:stun2.l.google.com:5349',
-    'stun:stun3.l.google.com:3478',
-    'stun:stun3.l.google.com:5349',
-    'stun:stun4.l.google.com:19302',
-    'stun:stun4.l.google.com:5349',
-]
+// Updates for online
+const SOCKET_ADDRESS = `ws://${keys.COTURN_IP}:3003` // set for online env
 
-const peerConnections: Record<string, RTCPeerConnection> = {}
-
-async function createNewPeerConnection(userUID: string, isInitiator: boolean) {
-    const peerConnection = new RTCPeerConnection({
-        iceServers: [
-            {
-                urls: 'stun:stun.l.google.com:19302',
-                // urls: [`stun:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
-            },
-            {
-                urls: [`turn:${keys.COTURN_IP}:${keys.COTURN_PORT}`],
-                username: 'turn',
-                credential: 'turn',
-            },
-        ],
-        iceTransportPolicy: 'all',
-    })
-
-    let dataChannel // Will store the game data channel
-
-    // create data channel
-    if (isInitiator) {
-        // console.log('creating a data channel')
-        // Only the initiator creates a data channel
-        dataChannel = peerConnection.createDataChannel('updForwarding')
-        dataChannel.onopen = () => console.log('Data channel open')
-        dataChannel.onmessage = (event) => console.log('Received:', event.data)
-    } else {
-        // Answerer handles data channel event
-        peerConnection.ondatachannel = (event) => {
-            dataChannel = event.channel
-            dataChannel.onopen = () => console.log('Data channel open')
-            dataChannel.onmessage = (event) => console.log('Received peer:', event.data)
-        }
-    }
-
-    // send new ice candidates from the coturn server
-    peerConnection.onicecandidate = (event) => {
-        if (event.candidate) {
-            setupLogging(peerConnection, userName, event)
-        } else {
-            // console.log('ICE Candidate gathering complete!')
-        }
-    }
-
-    peerConnection.oniceconnectionstatechange = () => {
-        if (peerConnection.iceConnectionState === 'connected') {
-            // console.log('Connected! Ready to send data.')
-        } else if (peerConnection.iceConnectionState === 'failed') {
-            // console.log('ICE connection failed. Check STUN/TURN settings.')
-        }
-    }
-
-    peerConnection.isInitiator = isInitiator || false // type error but we can fix this later. We'll use this line to make sure we set the correct player number
-    peerConnection.dataChannel = dataChannel
-    peerConnections[userUID] = peerConnection
-
-    return peerConnection
-}
-
-function closePeerConnection(userId: string) {
-    if (peerConnections[userId]) {
-        peerConnections[userId].getSenders().forEach((sender) => {
-            peerConnections[userId].removeTrack(sender)
-        })
-        peerConnections[userId].close()
-        delete peerConnections[userId] // delete user from our map
-    }
-}
+const gows = new WebSocket(`ws://${keys.COTURN_IP}:8890/ws`) // go web socks
 
 function resetState() {
     candidateList = []
@@ -105,40 +38,11 @@ function resetState() {
     opponentUID = null
 }
 
-function setupLogging(peer, userLabel, event) {
-    if (event.candidate) {
-        let candidate = event.candidate.candidate
-
-        if (candidate.includes('srflx')) {
-            let regex = /([0-9]{1,3}\.){3}[0-9]{1,3} (\d+) typ srflx raddr ([0-9\.]+) rport (\d+)/
-            let matches = candidate.match(regex)
-            if (matches) {
-                let ip = matches[1] // The public IP (e.g., 133.32.4.39)
-                let port = matches[2] // The port (e.g., 50133)
-                let raddr = matches[3] // The private IP address (e.g., 192.168.11.2)
-                let rport = matches[4] // The rport (e.g., 50133)
-            }
-            candidateList.push(event.candidate)
-            if (callerIdState) {
-                signalServerSocket.send(
-                    JSON.stringify({
-                        type: 'iceCandidate',
-                        data: {
-                            targetId: callerIdState,
-                            candidate: event.candidate,
-                            callerId: myUID,
-                        },
-                    })
-                )
-            }
-        }
-    }
-}
-
 window.api.on('loginSuccess', (user) => {
     if (user) {
         myUID = user.uid
         userName = user.email
+        myUserData = user
         connectWebSocket(user)
     } else {
         if (signalServerSocket) {
@@ -166,15 +70,54 @@ window.api.on('loggedOutSuccess', async (user) => {
 })
 
 // below code causes some app hanging
-// window.api.on('closingApp', async (user) => {
-//     // kill the socket connection
-//     if (signalServerSocket) {
-//         console.log('we are killing the socket user')
-//         await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
-//         signalServerSocket.close()
-//         signalServerSocket = null
-//     }
-// })
+window.api.on('closingApp', async (user) => {
+    closeAllPeers(peerConnection)
+    peerConnection = null
+    // kill the socket connection
+    // if (signalServerSocket) {
+    //     console.log('we are killing the socket user')
+    //     await signalServerSocket.send(JSON.stringify({ type: 'userDisconnect', user }))
+    //     signalServerSocket.close()
+    //     signalServerSocket = null
+    // }
+})
+
+window.api.on(
+    'callUser',
+    async ({ callerId, calleeId }: { callerId: string; calleeId: string }) => {
+        peerConnection = await initWebRTC(myUID, calleeId, signalServerSocket)
+        startCall(peerConnection, signalServerSocket, calleeId, callerId, true)
+    }
+)
+
+// handle update away status
+window.api.on(
+    'updateSocketState',
+    async ({ key, value }: { key: string; value: string | number | boolean }) => {
+        if (signalServerSocket) {
+            await signalServerSocket.send(
+                JSON.stringify({
+                    type: 'updateSocketState',
+                    data: { lobbyId: currentLobbyID, uid: myUID, stateToUpdate: { key, value } },
+                })
+            )
+        }
+    }
+)
+
+// handle send answer to specific user
+window.api.on('answerCall', async ({ from }: { from: string }) => {
+    answerCall(peerConnection, signalServerSocket, from, myUID)
+    callerIdState = from
+    opponentUID = from
+    playerNum = 1 // if we answer a call we are always player 1
+    window.api.startGameOnline(opponentUID, playerNum, '')
+})
+
+window.api.on('declineCall', async ({ from }: { from: string }) => {
+    console.log('trying to decline a call', from)
+    declineCall(signalServerSocket, from, myUID)
+})
 
 function connectWebSocket(user) {
     if (signalServerSocket) return // Prevent duplicate ws connections from same client
@@ -182,7 +125,6 @@ function connectWebSocket(user) {
     signalServerSocket = new WebSocket(SOCKET_ADDRESS)
     signalServerSocket.onopen = () => {
         signalServerSocket.send(JSON.stringify({ type: 'join', user }))
-        signalServerSocket.send(JSON.stringify({ type: 'user-connect', user }))
     }
 
     signalServerSocket.onclose = async (user) => {
@@ -196,69 +138,31 @@ function connectWebSocket(user) {
         console.error('WebSocket Error:', error)
     }
 
-    // handle matchmaking
-    // handle send call to specific user
-    window.api.on(
-        'callUser',
-        async ({ callerId, calleeId }: { callerId: string; calleeId: string }) => {
-            await createNewPeerConnection(calleeId, true).catch((err) => console.warn(err))
-
-            const offer = await peerConnections[calleeId].createOffer()
-
-            await peerConnections[calleeId].setLocalDescription(offer)
-            const localDescription = peerConnections[calleeId].localDescription
-            signalServerSocket.send(
-                JSON.stringify({ type: 'callUser', data: { callerId, calleeId, localDescription } })
-            )
-        }
-    )
-
-    // handle send answer to specific user
-    window.api.on(
-        'answerCall',
-        async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
-            console.log('is this actually firing off?', callerId, answererId)
-            let answer = await peerConnections[callerId]?.createAnswer()
-            await peerConnections[callerId].setLocalDescription(answer)
-
-            signalServerSocket.send(
-                JSON.stringify({
-                    type: 'answerCall',
-                    data: {
-                        callerId,
-                        answer,
-                        answererId,
-                    },
-                })
-            )
-            callerIdState = callerId
-            opponentUID = callerId
-            playerNum = 1 // if we answer a call we are always player 1
-            window.api.startGameOnline(opponentUID, playerNum)
-        }
-    )
-
-    window.api.on(
-        'declineCall',
-        async ({ callerId, answererId }: { callerId: string; answererId: string }) => {
-            await signalServerSocket.send(
-                JSON.stringify({
-                    type: 'declineCall',
-                    data: {
-                        callerId,
-                        answererId,
-                    },
-                })
-            )
-            await closePeerConnection(callerId) // close the peer connection when we decline
-        }
-    )
-
     // allow users to chat
-    window.api.on('sendMessage', (messageObject: { text: string; user: any }) => {
-        // sends a message over to another user
+    window.api.on('sendMessage', async (messageObject: { text: string; user: any }) => {
+        // Send message to all
         // probably need more validation
         if (messageObject.text.length) {
+            // Below is debug code for starting web rtc stuff
+            if (messageObject.text === 'close' && peerConnection) {
+                await closeAllPeers(peerConnection) // TODO fix this we will have an array
+                peerConnection = null
+            }
+            if (messageObject.text === 'ping' && peerConnection) {
+                pingUser(user.uid)
+            }
+            // testing new go socket server
+            if (messageObject.text === 'golang') {
+                console.log('sending message to golang server')
+                gows.onmessage = (e) => console.log('From server:', e.data)
+                gows.send('Hello Go!')
+            }
+            if (messageObject.text === 'vid') {
+                try {
+                } catch (error) {
+                    console.log(error)
+                }
+            }
             signalServerSocket.send(
                 JSON.stringify({
                     type: 'sendMessage',
@@ -271,16 +175,18 @@ function connectWebSocket(user) {
                 })
             )
         }
+        sendDataChannelMessage('Hey transmitting on data channel whats up')
     })
 
     window.api.on('createNewLobby', (lobbyInfo) => {
         console.log('sending lobby data', lobbyInfo)
+        currentLobbyID = lobbyInfo.name || null
         signalServerSocket.send(
             JSON.stringify({
                 type: 'createLobby',
                 lobbyId: lobbyInfo.name,
                 pass: lobbyInfo.pass,
-                private: lobbyInfo.private,
+                isPrivate: lobbyInfo.isPrivate,
                 user: lobbyInfo.user, // this is our full user object
             })
         )
@@ -288,12 +194,13 @@ function connectWebSocket(user) {
 
     window.api.on('userChangeLobby', (lobbyInfo) => {
         console.log('hey we changed lobbies', lobbyInfo)
+        currentLobbyID = lobbyInfo.newLobbyId || null
         signalServerSocket.send(
             JSON.stringify({
                 type: 'changeLobby',
                 newLobbyId: lobbyInfo.newLobbyId,
                 pass: lobbyInfo.pass,
-                private: lobbyInfo.private,
+                isPrivate: lobbyInfo.isPrivate,
                 user: lobbyInfo.user, // this is our full user object
             })
         )
@@ -316,32 +223,68 @@ function connectWebSocket(user) {
         }
     }
 
+    function checkConnectionStability() {
+        const connection =
+            navigator.connection || navigator.mozConnection || navigator.webkitConnection
+        if (connection) {
+            const isUnstable =
+                connection.effectiveType === '4g' &&
+                connection.rtt < 100 &&
+                connection.downlink > 10
+            return isUnstable
+        }
+        return false
+    }
+
     signalServerSocket.onmessage = async (message) => {
         const data = await convertBlob(message).then((res) => res)
         if (data.type === 'connected-users') {
             if (data.users.length) {
+                currentUsers = data.users
+                // console.log('current user list', currentUsers)
+                // The timing issue is here.
+                data.users.forEach(async (user) => {
+                    if (user.uid !== myUID) {
+                        console.log(data.users)
+                        signalServerSocket.send(
+                            JSON.stringify({
+                                type: 'estimate-ping-users',
+                                data: {
+                                    userA: {
+                                        id: myUserData.uid,
+                                        stability: checkConnectionStability(),
+                                    },
+                                    userB: {
+                                        id: user.uid,
+                                    },
+                                },
+                            })
+                        )
+                    }
+                })
                 window.api.addUserGroupToRoom(data.users)
             }
         }
 
-        if (data.type === 'user-connect') {
-            signalServerSocket.send(JSON.stringify({ type: 'join', user }))
-            // window.api.addUserToRoom(user)
+        if (data.type === 'update-user-pinged') {
+            console.log('hey the user has a ping, lets update all that data----------------', data)
+            window.api.updateUserData(data?.data)
         }
 
         if (data.type === 'userDisconnect') {
+            // TODO this isn't actually being used anymore?
             // Here we want to close the Peer connection if a user leaves if the connection already exists.
-            closePeerConnection(data.userUID)
+            console.log('user DCed from socket server')
         }
 
         if (data.type === 'lobby-user-counts') {
+            // console.log('lobby update', data.updates)
             window.api.updateLobbyStats(data.updates)
         }
 
         if (data.type === 'matchEndedClose') {
             //user the userUID and close all matches.
             if (opponentUID === data.userUID) {
-                closePeerConnection(data.userUID)
                 window.api.killEmulator()
                 resetState()
             }
@@ -352,41 +295,49 @@ function connectWebSocket(user) {
 
         if (data.type === 'getRoomMessage') {
             window.api.sendRoomMessage(data)
+            webCheckData(peerConnection)
         }
 
-        if (data.type === 'incomingCall') {
-            await createNewPeerConnection(data.callerId, false)
-            await peerConnections[data.callerId]
-                .setRemoteDescription(new RTCSessionDescription(data.offer))
-                .catch((err) => console.warn(err))
-            console.log(data)
+        if (data.type === 'webrtc-ping-decline') {
+            // closePeerConnection(data.data.answererId)
+            window.api.callDeclined(data.from)
+        }
+
+        // new web rtc
+        if (data.type === 'webrtc-ping-offer') {
+            if (!data?.from) return
+            peerConnection = await initWebRTC(myUID, data.from, signalServerSocket)
+            if (peerConnection) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer))
+            }
             window.api.receivedCall(data)
-        }
-
-        if (data.type === 'callAnswered') {
-            await peerConnections[data.data.answererId].setRemoteDescription(
-                new RTCSessionDescription(data.data.answer)
-            )
-            opponentUID = data.data.answererId // set the current opponent so we can get them from the peer list.
-            signalServerSocket.send(
-                JSON.stringify({
-                    type: 'iceCandidate',
-                    data: { targetId: data.data.answererId, candidate: candidateList[0] },
-                })
-            )
-            playerNum = 0 // if our call is answered we are always player 0
-            window.api.startGameOnline(opponentUID, playerNum)
-        }
-
-        if (data.type === 'callDeclined') {
-            closePeerConnection(data.data.answererId)
-            window.api.callDeclined(data.data.answererId)
-        }
-
-        if (data.type === 'iceCandidate') {
-            console.info(
-                'made a connection with someone, probably need to initialize some data channel stuff'
-            )
+        } else if (data.type === 'webrtc-ping-answer') {
+            if (!data.from) return
+            const acceptMessage = {
+                sender: data.from,
+                message: 'Accepted',
+                type: 'accept',
+                declined: false,
+                accepted: true,
+                id: Date.now(), // TODO this is not a long lasting solution
+            }
+            window.api.sendRoomMessage(acceptMessage)
+            playerNum = 0 // if we answer a call we are always player 1
+            window.api.startGameOnline(data?.from, playerNum, '')
+            try {
+                // there is a timing issue here that nees to be fixed.
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))
+            } catch (error) {
+                console.warn(error)
+            }
+        } else if (data.type === 'webrtc-ping-candidate') {
+            const candidate = new RTCIceCandidate(data.candidate)
+            //console.log('Received ICE candidate:', candidate)
+            try {
+                await peerConnection.addIceCandidate(candidate)
+            } catch (error) {
+                console.warn('Failed to add ICE candidate:', error)
+            }
         }
     }
 }

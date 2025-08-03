@@ -1,2 +1,4 @@
-emuPath=C:\Users\dusti\Documents\Fightcade\emulator\fbneo
-emuDelay=1
+emuDelay=0
+isAway=false
+appSoundOn=true
+appTheme=0

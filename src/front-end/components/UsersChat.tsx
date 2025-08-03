@@ -70,11 +70,16 @@ export default function UsersChat() {
         }
     }, [])
 
+    // useEffect(() => {
+    //     console.log(userList)
+    // }, [userList])
+
     const renderUsers = () => {
-        return userList.map((user, index) => {
+        return userList.map((user) => {
             var timestamp = new Date()
+
             const isMe = user.uid === userState.uid
-            return <UserCard key={index + timestamp + user.uid} user={isMe ? userState : user} />
+            return <UserCard key={user.uid} user={user} />
         })
     }
 

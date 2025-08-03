@@ -1,20 +1,20 @@
 const { spawn } = require('child_process')
 import { Config } from './config'
+import path from 'path'
+
 
 export function launchGGPOSpawn(command: string, callBack: (isOnOpen?: boolean) => any) {
     try {
         const [cmd, ...args] = command.split(' ')
-        let child
-        child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
+        const child = spawn(cmd, args, { shell: true, stdio: ['ignore', 'pipe', 'pipe'] })
 
-        // Capture stdout (logs from emulator)
         child.stdout.on('data', (data) => {
-            console.log(`[Fightcade-FBNeo]: ${data.toString()}`)
+            console.log(`[FBNeo]: ${data.toString()}`)
         })
 
         // Capture stderr (errors)
         child.stderr.on('data', (data) => {
-            console.error(`[Fightcade-FBNeo Error]: ${data.toString()}`)
+            console.error(`[FBNeo Error]: ${data.toString()}`)
             return 'test error'
         })
 
@@ -38,7 +38,7 @@ export function launchGGPOSpawn(command: string, callBack: (isOnOpen?: boolean) 
 
         // Listen for errors
         child.on('error', (error) => {
-            console.error(`Failed to start Fightcade-FBNeo: ${error.message}`)
+            console.error(`Failed to start FBNeo: ${error.message}`)
         })
 
         return child // Return process reference
@@ -47,21 +47,21 @@ export function launchGGPOSpawn(command: string, callBack: (isOnOpen?: boolean) 
     }
 }
 
-function fightcadeCmd(config: Config) {
-    const { fightcadePath } = config.emulator
+function fbNeoCommand(config: Config) {
+    const { fbNeoPath } = config.emulator
     console.log({ platform: process.platform })
     switch (process.platform) {
         case 'darwin':
-            return `wine "${fightcadePath}"`
+            return `wine "${fbNeoPath}"`
         case 'linux':
-            return `wine "${fightcadePath}"`
+            return `wine "${fbNeoPath}"`
         default:
-            return `"${fightcadePath}"`
+            return `"${fbNeoPath}"`
     }
 }
 
 /**
- * for these file paths like fightcade path and lua path, we need some way to access this directly through electron so we do no need to update all of the time.
+ * for these file paths like fbneo path and lua path, we need some way to access this directly through electron so we do no need to update all of the time.
  */
 export function startPlayingOnline({
     config,
@@ -69,6 +69,7 @@ export function startPlayingOnline({
     remoteIp,
     remotePort,
     player,
+    playerName,
     delay,
     isTraining = false,
     callBack,
@@ -78,15 +79,28 @@ export function startPlayingOnline({
     remoteIp: string
     remotePort: number
     player: number
+    playerName: string
     delay: number
     isTraining: boolean
     callBack: (isOnOpen?: boolean) => any
 }) {
+    // TODO actually implement this
     let luaPath = config.emulator.luaPath
     if (isTraining) {
         luaPath = config.emulator.trainingLuaPath
     }
-    const directCommand = `${fightcadeCmd(config)} quark:direct,sfiii3nr1,${localPort},${remoteIp},${remotePort},${player},${delay},0 ${luaPath}`
+
+    const pathEnd = config.emulator.fbNeoPath
+    const slicedPathEnd = pathEnd && path.basename(pathEnd)
+    let directCommand
+
+    if (slicedPathEnd === 'fs-fbneo.exe') {
+        directCommand = `${fbNeoCommand(config)} --rom sfiii3nr1 --lua ${luaPath} direct --player ${player} -n ${playerName} -l 127.0.0.1:7000 -r 127.0.0.1:7001 -d ${delay}` //fs verison
+    } else if (slicedPathEnd === 'fcadefbneo.exe') {
+        directCommand = `${fbNeoCommand(config)} quark:direct,sfiii3nr1,${localPort},127.0.0.1,${7001},${player},${delay},0 --lua ${luaPath}` // for fc version
+    }
+    // console.log("starting game on ", `${"127.0.0.1" + ':' + localPort}`, 'sending to: ', `${remoteIp + ':' + remotePort}`, player, playerName)
+
     switch (process.platform) {
         case 'darwin':
             return launchGGPOSpawn(directCommand, callBack)
@@ -97,6 +111,8 @@ export function startPlayingOnline({
     }
 }
 
+// Current Path: C:\Users\dusti\Desktop\hyper-reflector\out\hyper-reflector-win32-x64\resources\emu\hyper-screw-fbneo
+
 export function startSoloMode({
     config,
     callBack,
@@ -104,7 +120,19 @@ export function startSoloMode({
     config: Config
     callBack: (isOnOpen?: boolean) => any
 }) {
-    const directCommand = `${fightcadeCmd(config)} -game sfiii3nr1 ${config.emulator.trainingLuaPath}`
+    const pathEnd = config.emulator.fbNeoPath
+    const slicedPathEnd = pathEnd && path.basename(pathEnd)
+    let directCommand
+
+    // uncomment to send use the match data sender
+    // let luaPath = config.emulator.luaPath
+    // directCommand = `${fbNeoCommand(config)} --rom sfiii3nr1 --lua ${luaPath}`
+
+    if (slicedPathEnd === 'fs-fbneo.exe') {
+        directCommand = `${fbNeoCommand(config)} --rom sfiii3nr1 --lua ${config.emulator.trainingLuaPath}` // fs fbneo
+    } else if (slicedPathEnd === 'fcadefbneo.exe') {
+        directCommand = `${fbNeoCommand(config)} -game sfiii3nr1 ${config.emulator.trainingLuaPath}`
+    }
     return launchGGPOSpawn(directCommand, callBack)
 }
 

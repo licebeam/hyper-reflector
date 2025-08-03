@@ -46,7 +46,7 @@ export default function LobbyPage() {
     const [enteredPass, setEnteredPass] = useState<string>('')
     const [open, setOpen] = useState(false)
     const [openCreate, setOpenCreate] = useState(false)
-    const [newLobby, setNewLobby] = useState({ name: '', private: false, pass: '' })
+    const [newLobby, setNewLobby] = useState({ name: '', isPrivate: false, pass: '' })
 
     const createBlocked = (): boolean => {
         if (newLobby?.name === 'Hyper Reflector') {
@@ -59,7 +59,7 @@ export default function LobbyPage() {
         if (newLobby?.pass?.length >= 151) {
             return true
         }
-        if (newLobby.private && !newLobby.pass.length) {
+        if (newLobby.isPrivate && !newLobby.pass.length) {
             return true
         }
         if (!newLobby.name.length) {
@@ -69,7 +69,7 @@ export default function LobbyPage() {
     }
 
     const resetCreate = () => {
-        setNewLobby({ name: '', private: false, pass: '' })
+        setNewLobby({ name: '', isPrivate: false, pass: '' })
     }
 
     useEffect(() => {
@@ -78,13 +78,15 @@ export default function LobbyPage() {
             window.api.userChangeLobby({
                 newLobbyId: selectedLobby.name,
                 pass: selectedLobby.pass || enteredPass,
-                private: selectedLobby.private,
+                isPrivate: selectedLobby.isPrivate,
                 user: userState,
             })
             setSelectedLobby(selectedLobby)
             // set the userState lobby so that messages send to the current lobby via websockets
             updateUserState({ ...userState, currentLobbyId: selectedLobby.name })
             clearMessageState()
+            // this makes sure when we change lobbies everyone gets our CURRENT state.
+            window.api.getConfigValue('isAway')
         }
     }, [currentLobbyState])
 
@@ -92,17 +94,59 @@ export default function LobbyPage() {
         setCurrentLobbiesState(data)
     }
 
+    // const checkVid = () => {
+    //     const video = document.querySelector('video')
+    //     navigator.mediaDevices
+    //         .getDisplayMedia({
+    //             audio: true,
+    //             video: {
+    //                 width: 320,
+    //                 height: 240,
+    //                 frameRate: 60,
+    //             },
+    //         })
+    //         .then((stream) => {
+    //             video.srcObject = stream
+    //             video.onloadedmetadata = (e) => video.play()
+    //         })
+    //         .catch((e) => console.log(e))
+    // }
+
+    const handleUpdateUser = (data) => {
+        window.api.getConfigValue('isAway')
+        if (data?.isNewPing) {
+            const updatedPings =
+                userState?.lastKnownPings?.filter((peer) => peer.id !== data.id) ?? []
+            updatedPings.push(data)
+
+            updateUserState({
+                ...userState,
+                lastKnownPings: updatedPings,
+            })
+        } else {
+            updateUserState({
+                ...userState,
+                ...data,
+            })
+        }
+    }
+
     useEffect(() => {
+        window.api.removeExtraListeners('updateUserData', handleUpdateUser)
+        window.api.on('updateUserData', handleUpdateUser)
+
         window.api.removeExtraListeners('updateLobbyStats', handleUpdateLobbies)
         window.api.on('updateLobbyStats', handleUpdateLobbies)
 
         return () => {
+            window.api.removeListener('updateUserData', handleUpdateUser)
             window.api.removeListener('updateLobbyStats', handleUpdateLobbies)
         }
     }, [])
 
     return (
         <Box height="100%" display="flex" width="100%">
+            {/* <video width="320" height="240" autoPlay></video> */}
             <Dialog.Root open={openCreate}>
                 <Portal>
                     <Dialog.Backdrop />
@@ -156,7 +200,7 @@ export default function LobbyPage() {
                                         marginTop="12px"
                                         color={theme.colors.main.actionSecondary}
                                         onCheckedChange={(e) =>
-                                            setNewLobby({ ...newLobby, private: e.checked })
+                                            setNewLobby({ ...newLobby, isPrivate: e.checked })
                                         }
                                     >
                                         <Switch.HiddenInput />
@@ -167,7 +211,7 @@ export default function LobbyPage() {
                                     </Switch.Root>
                                 </Box>
 
-                                {newLobby?.private && (
+                                {newLobby?.isPrivate && (
                                     <Box marginTop={'12px'}>
                                         <PasswordInput
                                             bg={theme.colors.main.textSubdued}
@@ -217,7 +261,7 @@ export default function LobbyPage() {
                                         window.api.createNewLobby({
                                             name: censoredLobbyName,
                                             pass: newLobby.pass,
-                                            private: newLobby.private,
+                                            isPrivate: newLobby.isPrivate,
                                             user: userState,
                                         }) // send new lobby info to BE
                                         toaster.success({
@@ -251,14 +295,14 @@ export default function LobbyPage() {
                 <Dialog.Root open={open}>
                     {currentLobbiesState.map((lobby, index) => {
                         return (
-                            <Dialog.Trigger asChild>
+                            <Dialog.Trigger asChild key={index}>
                                 <Button
                                     display={'flex'}
                                     disabled={currentLobbyState.name === lobby.name}
                                     justifyContent="flex-start"
                                     bg={theme.colors.main.card}
                                     onClick={async () => {
-                                        if (lobby.private) {
+                                        if (lobby.isPrivate) {
                                             setOpen(true)
                                             setSelectedLobby(lobby)
                                         } else {
@@ -286,7 +330,7 @@ export default function LobbyPage() {
                                             </Box>
                                         </Box>
                                     </Box>
-                                    {lobby.private && (
+                                    {lobby.isPrivate && (
                                         <Stack
                                             justifyContent="center"
                                             verticalAlign="center"
@@ -333,7 +377,7 @@ export default function LobbyPage() {
                                     </Dialog.Title>
                                 </Dialog.Header>
                                 <Dialog.Body>
-                                    {selectedLobby?.private && (
+                                    {selectedLobby?.isPrivate && (
                                         <div>
                                             <Box>Lobby Password</Box>
                                             <PasswordInput
@@ -364,7 +408,7 @@ export default function LobbyPage() {
                                         disabled={!enteredPass.length}
                                         onClick={() => {
                                             if (enteredPass === selectedLobby.pass) {
-                                                console.log('enetered pass', enteredPass)
+                                                //console.log('enetered pass', enteredPass)
                                                 setCurrentLobbyState(selectedLobby)
                                                 setEnteredPass('')
                                                 setOpen(false)
@@ -390,7 +434,7 @@ export default function LobbyPage() {
                     height={'24px'}
                 >
                     {currentLobbyState?.name || ''}
-                    {currentLobbyState?.private && (
+                    {currentLobbyState?.isPrivate && (
                         <Clipboard.Root
                             value={currentLobbyState?.pass || 'eeeee'}
                             color={theme.colors.main.action}

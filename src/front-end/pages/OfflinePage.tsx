@@ -12,7 +12,6 @@ import {
 import {
     SelectContent,
     SelectItem,
-    SelectLabel,
     SelectRoot,
     SelectTrigger,
     SelectValueText,
@@ -29,7 +28,7 @@ export default function OfflinePage() {
     const [currentTab, setCurrentTab] = useState<number>(0)
     const [player, setPlayer] = useState('')
     const [opponentPort, setOpponentPort] = useState('')
-    const [opponentIp, setOpponentIp] = useState('')
+    // const [opponentIp, setOpponentIp] = useState('')
     const [myPort, setMyPort] = useState('')
 
     const players = createListCollection({
@@ -132,7 +131,7 @@ export default function OfflinePage() {
                                     <SelectContent>
                                         {players.items.map((player) => (
                                             <SelectItem item={player} key={player.value}>
-                                                {player.label}
+                                                {player?.label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

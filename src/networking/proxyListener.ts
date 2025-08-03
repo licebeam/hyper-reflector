@@ -19,8 +19,8 @@ export default async function startProxyListener(proxyPort: number, mainWindow: 
 
         if (rinfo.port !== 7000) {
             currentTargetPort = rinfo.port
-            console.log('Player isnt using upnp -> changing target port to: ', rinfo.port)
-            console.log('currentTargetPort = ', currentTargetPort)
+            // console.log('Player isnt using upnp -> changing target port to: ', rinfo.port)
+            // console.log('currentTargetPort = ', currentTargetPort)
         }
 
         // prevent keep alive from being forwarded to the emulator - it crashes

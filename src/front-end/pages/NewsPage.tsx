@@ -7,6 +7,20 @@ import { useLayoutStore, useLoginStore } from '../state/store'
 
 const blogsArray = [
     {
+        title: 'Update Version 0.4.0a',
+        date: '8/3/2025',
+        content: `
+         News updates will be going away from this page, so check the discord for full notes!
+        `,
+    },
+    {
+        title: 'Update Version 0.3.1a',
+        date: '6/10/2025',
+        content: `
+         Hey this isn't perfect but I want to get it out as soon as possible so that people can use the platform again. I've added a few things, but the notes will have more info
+        `,
+    },
+    {
         title: 'Update Version 0.3.0a',
         date: '4/30/2025',
         content: `
@@ -51,7 +65,6 @@ export default function NewsPage() {
     const [globalStats, setGlobalStats] = useState(undefined)
 
     const handleFillGlobalStats = (stats) => {
-        console.log('stats', stats)
         setGlobalStats(stats.globalStatSet)
     }
 
@@ -80,7 +93,7 @@ export default function NewsPage() {
 
     const chart = useChart<BarListData>({
         sort: { by: 'value', direction: 'desc' },
-        data: getCharacterData() || [{ name: 'unknown', value: 0, test: 'poop' }],
+        data: getCharacterData() || [{ name: 'unknown', value: 0, test: 'cool' }],
         series: [{ name: 'name', color: theme.colors.main.actionSecondary }],
     })
 
@@ -90,11 +103,9 @@ export default function NewsPage() {
         if (!globalStats.globalCharacterChoice) return null
         const character = globalStats.globalCharacterChoice[characterName]
         if (!character) return null
-        console.log(character)
         const sa1Picks = character?.superChoice[0]?.wins + character?.superChoice[0]?.losses || 0
         const sa2Picks = character?.superChoice[1]?.wins + character?.superChoice[1]?.losses || 0
         const sa3Picks = character?.superChoice[2]?.wins + character?.superChoice[2]?.losses || 0
-        console.log('making a donut', sa1Picks, sa2Picks, sa3Picks)
         const superDonut = useChart({
             data: [
                 { name: 'SA I', value: sa1Picks, color: theme.colors.main.sa1 },
@@ -139,13 +150,7 @@ export default function NewsPage() {
         const playerWinDonut = useChart({
             data: [
                 { name: 'Player 1 Wins', value: p1Wins, color: theme.colors.main.action },
-                { name: 'Player 1 Losses', value: p2Wins, color: theme.colors.main.actionDark },
-                { name: 'Player 2 Wins', value: p2Wins, color: theme.colors.main.actionSecondary },
-                {
-                    name: 'Player 1 Losses',
-                    value: p1Wins,
-                    color: theme.colors.main.actionSecondaryDark,
-                },
+                { name: 'Player 2 Wins', value: p2Wins, color: theme.colors.main.secondary },
             ],
         })
         return (

@@ -1,16 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useLoginStore, useMessageStore, useLayoutStore } from '../../state/store'
+import { useLoginStore, useMessageStore, useLayoutStore, useConfigStore } from '../../state/store'
 import {
     Button,
     Stack,
-    Input,
     Flex,
     Box,
     Avatar,
-    AvatarGroup,
-    Card,
-    Badge,
     Text,
     Icon,
     Float,
@@ -18,62 +14,70 @@ import {
     Portal,
     Popover,
 } from '@chakra-ui/react'
-import { Crown } from 'lucide-react'
+import { Tooltip } from '../chakra/ui/tooltip'
+import { Crown, Sword, Wifi, WifiHigh, WifiLow, WifiOff } from 'lucide-react'
 import TitleBadge from './TitleBadge'
+import '/node_modules/flag-icons/css/flag-icons.min.css'
 
 export default function UserCard({ user }) {
+    const configState = useConfigStore((state) => state.configState)
     const theme = useLayoutStore((state) => state.appTheme)
-    const [userPopOpen, setUserPopOpen] = useState(false)
-    const [isInMatch, setIsInMatch] = useState(false)
-    const [isUserChallenging, setIsUserChallenging] = useState(false)
+    const pushMessage = useMessageStore((state) => state.pushMessage)
     const userState = useLoginStore((state) => state.userState)
     const updateUserState = useLoginStore((state) => state.updateUserState)
-    const callData = useMessageStore((state) => state.callData)
-    const removeCallData = useMessageStore((state) => state.removeCallData)
-    const clearCallData = useMessageStore((state) => state.clearCallData)
     const setLayoutTab = useLayoutStore((state) => state.setSelectedTab)
+    const [userPopOpen, setUserPopOpen] = useState(false)
+    const [cannotChallenge, setCannotChallenge] = useState(false)
 
     const navigate = useNavigate()
 
-    useEffect(() => {
-        setIsUserChallenging((prevState) => {
-            const found = callData.some((call) => call.callerId === user.uid)
-            return found // This ensures the state is always updated properly
-        })
-    }, [callData, user.uid])
-
     //TODO: modify this to not use a time out maybe?
     const handleEndMatch = () => {
-        updateUserState({ ...userState, isFighting: false })
-        setTimeout(() => {
-            setIsInMatch(false)
-            clearCallData()
-        }, 2000)
-    }
-
-    const handleCallDeclined = (declinedCall) => {
-        const { answererId } = declinedCall
-        setIsUserChallenging(false)
-        setIsInMatch(false)
-        const callToRemove = callData.find((call) => call.callerId === answererId)
-        removeCallData(callToRemove)
+        setCannotChallenge(false)
+        // updateUserState({ ...userState, isFighting: false })
+        // setTimeout(() => {
+        //     setIsInMatch(false)
+        //     clearCallData()
+        // }, 2000)
     }
 
     useEffect(() => {
         window.api.removeAllListeners('endMatchUI', handleEndMatch)
         window.api.on('endMatchUI', handleEndMatch)
 
-        window.api.removeAllListeners('callDeclined', handleCallDeclined)
-        window.api.on('callDeclined', handleCallDeclined)
         return () => {
             window.api.removeListener('endMatchUI', handleEndMatch)
-            window.api.removeListener('callDeclined', handleCallDeclined)
         }
     }, [])
 
     function RankDisplay({ elo }) {
         if (!elo) return
-        if (elo <= 1200) {
+        // this is just for demonstration purposes
+        if (elo < 1100) {
+            return (
+                <Box alignContent="center" width="40px" textAlign="center">
+                    <Icon size="md" color="yellow.800">
+                        <Crown />
+                    </Icon>
+                    <Text textStyle="xs" fontWeight="bold" color={theme.colors.main.text}>
+                        {elo}
+                    </Text>
+                </Box>
+            )
+        }
+        if (elo <= 1400) {
+            return (
+                <Box alignContent="center" width="40px" textAlign="center">
+                    <Icon size="md" color="green.600">
+                        <Crown />
+                    </Icon>
+                    <Text textStyle="xs" fontWeight="bold" color={theme.colors.main.text}>
+                        {elo}
+                    </Text>
+                </Box>
+            )
+        }
+        if (elo > 1400) {
             return (
                 <Box alignContent="center" width="40px" textAlign="center">
                     <Icon size="md" color="yellow.400">
@@ -87,6 +91,60 @@ export default function UserCard({ user }) {
         }
     }
 
+    function PingDisplay({
+        peer,
+    }: {
+        peer: { uid: string; countryCode: string; ping: number } | undefined
+    }) {
+        const isMe = peer.uid === userState?.uid || false
+        const getWifiIcon = () => {
+            if (peer?.ping < 100) {
+                return <Wifi />
+            }
+            if (peer?.ping > 100 && peer?.ping > 200) {
+                return <WifiHigh />
+            }
+            if (peer?.ping > 200) {
+                return <WifiLow />
+            }
+            return <WifiOff />
+        }
+        return (
+            <Box display={'flex'} gap="8px">
+                <Tooltip
+                    content={`${peer?.countryCode || 'Unknown'}`}
+                    openDelay={200}
+                    closeDelay={100}
+                >
+                    <div>
+                        <span class={`fi fi-${peer?.countryCode?.toLowerCase() || 'xx'}`} />
+                    </div>
+                </Tooltip>
+                {!isMe && (
+                    <Tooltip
+                        content={`Estimated Ping: ${peer?.ping || 'Unknown'} ms`}
+                        openDelay={200}
+                        closeDelay={100}
+                    >
+                        <Icon size="md" color="gray.100">
+                            {getWifiIcon()}
+                        </Icon>
+                    </Tooltip>
+                )}
+            </Box>
+        )
+    }
+
+    const getIsOnline = () => {
+        if (user.uid !== userState.uid) {
+            return user?.isAway !== 'true'
+        }
+        if (configState?.isAway === 'true') {
+            return false
+        }
+        return true
+    }
+
     return (
         <Popover.Root
             open={userPopOpen}
@@ -95,7 +153,8 @@ export default function UserCard({ user }) {
         >
             <Popover.Trigger asChild>
                 <Box
-                    minW="260px"
+                    minW="280px"
+                    maxW="280px"
                     minH="60px"
                     maxH="60px"
                     background={theme.colors.main.card}
@@ -105,14 +164,41 @@ export default function UserCard({ user }) {
                     borderWidth="2px"
                     borderColor={theme.colors.main.cardDark}
                     _hover={{ bg: theme.colors.main.cardLight, cursor: 'pointer' }}
+                    position={'relative'}
                 >
+                    <Float placement="middle-start" offsetX="-2.5" offsetY="0">
+                        <Tooltip content={`Win Streak`} openDelay={200} closeDelay={100}>
+                            <Box
+                                textAlign={'center'}
+                                alignItems={'center'}
+                                className={user.winStreak >= 5 && 'glow'}
+                                background={theme.colors.main.bg}
+                                width={'32px'}
+                                borderRadius={'8px'}
+                            >
+                                <Text
+                                    textStyle="sm"
+                                    fontWeight="bold"
+                                    color={theme.colors.main.text}
+                                    animation={'pulse'}
+                                >
+                                    {user.winStreak || null}
+                                </Text>
+                            </Box>
+                        </Tooltip>
+                    </Float>
                     <Flex gap="12px">
-                        <Box>
-                            <Avatar.Root colorPalette="cyan" variant="solid">
+                        <Box maxW="120px">
+                            <Avatar.Root bg={theme.colors.main.bg} variant="solid">
                                 <Avatar.Fallback name={user.name} />
+                                <Avatar.Image src={user.userProfilePic} />
                                 <Float placement="bottom-end" offsetX="1" offsetY="1">
                                     <Circle
-                                        bg="green.500" // offline online stuff
+                                        bg={
+                                            getIsOnline()
+                                                ? theme.colors.main.active
+                                                : theme.colors.main.away
+                                        }
                                         size="8px"
                                         outline="0.2em solid"
                                         outlineColor={theme.colors.main.cardDark}
@@ -121,7 +207,8 @@ export default function UserCard({ user }) {
                             </Avatar.Root>
                         </Box>
                         <Stack gap="0px">
-                            <Flex>
+                            {/* position absolute isn't a great idea here but it is a quick fix */}
+                            <Flex position={'absolute'} marginBottom={'20px'}>
                                 <Text
                                     textStyle="sm"
                                     fontWeight="bold"
@@ -133,10 +220,21 @@ export default function UserCard({ user }) {
                             <TitleBadge title={user.userTitle || null} />
                         </Stack>
                         {/* eventually we'll display user account ranks here. */}
-                        <Box marginLeft={'12px'}>
+                        <Box marginLeft={'18px'} minWidth={'40px'}>
                             <RankDisplay elo={user.elo} />
                         </Box>
-                        <Box>{/* eventually we will display ping here */}</Box>
+                        <Box display="flex" alignItems={'center'} gap="4px" minW={'60px'}>
+                            <PingDisplay
+                                peer={
+                                    (userState?.lastKnownPings &&
+                                        userState?.lastKnownPings?.find(
+                                            (u: string) => u.id === user.uid
+                                        )) ||
+                                    user ||
+                                    undefined
+                                }
+                            />
+                        </Box>
                     </Flex>
                 </Box>
             </Popover.Trigger>
@@ -146,19 +244,33 @@ export default function UserCard({ user }) {
                         <Popover.Arrow />
                         <Popover.Body>
                             <Flex gap="8px">
-                                {!isUserChallenging && user.uid !== userState.uid && (
+                                {user.uid !== userState.uid && (
                                     <Button
+                                        borderColor={theme.colors.main.text}
+                                        borderWidth={'1px'}
                                         bg={theme.colors.main.action}
-                                        disabled={isInMatch}
+                                        disabled={cannotChallenge || !getIsOnline()}
                                         onClick={() => {
                                             setUserPopOpen(false)
-                                            setIsInMatch(true)
+                                            setCannotChallenge(true)
                                             window.api.callUser({
                                                 callerId: userState.uid,
                                                 calleeId: user.uid,
                                             })
+                                            pushMessage({
+                                                sender: userState.uid,
+                                                fromMe: true,
+                                                challengedUID: user.uid,
+                                                opp: user.name,
+                                                message: `You Challenged: ${user.name}`,
+                                                type: 'request',
+                                                declined: false,
+                                                accepted: false,
+                                                id: Date.now(), // TODO this is not a long lasting solution
+                                            })
                                         }}
                                     >
+                                        <Sword />
                                         Challenge
                                     </Button>
                                 )}

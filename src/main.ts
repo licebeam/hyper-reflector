@@ -1,4 +1,13 @@
-import { app, BrowserWindow, ipcMain, dialog, Notification } from 'electron'
+import {
+    app,
+    BrowserWindow,
+    ipcMain,
+    dialog,
+    Notification,
+    shell
+    // desktopCapturer,
+    // session,
+} from 'electron'
 const { exec } = require('child_process')
 import started from 'electron-squirrel-startup'
 import { sendCommand, readCommand, readStatFile, clearStatFile } from './sendHyperCommands'
@@ -6,11 +15,12 @@ import { startPlayingOnline, startSoloMode } from './loadFbNeo'
 import { getConfig, type Config } from './config'
 // updating automatically
 import { updateElectronApp } from 'update-electron-app'
+import { parseMatchData } from './utils/data'
 import keys from './private/keys'
 // external api
 import api from './external-api/requests'
 // p2p networking
-var dgram = require('dgram')
+const dgram = require('dgram')
 // Emulator reference
 let spawnedEmulator = null //used to handle closing the emulator process
 let opponentEndpoint
@@ -45,17 +55,22 @@ const path = require('path')
 const isDev = !app.isPackaged
 
 let userUID: string | null = null
+let userName: string | null = null
 let filePathBase = process.resourcesPath
 const tokenFilePath = path.join(app.getPath('userData'), 'auth_token.json')
 
+// USER LOGIN OBJECT GENERATION
 const getLoginObject = (user: any) => {
     return {
         name: user.userName,
         email: user.userEmail,
         uid: user.uid,
-        elo: user.accountELO || 0,
-        profilePicture: user.profilePicture || 'test',
+        elo: user.accountElo || 0,
+        userProfilePic: user.userProfilePic || 'test',
         userTitle: user.userTitle || null,
+        lastKnownPings: user.lastKnownPings || null,
+        countryCode: user.countryCode || null,
+        winStreak: user.winStreak || 0,
     }
 }
 
@@ -87,6 +102,10 @@ async function autoUpdate() {
     }
 }
 
+const iconPath = isDev
+    ? path.join(__dirname, '..', 'icons', 'favicon.ico')
+    : path.join(process.resourcesPath, 'icons', 'favicon.ico')
+
 const createWindow = () => {
     autoUpdate()
     // Create the browser window.
@@ -99,14 +118,57 @@ const createWindow = () => {
             preload: path.join(__dirname, 'preload.js'),
         },
         autoHideMenuBar: true,
+        icon: iconPath
+        // icon: './icons/favicon-32x32.png',
     })
+
+    // allow for external link opening
+    mainWindow.webContents.setWindowOpenHandler((details) => {
+        require('electron').shell.openExternal(details.url)
+        return { action: 'deny' }
+    })
+
+    // const overlayWindow = new BrowserWindow({
+    //     width: 400,
+    //     height: 200,
+    //     frame: false,
+    //     transparent: true,
+    //     alwaysOnTop: true,
+    //     focusable: false,
+    //     skipTaskbar: true,
+    //     hasShadow: false,
+    //     resizable: false,
+    //     fullscreenable: false,
+    //     webPreferences: {
+    //         nodeIntegration: true,
+    //         contextIsolation: false,
+    //     },
+    // })
+
+    // overlayWindow.setIgnoreMouseEvents(true) // Allows clicks to go through
+    // overlayWindow.loadURL('file://' + __dirname + '/overlay.html')
+
+    // TODO this is for screen share, just for testing, but possible for other features in the future.
+    // session.defaultSession.setDisplayMediaRequestHandler(
+    //     (request, callback) => {
+    //         desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
+    //             // Grant access to the first screen found.
+    //             // callback({ video: sources[0], audio: 'loopback' })
+    //             callback({ video: sources[0] })
+    //         })
+    //         // If true, use the system picker if available.
+    //         // Note: this is currently experimental. If the system picker
+    //         // is available, it will be used and the media request handler
+    //         // will not be invoked.
+    //     },
+    //     { useSystemPicker: true }
+    // )
 
     let config: Config
 
     function getConfigData() {
         try {
             config = getConfig()
-            console.log({ config })
         } catch (error) {
             mainWindow.webContents.send('message-from-main', error)
             console.error('Failed to read file:', error)
@@ -115,17 +177,64 @@ const createWindow = () => {
 
     getConfigData() // get the config on boot.
 
-    // Open the DevTools.
-    // mainWindow.webContents.openDevTools()
+    // show dev tools
+    //mainWindow.webContents.openDevTools()
 
-    if (!config.app.emuPath) {
-        new Notification({
-            title: 'error',
-            body: 'incorrect file path for your emulator',
-        }).show()
-    }
+    ipcMain.on('openEmulatorFolder', async () => {
+        const externalAppPath = path.join(process.resourcesPath, 'emu\\hyper-screw-fbneo\\roms');
+        try {
+            await shell.openPath(externalAppPath);
+        } catch (error) {
+            new Notification({
+                title: 'Error',
+                body: 'Rom folder does not exist'
+            }).show()
+        }
 
-    const setEmulatorPath = async () => {
+    })
+
+    const setEmulatorPath = async (isResetPath = false) => {
+        // the below path is only for the default emulator settings
+        const externalAppPath = path.join(process.resourcesPath, 'emu\\hyper-screw-fbneo');
+        if (isResetPath) {
+            const filePath = path.join(filePathBase, 'config.txt')
+            mainWindow.webContents.send(
+                'message-from-main',
+                `reset file path`
+            )
+
+            // Read the existing file
+            let fileContent = fs.existsSync(filePath)
+                ? fs.readFileSync(filePath, 'utf8')
+                : ''
+
+            // Split the file into lines
+            let lines = fileContent.split('\n')
+
+            // Find and update the delay line
+            let found = false
+            lines = lines.map((line: string) => {
+                if (line.startsWith('emuPath=')) {
+                    found = true
+                    return `emuPath=${externalAppPath}` // Replace the file path line
+
+                }
+                return line // Keep other lines the same
+            })
+
+            // If no emuPath= line exists, append it with the default path
+            if (!found) {
+                if (isResetPath) {
+                    lines.push(`emuPath=${externalAppPath}`)
+                }
+            }
+
+            // Write back the modified content
+            fs.writeFileSync(filePath, lines.join('\n'), 'utf8')
+            getEmulatorPath()
+            return
+        }
+
         try {
             await dialog
                 .showOpenDialog({ properties: ['openFile', 'openDirectory'] })
@@ -156,7 +265,7 @@ const createWindow = () => {
                             return line // Keep other lines the same
                         })
 
-                        // If no emuPath= line exists, append it
+                        // If no emuPath= line exists, append it with the default path
                         if (!found) {
                             lines.push(`emuPath=${res.filePaths[0]}`)
                         }
@@ -175,6 +284,17 @@ const createWindow = () => {
             console.log(error)
         }
     }
+
+    // This will happen on load
+    if (!config.app.emuPath) {
+        setEmulatorPath(true)
+        // We don't necessarily need this warning because it should default the path now.
+        // new Notification({
+        //     title: 'error',
+        //     body: 'incorrect file path for your emulator',
+        // }).show()
+    }
+
 
     const getEmulatorPath = async () => {
         await getConfigData()
@@ -261,9 +381,54 @@ const createWindow = () => {
         }
     }
 
+    const setConfigValue = async (key: string, value: string | number) => {
+        console.log(`Attempting to set config ${key} = ${value}`)
+
+        try {
+            const filePath = path.join(filePathBase, 'config.txt')
+            mainWindow.webContents.send('message-from-main', `Set config ${key} to: ${value}`)
+
+            let fileContent = fs.existsSync(filePath)
+                ? fs.readFileSync(filePath, 'utf8').replace(/\r\n/g, '\n')
+                : ''
+            let lines = fileContent
+                .split('\n')
+                .filter(line => line.trim() !== '')
+
+            let found = false
+            lines = lines.map((line: string) => {
+                if (line.startsWith(`${key}=`)) {
+                    found = true
+                    return `${key}=${value}`
+                }
+                return line
+            })
+
+            if (!found) {
+                lines.push(`${key}=${value}`)
+            }
+
+            fs.writeFileSync(filePath, lines.join('\n'), 'utf8')
+
+            console.log(`CONFIG: Updated ${key} to ${value}`)
+        } catch (error) {
+            mainWindow.webContents.send('message-from-main', `Error updating ${key}: ${error}`)
+            console.error(`Failed to update config ${key}:`, error)
+        }
+    }
+
+    const getConfigValue = async (key: string) => {
+        await getConfigData() // Ensures latest config is loaded
+
+        // Access value safely, assuming config is flat or nested as needed
+        const value = config[key] ?? config.app?.[key]
+        console.log('Got a config value', key, value)
+
+        mainWindow.webContents.send('getConfigValue', { key, value })
+    }
+
     const getAppTheme = async () => {
         await getConfigData()
-        console.log(config.app.appTheme)
         mainWindow.webContents.send('appTheme', parseInt(config.app.appTheme))
     }
 
@@ -272,7 +437,6 @@ const createWindow = () => {
         try {
             await signInWithEmailAndPassword(auth, email, pass)
                 .then(async (data) => {
-                    console.log('login info', data)
                     await saveRefreshToken(data.user.refreshToken)
                     return true
                 })
@@ -295,14 +459,12 @@ const createWindow = () => {
 
     async function removeRefreshToken() {
         await fs.unlinkSync(tokenFilePath, 'auth_token.json')
-        console.log('Refresh token removed.')
     }
 
     async function handleLogOut() {
         await signOut(auth)
             .then(() => {
                 try {
-                    console.log('logout success')
                     removeRefreshToken()
                     mainWindow.webContents.send('loggedOutSuccess', 'user logged out')
                 } catch (error) {
@@ -338,6 +500,8 @@ const createWindow = () => {
             // send our user object to the front end
             mainWindow.webContents.send('loginSuccess', getLoginObject(user))
             userUID = user.uid
+            console.log('setting user ', user.name, user)
+            userName = user.name
             console.log('user is: ', user)
         }
     }
@@ -389,8 +553,8 @@ const createWindow = () => {
         mainWindow.webContents.send('send-data-channel', data)
     })
 
-    ipcMain.on('setEmulatorPath', () => {
-        setEmulatorPath()
+    ipcMain.on('setEmulatorPath', (event, isResetPath) => {
+        setEmulatorPath(isResetPath)
     })
 
     ipcMain.on('getEmulatorPath', () => {
@@ -409,6 +573,24 @@ const createWindow = () => {
         setAppTheme(themeIndex)
     })
 
+    //TODO make the config setters use this instead
+    ipcMain.on('setConfigValue', (event, { key, value }) => {
+        setConfigValue(key, value)
+        if (key === 'isAway') {
+            mainWindow.webContents.send('updateSocketState', { key, value })
+        }
+    })
+
+    ipcMain.on('getConfigValue', (event, { key }) => {
+        getConfigValue(key)
+        if (key === 'isAway') {
+            mainWindow.webContents.send('updateSocketState', {
+                key,
+                value: config?.app?.isAway || 'false',
+            })
+        }
+    })
+
     ipcMain.on('getAppTheme', () => {
         getAppTheme()
     })
@@ -420,11 +602,12 @@ const createWindow = () => {
         readStatFile(mainWindow)
     })
 
-    ipcMain.on('serveMatch', async (event, data) => {})
+    ipcMain.on('serveMatch', async (event, data) => { })
 
     let keepAliveInterval = null
 
     ipcMain.on('startGameOnline', async (event, data) => {
+        console.log('data', data)
         if (socket) {
             console.log('killing socket', socket)
             try {
@@ -493,21 +676,25 @@ const createWindow = () => {
                         // )
                         // console.log(remote.address + ':' + remote.port + ' - ' + message)
                     } else {
-                        socket.send(message, 0, message.length, 7000, '127.0.0.1')
+                        // console.log('message from other user', message)
+                        // This is a message to the proxy from our opponent, we then send that information directly to the listening port of the emulator.
+                        emuListener.send(message, 0, message.length, 7000, '127.0.0.1')
                     }
                     try {
                         opponentEndpoint = JSON.parse(message)
                         currentMatchId = opponentEndpoint.matchId || null
                         sendMessageToB(opponentEndpoint.peer.address, opponentEndpoint.peer.port)
-                    } catch (err) {}
+                    } catch (err) { }
                 })
             } catch (error) {
                 console.log('error in socket', error)
             }
 
             try {
-                // get messages from our local emulator and send it to the other player socket
+                // listening to the emulator on port 7001
+                // get messages from our local emulator and send it to the other players open proxy
                 emuListener.on('message', function (message, remote) {
+                    // console.log('sending message to via listener > ' + JSON.stringify(opponentEndpoint.peer))
                     sendMessageToB(
                         opponentEndpoint.peer.address,
                         opponentEndpoint.peer.port,
@@ -515,13 +702,12 @@ const createWindow = () => {
                     )
                 })
             } catch (error) {
-                console.log('error in emu scket', error)
+                console.log('error in emu socket', error)
             }
 
             function sendMessageToS(kill: boolean) {
-                const serverPort = 33334
+                const serverPort = keys.PUNCH_PORT // revert this after killing all of the new services
                 const serverHost = keys.COTURN_IP
-                // var serverHost = '127.0.0.1'
                 console.log(userUID, '- is kill? ' + kill)
                 const message = new Buffer(
                     JSON.stringify({ uid: userUID || data.myId, peerUid: data.opponentUID, kill })
@@ -538,7 +724,7 @@ const createWindow = () => {
                         message.length,
                         serverPort,
                         serverHost,
-                        function (err, nrOfBytesSent) {
+                        function (err) {
                             if (err) return console.log(err)
                             console.log('UDP message sent Server ' + serverHost + ':' + serverPort)
                         }
@@ -565,6 +751,7 @@ const createWindow = () => {
                     message = new Buffer('ping')
                 }
                 try {
+                    if (!socket) return
                     socket.send(
                         message,
                         0,
@@ -578,6 +765,9 @@ const createWindow = () => {
                     )
                 } catch (error) {
                     console.log('could not send message user B')
+                    killSocketAndEmu()
+                    // TODO: should we really close the sockets like this?
+                    mainWindow.webContents.send('endMatch', userUID)
                 }
             }
 
@@ -589,8 +779,9 @@ const createWindow = () => {
                     localPort: 7000,
                     remoteIp: '127.0.0.1',
                     remotePort: emuListener.address().port,
-                    player: data.player,
+                    player: data.player + 1, // This depends on the emulator
                     delay: parseInt(config.app.emuDelay),
+                    playerName: userName || 'Unknown',
                     isTraining: false, // Might be used in the future.
                     callBack: (isOnOpen: boolean) => {
                         if (isOnOpen) {
@@ -602,18 +793,9 @@ const createWindow = () => {
                                 },
                             })
                         }
+                        console.log('callback firing off')
                         sendMessageToS(true)
-                        // attempt to kill the emulator
-                        console.log('emulator should die')
-                        try {
-                            socket.close()
-                            emuListener.close()
-                            socket = null
-                            emuListener = null
-                        } catch (error) {
-                            console.log('could not properly shut down emulator and sockets')
-                        }
-
+                        killSocketAndEmu()
                         mainWindow.webContents.send('endMatch', userUID)
                         // get user out of challenge pool
                     },
@@ -621,6 +803,22 @@ const createWindow = () => {
             }
         }
     })
+
+    async function killSocketAndEmu() {
+        clearInterval(keepAliveInterval)
+        keepAliveInterval = null
+        // attempt to kill the emulator
+        console.log('emulator should die in main')
+        try {
+            await socket.close()
+            await emuListener.close()
+            socket = null
+            emuListener = null
+            spawnedEmulator = null
+        } catch (error) {
+            console.log('could not properly shut down emulator and sockets')
+        }
+    }
 
     function killProcessByName(processName) {
         exec(`taskkill /F /IM ${processName}`, (error, stdout, stderr) => {
@@ -633,85 +831,143 @@ const createWindow = () => {
     }
 
     ipcMain.on('killEmulator', async () => {
-        clearInterval(keepAliveInterval)
-        keepAliveInterval = null
-        try {
-            socket.close()
-            emuListener.close()
-            socket = null
-            emuListener = null
-        } catch (error) {
-            console.log('could not close sockets used by emulator')
-        }
-
         await mainWindow.webContents.send(
             'message-from-main',
             'Attempting to gracefully close emulator'
-        )
+        );
 
-        try {
-            if (spawnedEmulator) {
-                console.log('Trying to close emulator', spawnedEmulator.pid)
-
-                // Try SIGTERM first
-                spawnedEmulator.kill('SIGTERM')
-                // if we are on windows we also need to kill the process
-
-                // Listen for the process to close
-                spawnedEmulator.on('close', (code, signal) => {
-                    console.log(`Emulator exited with code ${code} and signal ${signal}`)
-                    spawnedEmulator = null
-                })
-
-                // After 2 seconds, force kill if it's still running
-                setTimeout(() => {
-                    if (spawnedEmulator && !spawnedEmulator.killed) {
-                        console.log('Force killing emulator')
-                        spawnedEmulator.kill('SIGKILL')
-                    }
-                }, 2000)
-
-                if (process.platform === 'win32') {
-                    killProcessByName('fcadefbneo.exe')
-                    spawnedEmulator = null
-                }
-
-                mainWindow.webContents.send('message-from-main', 'Emulator exists, closing')
-            }
-        } catch (err) {
-            mainWindow.webContents.send('message-from-main', 'Could not close emulator')
-            console.error('Failed to close emulator:', err)
-        }
-
-        // Check if process is still alive before calling taskkill
         if (spawnedEmulator) {
-            const pid = spawnedEmulator.pid
+            const pid = spawnedEmulator.pid;
+            console.log('Attempting to terminate emulator, PID:', pid);
 
-            // Debug: Check if process is still running
-            exec(`tasklist /FI "PID eq ${pid}"`, (err, stdout, stderr) => {
-                if (!stdout.includes(pid)) {
-                    console.log(`Process ${pid} is already gone.`)
-                    return
+            spawnedEmulator.on('close', (code, signal) => {
+                console.log(`Emulator process closed. Code: ${code}, Signal: ${signal}`);
+                spawnedEmulator = null;
+            });
+
+            try {
+                spawnedEmulator.kill('SIGTERM');
+            } catch (e) {
+                console.error('Error sending SIGTERM:', e);
+            }
+
+            setTimeout(() => {
+                if (spawnedEmulator) {
+                    console.warn('Process still alive after 2s. Forcing SIGKILL...');
+                    try {
+                        spawnedEmulator.kill('SIGKILL');
+                    } catch (e) {
+                        console.error('Failed to SIGKILL:', e);
+                    }
+                }
+            }, 2000);
+
+            if (process.platform === 'win32') {
+                exec(`taskkill /PID ${pid} /F /T`, (err, stdout, stderr) => {
+                    if (err) {
+                        console.error(`taskkill failed for PID ${pid}:`, err);
+                    } else {
+                        console.log(`taskkill succeeded for PID ${pid}`);
+                    }
+                });
+
+                const pathEnd = config.emulator.fbNeoPath
+                const slicedPathEnd = pathEnd && pathEnd.split('\\').pop()
+
+                if (slicedPathEnd === 'fs-fbneo.exe') {
+                    killProcessByName('fs-fbneo.exe');
+                } else if (slicedPathEnd === 'fcadefbneo.exe') {
+                    killProcessByName('fcadefbneo.exe');
+
                 }
 
-                console.log(`Process ${pid} is still running. Attempting to force kill...`)
+            }
 
-                if (process.platform === 'win32') {
-                    exec(`taskkill /PID ${pid} /F`, (err, stdout, stderr) => {
-                        if (err) console.error('taskkill failed:', err)
-                    })
-                } else {
-                    exec(`pkill -P ${pid}`, (err, stdout, stderr) => {
-                        if (err) console.error('pkill failed:', err)
-                    })
-                }
-            })
+            await mainWindow.webContents.send('message-from-main', 'Emulator exists, closing');
+        } else {
+            console.log('No emulator process found to kill.');
         }
 
-        // Cleanup
-        clearStatFile()
-        mainWindow.webContents.send('endMatchUI', userUID)
-    })
+        killSocketAndEmu();
+        clearStatFile();
+        mainWindow.webContents.send('endMatchUI', userUID);
+    });
+
+    // ipcMain.on('killEmulator', async () => {
+    //     killSocketAndEmu()
+
+    //     await mainWindow.webContents.send(
+    //         'message-from-main',
+    //         'Attempting to gracefully close emulator'
+    //     )
+
+    //     try {
+    //         if (spawnedEmulator) {
+    //             console.log('Trying to close emulator', spawnedEmulator.pid)
+
+    //             // Try SIGTERM first
+    //             spawnedEmulator.kill('SIGTERM')
+    //             // if we are on windows we also need to kill the process
+
+    //             // Listen for the process to close
+    //             spawnedEmulator.on('close', (code, signal) => {
+    //                 console.log(`Emulator exited with code ${code} and signal ${signal}`)
+    //                 spawnedEmulator = null
+    //             })
+
+    //             // After 2 seconds, force kill if it's still running
+    //             setTimeout(() => {
+    //                 if (spawnedEmulator && !spawnedEmulator.killed) {
+    //                     console.log('Force killing emulator')
+    //                     spawnedEmulator.kill('SIGKILL')
+    //                 }
+    //             }, 2000)
+
+    //             if (process.platform === 'win32') {
+    //                 console.log('trying to kill the emulator here')
+    //                 // killProcessByName('fcadefbneo.exe')
+    //                 killProcessByName('fs-fbneo.exe')
+    //                 spawnedEmulator = null
+    //             }
+
+    //             mainWindow.webContents.send('message-from-main', 'Emulator exists, closing')
+    //         }
+    //     } catch (err) {
+    //         mainWindow.webContents.send('message-from-main', 'Could not close emulator')
+    //         console.error('Failed to close emulator:', err)
+    //     }
+
+    //     // Check if process is still alive before calling taskkill
+    //     if (spawnedEmulator) {
+    //         const pid = spawnedEmulator.pid
+    //         console.log('emulator', pid)
+
+    //         // Debug: Check if process is still running
+    //         exec(`tasklist /FI "PID eq ${pid}"`, (err, stdout, stderr) => {
+    //             if (!stdout.includes(pid)) {
+    //                 console.log(`Process ${pid} is already gone.`)
+    //                 return
+    //             }
+
+    //             console.log(`Process ${pid} is still running. Attempting to force kill...`)
+
+    //             if (process.platform === 'win32') {
+    //                 exec(`taskkill /PID ${pid} /F`, (err, stdout, stderr) => {
+    //                     if (err) console.error('taskkill failed:', err)
+    //                 })
+    //             } else {
+    //                 exec(`pkill -P ${pid}`, (err, stdout, stderr) => {
+    //                     if (err) console.error('pkill failed:', err)
+    //                 })
+    //             }
+    //         })
+    //     }
+
+    //     // Cleanup
+    //     spawnedEmulator = null
+    //     clearStatFile()
+    //     mainWindow.webContents.send('endMatchUI', userUID)
+    // })
 
     ipcMain.on('startTrainingMode', (event) => {
         startSoloMode({
@@ -742,7 +998,7 @@ const createWindow = () => {
 
     ipcMain.on(
         'createNewLobby',
-        (event, lobbyData: { name: string; pass: string; user: any; private: boolean }) => {
+        (event, lobbyData: { name: string; pass: string; user: any; isPrivate: boolean }) => {
             mainWindow.webContents.send('createNewLobby', lobbyData)
         }
     )
@@ -751,9 +1007,13 @@ const createWindow = () => {
         mainWindow.webContents.send('updateLobbyStats', lobbyArray)
     })
 
+    ipcMain.on('updateUserData', (event, data: any) => {
+        mainWindow.webContents.send('updateUserData', data)
+    })
+
     ipcMain.on(
         'userChangeLobby',
-        (event, lobbyData: { newLobbyId: string; pass: string; user: any; private: boolean }) => {
+        (event, lobbyData: { newLobbyId: string; pass: string; user: any; isPrivate: boolean }) => {
             console.log('lobby changing', lobbyData)
             mainWindow.webContents.send('userChangeLobby', lobbyData)
         }
@@ -833,10 +1093,12 @@ const createWindow = () => {
 
     // matchmaking
     ipcMain.on('callUser', (event, data) => {
+        console.log(data)
         mainWindow.webContents.send('callUser', data)
     })
 
     ipcMain.on('answerCall', (event, data) => {
+        console.log(data)
         mainWindow.webContents.send('answerCall', { ...data, answererId: userUID })
     })
 
@@ -847,13 +1109,14 @@ const createWindow = () => {
 
     ipcMain.on('callDeclined', (event, data) => {
         console.log('our call was declined')
-        mainWindow.webContents.send('callDeclined', { ...data, answererId: userUID })
+        mainWindow.webContents.send('callDeclined', data)
     })
 
     ipcMain.on('receivedCall', (event, data) => {
+        console.log(data)
         mainWindow.webContents.send('receivedCall', data)
         const challengeObject = {
-            sender: data.callerId,
+            sender: data.from,
             message: 'got a challenge',
             type: 'challenge',
             declined: false,
@@ -915,6 +1178,7 @@ ipcMain.on('request-data', (event) => {
     })
 })
 
+
 async function handleReadAndUploadMatch() {
     const data = await readCommand()
     if (!data) return
@@ -924,7 +1188,7 @@ async function handleReadAndUploadMatch() {
     }
     if (data && data.length && currentMatchId) {
         //send match data to back end
-        console.log('we got some match data, sending it to the BE')
+        // console.log('we got some match data, sending it to the BE')
         const matchData = {
             matchData: {
                 raw: data,
@@ -933,6 +1197,25 @@ async function handleReadAndUploadMatch() {
             player1: lastKnownPlayerSlot == 0 ? userUID : opponentUID || 'fake-user',
             player2: lastKnownPlayerSlot == 1 ? userUID : opponentUID || 'fake-user',
         }
+        const parsedMatch = parseMatchData(data)
+        // Update win streak or local UI data after a match.
+        // Users could potentially fudge this data but thats ok for now.
+        if (matchData.player1 === userUID) {
+            if (parsedMatch?.['p1-win']) {
+                console.log('streak increased')
+                mainWindow.webContents.send('updateSocketState', {
+                    key: 'winStreak',
+                    value: 1,
+                })
+            } else {
+                console.log('streak lost')
+                mainWindow.webContents.send('updateSocketState', {
+                    key: 'winStreak',
+                    value: 0,
+                })
+            }
+        }
+
         await api.uploadMatchData(auth, matchData)
     }
 }
@@ -992,7 +1275,6 @@ app.on('activate', () => {
 
 app.whenReady().then(async () => {
     mainWindow.webContents.once('did-finish-load', () => {
-        console.log('UI has fully loaded!')
         mainWindow.webContents.send('autoLoggingIn')
         function getRefreshToken() {
             if (fs.existsSync(tokenFilePath)) {
@@ -1019,15 +1301,13 @@ app.whenReady().then(async () => {
                 const user = await api
                     .getUserByAuth(auth)
                     .catch((err) => console.log('err getting user by auth'))
-                console.log(user)
 
                 if (user) {
-                    console.log('user logged in')
                     // send our user object to the front end
                     mainWindow.webContents.send('loginSuccess', getLoginObject(user))
-
                     userUID = user.uid
-                    console.log('user is: ', user)
+                    userName = user.userName
+                    console.log('user is: ', user) // used to observe initial user state
                 }
             } else {
                 mainWindow.webContents.send('autoLoginFailure')

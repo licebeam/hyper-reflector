@@ -1,31 +1,45 @@
 import { useEffect, useState } from 'react'
-import { Stack, Tabs, Box, Text } from '@chakra-ui/react'
+import { Stack, Tabs, Box, Text, Image, Button } from '@chakra-ui/react'
 import { useNavigate } from '@tanstack/react-router'
 import { toaster } from '../components/chakra/ui/toaster'
-import { useLayoutStore, useLoginStore, useMessageStore } from '../state/store'
-import { Settings } from 'lucide-react'
+import { useConfigStore, useLayoutStore, useLoginStore, useMessageStore } from '../state/store'
+import { Bell, BellOff, Settings } from 'lucide-react'
 import { getThemeNameList } from '../utils/theme'
 import bgImage from './bgImage.svg'
+import hrLogo from './logo.svg'
 
 import soundBase64Data from '../components/sound/challenge.wav'
 
 export default function Layout({ children }) {
-    const theme = useLayoutStore((state) => state.appTheme)
-    const setTheme = useLayoutStore((state) => state.setTheme)
-    const [isLoading, setIsLoading] = useState(false)
+    const audioEffect = new Audio(soundBase64Data) // this line for renderer process only
     const isLoggedIn = useLoginStore((state) => state.isLoggedIn)
     const setUserState = useLoginStore((state) => state.setUserState)
     const user = useLoginStore((state) => state.userState)
     const loggedOut = useLoginStore((state) => state.loggedOut)
+    const messageState = useMessageStore((state) => state.messageState)
     const clearMessageState = useMessageStore((state) => state.clearMessageState)
+    const updateMessage = useMessageStore((state) => state.updateMessage)
+    const callData = useMessageStore((state) => state.callData)
+    const removeCallData = useMessageStore((state) => state.removeCallData)
     const clearUserList = useMessageStore((state) => state.clearUserList)
     const layoutTab = useLayoutStore((state) => state.selectedTab)
     const setLayoutTab = useLayoutStore((state) => state.setSelectedTab)
+    const configState = useConfigStore((state) => state.configState)
+    const updateConfigState = useConfigStore((state) => state.updateConfigState)
+    const theme = useLayoutStore((state) => state.appTheme)
+    const setTheme = useLayoutStore((state) => state.setTheme)
+    const [isLoading, setIsLoading] = useState(false)
 
     const navigate = useNavigate()
 
+    // useEffect(() => {
+    //     console.log('state update  -------------------------------', configState)
+    // }, [configState])
+
     // Initially set the theme when loaded
     useEffect(() => {
+        window.api.getConfigValue('appSoundOn')
+        window.api.getConfigValue('isAway')
         window.api.removeExtraListeners('appTheme', handleSetTheme)
         window.api.on('appTheme', handleSetTheme)
 
@@ -70,34 +84,50 @@ export default function Layout({ children }) {
         })
     }
 
+    const handleSetConfigState = (data: { key: string; value: string | boolean | number }) => {
+        const { key, value } = data
+        updateConfigState({
+            [key]: value,
+        })
+    }
+
+    const handleCallDeclined = (fromUID) => {
+        const callToRemove = callData.find((call) => call.callerId === fromUID)
+        removeCallData(callToRemove)
+        const messageState = useMessageStore.getState().messageState
+        messageState.forEach((m) => {
+            if (m?.fromMe && m?.challengedUID === fromUID && !m?.declined) {
+                const updatedMessage = {
+                    ...m,
+                    declined: true,
+                }
+                updateMessage(updatedMessage)
+            }
+        })
+    }
+
     useEffect(() => {
+        window.api.removeAllListeners('callDeclined', handleCallDeclined)
+        window.api.on('callDeclined', handleCallDeclined)
+        window.api.removeExtraListeners('getConfigValue', handleSetConfigState)
+        window.api.on('getConfigValue', handleSetConfigState)
         window.api.removeExtraListeners('sendAlert', handleAlertFromMain)
         window.api.on('sendAlert', handleAlertFromMain)
 
         return () => {
+            window.api.removeListener('callDeclined', handleCallDeclined)
+            window.api.removeListener('getConfigValue', handleSetConfigState)
             window.api.removeListener('sendAlert', handleAlertFromMain)
         }
     }, [])
 
-    useEffect(() => {
-        console.log('user state change', user)
-    }, [user])
-
     // update chats
     const handleChallengeQueue = (messageObject) => {
-        const currentUser = useLoginStore.getState().userState
-        console.log('test message', messageObject, currentUser.isFighting)
-        if (messageObject.type === 'challenge' && !currentUser.isFighting) {
-            // TODO: adjust this to feedback
-            // if we are in the lobby tab, play the sound, if not push a notification etc.
-            new Audio(soundBase64Data).play() // this line for renderer process only
-
-            // TODO need to have another way of handling messages as they come in to the system outside of tab
-            // toaster.create({
-            //     type: 'warning',
-            //     title: 'Received a challenge!',
-            //     // description: 'from some user', fix this later
-            // })
+        const currentConfig = useConfigStore.getState().configState
+        if (messageObject.type === 'challenge') {
+            if (currentConfig?.appSoundOn === 'true') {
+                audioEffect.play()
+            }
         }
     }
 
@@ -128,6 +158,7 @@ export default function Layout({ children }) {
                 px="4"
                 flexShrink={0}
             >
+                <Image src={hrLogo} height={'80px'} />
                 <Tabs.Root variant="enclosed" value={layoutTab} width="100%">
                     <Tabs.List bg={theme.colors.main.secondary} rounded="l3" minW="100%">
                         <Box display={'flex'} width="100%">
@@ -198,7 +229,43 @@ export default function Layout({ children }) {
                                 Offline
                             </Tabs.Trigger>
                             <Tabs.Indicator rounded="l2" bgColor={theme.colors.main.action} />
-                            <Box width="100%">
+                            <Box
+                                gap={'20px'}
+                                width="100%"
+                                display={'flex'}
+                                alignItems="center"
+                                justifyContent={'right'}
+                            >
+                                <Button
+                                    bg="none"
+                                    width={'60px'}
+                                    color={
+                                        configState?.isAway === 'true'
+                                            ? theme.colors.main.away
+                                            : theme.colors.main.active
+                                    }
+                                    cursor={'pointer'}
+                                    onClick={() => {
+                                        // This is terrible logic, lets fix this
+                                        const value =
+                                            configState?.isAway === 'true' ? 'false' : 'true'
+                                        try {
+                                            window.api.setConfigValue('isAway', value)
+                                            updateConfigState({ isAway: value })
+                                        } catch (error) {
+                                            toaster.error({
+                                                title: 'Error',
+                                            })
+                                        }
+                                    }}
+                                >
+                                    {configState?.isAway === 'false' ||
+                                    configState?.isAway === undefined ? (
+                                        <Bell />
+                                    ) : (
+                                        <BellOff />
+                                    )}
+                                </Button>
                                 <Tabs.Trigger
                                     justifySelf="end"
                                     width="40px"
@@ -233,11 +300,30 @@ export default function Layout({ children }) {
                 px="4"
                 flexShrink={0}
             >
-                {/* <Text textStyle="xs" color={theme.colors.main.action}>
-                    https://discord.gg/T77dSXG7Re
-                </Text> */}
+                <Box display="flex" gap="8px">
+                    <a href="https://hyper-reflector.com/" target="_blank" rel="noreferrer">
+                        <Text textStyle="xs" color={theme.colors.main.action}>
+                            Hyper Reflector on:
+                        </Text>
+                    </a>
+                    <a href="https://discord.gg/fsQEVzXwbt" target="_blank" rel="noreferrer">
+                        <Text textStyle="xs" color={theme.colors.main.action}>
+                            Discord
+                        </Text>
+                    </a>
+                    <a
+                        href="https://github.com/Hyper-Reflector-Team"
+                        target="_blank"
+                        rel="noreferrer"
+                    >
+                        <Text textStyle="xs" color={theme.colors.main.action}>
+                            Github
+                        </Text>
+                    </a>
+                </Box>
+
                 <Text textStyle="xs" color={theme.colors.main.action}>
-                    Hyper Reflector version 0.3.0a 2025
+                    Hyper Reflector version 0.4.0a 2025
                 </Text>
             </Box>
         </Stack>

@@ -30,15 +30,16 @@ contextBridge.exposeInMainWorld('api', {
     handShake: (type: string) => ipcRenderer.send('hand-shake-users', type),
     sendDataChannel: (data: string) => ipcRenderer.send('send-data-channel', data),
     //lobbies
-    createNewLobby: (lobbyData: { name: string; pass: string; user: any; private: boolean }) =>
+    createNewLobby: (lobbyData: { name: string; pass: string; user: any; isPrivate: boolean }) =>
         ipcRenderer.send('createNewLobby', lobbyData),
     userChangeLobby: (lobbyData: {
         newLobbyId: string
         pass: string
         user: any
-        private: boolean
+        isPrivate: boolean
     }) => ipcRenderer.send('userChangeLobby', lobbyData),
     updateLobbyStats: (lobbyArray: any) => ipcRenderer.send('updateLobbyStats', lobbyArray),
+    updateUserData: (userData: any) => ipcRenderer.send('updateUserData', userData),
     // user profile
     getUserMatches: (matches: any) => ipcRenderer.send('getUserMatches', matches),
     getGlobalSet: (matches: any) => ipcRenderer.send('getGlobalSet', matches),
@@ -46,12 +47,20 @@ contextBridge.exposeInMainWorld('api', {
     getUserData: (user: any) => ipcRenderer.send('getUserData', user),
     getGlobalStats: (stats: any) => ipcRenderer.send('getGlobalStats', stats),
     changeUserData: (userData: any) => ipcRenderer.send('changeUserData', userData),
-    // match
-    setEmulatorPath: () => ipcRenderer.send('setEmulatorPath'),
+
+    // config and match
+    openEmulatorFolder: () => ipcRenderer.send('openEmulatorFolder'),
+    setEmulatorPath: (isResetPath: boolean) => ipcRenderer.send('setEmulatorPath', isResetPath),
     getEmulatorPath: () => ipcRenderer.send('getEmulatorPath'),
     setEmulatorDelay: (delay: number) => ipcRenderer.send('setEmulatorDelay', delay),
     getEmulatorDelay: (delay: number) => ipcRenderer.send('getEmulatorDelay', delay),
     setAppTheme: (themeIndex: number) => ipcRenderer.send('setAppTheme', themeIndex),
+    setConfigValue: (key: string, value: string | boolean | number) =>
+        ipcRenderer.send('setConfigValue', { key, value }),
+    updateSocketState: (key: string, value: string | boolean | number) =>
+        ipcRenderer.send('updateSocketState', { key, value }),
+    getConfigValue: (key: string, value: string | boolean | number) =>
+        ipcRenderer.send('getConfigValue', { key, value }),
     getAppTheme: (themeIndex: number) => ipcRenderer.send('getAppTheme', themeIndex),
     endMatch: (userUID: string) => ipcRenderer.send('endMatch', userUID),
     endMatchUI: (userUID: string) => ipcRenderer.send('endMatch', userUID),

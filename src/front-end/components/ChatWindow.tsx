@@ -26,24 +26,27 @@ export default function ChatWindow() {
     }
 
     const handleRoomMessage = (messageObject) => {
-        // censor words befor sending to BE
+        // console.log(messageObject)
+        // censor words before sending to BE
         const censor = new TextCensor()
         const input = messageObject.message
         const matches = matcher.getAllMatches(input)
         const censoredMessage = censor.applyTo(input, matches)
         const getSender = () => {
+            // I think this is incorrect
             if (typeof messageObject.sender === 'string') {
                 return messageObject.sender
             } else {
                 return messageObject.sender.name
             }
         }
+        // hey hey test new origin
         pushMessage({
             sender: getSender(),
             message: censoredMessage,
             type: messageObject.type || 'sendMessage',
             declined: false,
-            accepted: false,
+            accepted: messageObject.accepted || false,
             id: Date.now(), // TODO this is not a long lasting solution
         })
     }
