@@ -107,11 +107,15 @@ window.api.on(
 
 // handle send answer to specific user
 window.api.on('answerCall', async ({ from }: { from: string }) => {
+    let gameName = null
+    if (currentLobbyID === 'vampire') {
+        gameName = 'vsavj'
+    }
     answerCall(peerConnection, signalServerSocket, from, myUID)
     callerIdState = from
     opponentUID = from
     playerNum = 1 // if we answer a call we are always player 1
-    window.api.startGameOnline(opponentUID, playerNum, '')
+    window.api.startGameOnline(opponentUID, playerNum, '', gameName)
 })
 
 window.api.on('declineCall', async ({ from }: { from: string }) => {
@@ -283,6 +287,7 @@ function connectWebSocket(user) {
         }
 
         if (data.type === 'matchEndedClose') {
+            console.log('match end code', opponentUID, data)
             //user the userUID and close all matches.
             if (opponentUID === data.userUID) {
                 window.api.killEmulator()
@@ -313,6 +318,7 @@ function connectWebSocket(user) {
             window.api.receivedCall(data)
         } else if (data.type === 'webrtc-ping-answer') {
             if (!data.from) return
+            opponentUID = data.from;
             const acceptMessage = {
                 sender: data.from,
                 message: 'Accepted',
@@ -322,8 +328,12 @@ function connectWebSocket(user) {
                 id: Date.now(), // TODO this is not a long lasting solution
             }
             window.api.sendRoomMessage(acceptMessage)
+            let gameName = null
+            if (currentLobbyID === 'vampire') {
+                gameName = 'vsavj'
+            }
             playerNum = 0 // if we answer a call we are always player 1
-            window.api.startGameOnline(data?.from, playerNum, '')
+            window.api.startGameOnline(data?.from, playerNum, '', gameName)
             try {
                 // there is a timing issue here that nees to be fixed.
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer))

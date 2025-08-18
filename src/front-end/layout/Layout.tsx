@@ -323,7 +323,7 @@ export default function Layout({ children }) {
                 </Box>
 
                 <Text textStyle="xs" color={theme.colors.main.action}>
-                    Hyper Reflector version 0.4.0a 2025
+                    Hyper Reflector version 0.4.1a 2025
                 </Text>
             </Box>
         </Stack>

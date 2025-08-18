@@ -101,7 +101,7 @@ export default function UserCard({ user }) {
             if (peer?.ping < 100) {
                 return <Wifi />
             }
-            if (peer?.ping > 100 && peer?.ping > 200) {
+            if (peer?.ping > 100 && peer?.ping < 200) {
                 return <WifiHigh />
             }
             if (peer?.ping > 200) {

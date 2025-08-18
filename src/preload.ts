@@ -70,8 +70,8 @@ contextBridge.exposeInMainWorld('api', {
     sendCommand: (command: string) => ipcRenderer.send('send-command', command),
     serveMatch: (ip: string, port: number, player: number, delay: number, myPort: number) =>
         ipcRenderer.send('serveMatch', { ip, port, player, delay, myPort }),
-    startGameOnline: (opponentUID: string, player: number, myId?: string) =>
-        ipcRenderer.send('startGameOnline', { opponentUID, player, myId }),
+    startGameOnline: (opponentUID: string, player: number, myId?: string, gameName?: string) =>
+        ipcRenderer.send('startGameOnline', { opponentUID, player, myId, gameName }),
     startSoloTraining: () => ipcRenderer.send('startTrainingMode'),
     // ipc call stuff
     on: (channel, callback) => {
