@@ -1,0 +1,65 @@
+{
+  "Settings": {
+    "GGPO": {
+      "title": "GGPO設定",
+      "desc": "ネットプレーの体験を選択してください",
+      "label": "ディレイ ― 高いほど動作は滑らかですが入力遅延が増えます",
+      "placeholder": "ディレイを選択"
+    },
+    "Language": {
+      "placeholder": "言語を選択",
+      "title": "言語",
+      "en": "English",
+      "ja": "日本語"
+    },
+    "Notification": {
+      "title": "通知設定",
+      "desc": "アプリがイベントを通知する方法を選択します",
+      "challengeSound": "対戦リクエスト音",
+      "setCustomChallenge": "対戦リクエスト音をカスタム設定",
+      "messageSound": "メンション通知音",
+      "setCustomMessage": "メンション通知音をカスタム設定"
+    },
+    "Theme": {
+      "title": "テーマ設定",
+      "desc": "アプリケーションの見た目を変更します",
+      "darkMode": "モード",
+      "select": "テーマを選択"
+    },
+    "Emu": {
+      "title": "エミュレーター設定",
+      "desc": "警告: この機能は非推奨で今後削除されます",
+      "setEmuPath": "エミュレーターのパスを設定"
+    },
+    "Danger": {
+      "title": "注意",
+      "reset": "初期設定に戻す",
+      "logOut": "ログアウト"
+    }
+  },
+  "Lab": {
+    "title": "ラボ",
+    "currentPath": "現在のパス: ",
+    "start": "トレーニングを開始",
+    "setLua": "トレーニングLuaを設定",
+    "dialogLua": "Luaファイルを選択",
+    "errorPath": "ダイアログを開けませんでした"
+  },
+  "Lobby": {
+    "filters": "フィルター",
+    "searchPlaceholder": "ユーザー名",
+    "messagePlaceholder": "メッセージを入力してください",
+    "scrollToLatest": "最新メッセージへ移動",
+    "allCountries": "すべての国",
+    "showingUsers": "全{{total}}件中{{count}}件を表示",
+    "noMatches": "条件に一致するユーザーはいません。",
+    "hideFilters": "フィルターを隠す",
+    "showFilters": "フィルターを表示",
+    "elo": {
+      "all": "すべてのレート",
+      "rookie": "1500未満",
+      "intermediate": "1500〜1999",
+      "expert": "2000以上"
+    }
+  }
+}

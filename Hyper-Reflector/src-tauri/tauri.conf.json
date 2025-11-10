@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "hyper-reflector",
+  "version": "0.5.1",
+  "identifier": "com.dusti.hyper-reflector",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "hyper-reflector",
+        "width": 1280,
+        "height": 720,
+        "devtools": true,
+        "url": "index.html"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' tauri: asset: ipc: data: blob: http: https:; img-src 'self' asset: data: blob: https://www.gravatar.com https://secure.gravatar.com https://gravatar.com; media-src 'self' asset:; font-src 'self' asset: data:; connect-src 'self' https: ipc: ws: wss: http:// https://; style-src 'self' 'unsafe-inline' asset:; script-src 'self' 'unsafe-eval' 'unsafe-inline' asset:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "files/**/*"
+    ]
+  }
+}

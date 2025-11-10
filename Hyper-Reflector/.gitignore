@@ -1,0 +1,39 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# hr related secrets and untracked files
+/lua/*
+!/lua/.keep
+/emu/*
+!/emu/.keep
+secrets
+private
+src/private
+notes
+configs
+.env
+hyper_read_commands.txt
+hyper_track_match.txt
+hyper_write_commands.txt

@@ -1,0 +1,50 @@
+{
+  "name": "hyper-reflector",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "tauri dev",
+    "dev": "vite",
+    "build": "vite build",
+    "build-dev": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "clean:storage": "node src-tauri/utils/cleanStorage.js"
+  },
+  "dependencies": {
+    "@chakra-ui/icons": "^2.2.4",
+    "@chakra-ui/react": "^3.24.2",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@tanstack/react-router": "^1.131.25",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.3.3",
+    "@tauri-apps/plugin-http": "^2.5.1",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-shell": "^2.3.0",
+    "firebase": "^12.1.0",
+    "flag-icons": "^7.3.2",
+    "framer-motion": "^12.23.12",
+    "i18next": "^25.4.2",
+    "i18next-browser-languagedetector": "^8.2.0",
+    "i18next-http-backend": "^3.0.2",
+    "lucide-react": "^0.540.0",
+    "next-themes": "^0.4.6",
+    "obscenity": "^0.4.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-i18next": "^15.7.2",
+    "react-icons": "^5.5.0",
+    "recharts": "^2.15.3",
+    "zustand": "^5.0.7"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.4"
+  }
+}

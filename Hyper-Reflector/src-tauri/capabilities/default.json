@@ -1,0 +1,35 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "http://137.184.32.78:8080"
+        },
+        {
+          "url": "http://137.184.32.78:3004"
+        },
+        {
+          "url": "http://192.168.11.2:8080"
+        },
+        {
+          "url": "http://192.168.11.2:3004"
+        }
+      ],
+      "deny": [
+        {
+          "url": "https://private.tauri.app"
+        }
+      ]
+    },
+    "dialog:default"
+  ]
+}

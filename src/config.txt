@@ -1,4 +1,0 @@
-emuDelay=0
-isAway=false
-appSoundOn=true
-appTheme=0

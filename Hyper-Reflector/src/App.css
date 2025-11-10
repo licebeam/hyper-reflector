@@ -1,0 +1,4 @@
+.mention-highlight {
+    color: var(--chakra-colors-blue-500);
+    font-style: italic;
+}
