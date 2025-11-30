@@ -636,11 +636,25 @@ pub async fn start_proxy(
     let resolved_path = resolve_emulator_path(&app, &args.emulator_path)?;
     args.emulator_path = resolved_path.to_string_lossy().to_string();
 
+    let existing = {
+        let mut guard = state.inner.lock().await;
+        guard.take()
+    };
+    if let Some(existing_rt) = existing {
+        existing_rt
+            .stop()
+            .await
+            .map_err(|e| format!("Failed to stop previous proxy instance: {e}"))?;
+    }
+
     let rt = ProxyRuntime::new(app, args)
         .await
         .map_err(|e| e.to_string())?;
     rt.start().await.map_err(|e| e.to_string())?;
-    *state.inner.lock().await = Some(rt.clone());
+    {
+        let mut guard = state.inner.lock().await;
+        *guard = Some(rt.clone());
+    }
     Ok(format!(
         "proxy started: local={} emu_listener={}",
         rt.local_sock.local_addr().unwrap(),

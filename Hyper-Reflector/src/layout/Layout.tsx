@@ -2271,12 +2271,14 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
   const handleForceCloseMatch = useCallback(
     async (options?: { notifyServer?: boolean; silent?: boolean }) => {
-      if (!isInMatchRef.current) return;
+      const hadActiveMatch = isInMatchRef.current;
       const shouldNotifyServer = options?.notifyServer ?? true;
       const silent = options?.silent ?? false;
 
       if (!isTauriEnv()) {
-        markMatchEnded({ notifyServer: shouldNotifyServer });
+        if (hadActiveMatch) {
+          markMatchEnded({ notifyServer: shouldNotifyServer });
+        }
         return;
       }
 
@@ -2286,31 +2288,34 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           invoke("kill_mock_emulators").catch(() => {}),
           invoke("stop_proxy").catch(() => {}),
         ]);
-        if (!silent) {
+        if (!silent && hadActiveMatch) {
           toaster.info({
             title: "Closing match",
             description: "Attempting to force close the emulator.",
           });
         }
-        markMatchEnded({ notifyServer: shouldNotifyServer });
+        if (hadActiveMatch) {
+          markMatchEnded({ notifyServer: shouldNotifyServer });
+        }
       } catch (error) {
         console.error("Failed to force close emulator", error);
-        if (!silent) {
+        if (!silent && hadActiveMatch) {
           toaster.error({
             title: "Unable to close match",
             description: "Please try again.",
           });
         }
-        markMatchEnded({ notifyServer: shouldNotifyServer });
+        if (hadActiveMatch) {
+          markMatchEnded({ notifyServer: shouldNotifyServer });
+        }
       }
     },
     [markMatchEnded]
   );
 
   const handleEndMatch = useCallback(() => {
-    markMatchEnded({ notifyServer: true });
-    void handleForceCloseMatch({ notifyServer: false, silent: true });
-  }, [handleForceCloseMatch, markMatchEnded]);
+    void handleForceCloseMatch({ notifyServer: true, silent: true });
+  }, [handleForceCloseMatch]);
 
   useEffect(() => {
     if (!isTauriEnv()) return;
