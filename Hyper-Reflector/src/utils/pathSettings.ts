@@ -12,6 +12,7 @@ export const isTauriEnv = () => {
 }
 
 const toCliPath = (path: string) => path.replace(/\\/g, '/')
+const trimTrailingSlashes = (path: string) => path.replace(/\/+$/, '')
 const dedupeSrcTauriSegments = (path: string) => path.replace(/src-tauri\/src-tauri/g, 'src-tauri')
 const hasValue = (value?: string | null): value is string => Boolean(value && value.trim().length)
 const needsDefault = (value?: string | null) =>
@@ -24,6 +25,10 @@ const DEV_SEGMENTS = {
     match: ['lua', '3rd_training_lua', 'hyper_reflector.lua'],
     challenge: ['sounds', 'challenge.mp3'],
     mention: ['sounds', 'message.wav'],
+}
+
+const LEGACY_SEGMENTS = {
+    training: ['lua', '3rd_training_lua', '3rd_training.lua'],
 }
 
 type PreparedResources = {
@@ -44,6 +49,11 @@ type DefaultPaths = {
 
 let cachedDefaults: DefaultPaths | null = null
 let cachedFilesBase: string | null = null
+
+type SegmentSet = string[]
+type SegmentOptions = SegmentSet[]
+
+const segmentsToSuffix = (segments: SegmentSet) => segments.join('/')
 
 async function toAbsolute(path: string): Promise<string> {
     const resolved = await resolve(path)
@@ -110,6 +120,57 @@ async function resolveFilesBase(): Promise<string> {
     }
 }
 
+function stripDefaultSuffix(pathValue: string, suffix: string): string | null {
+    const normalizedPath = trimTrailingSlashes(pathValue)
+    const normalizedSuffix = trimTrailingSlashes(suffix).toLowerCase()
+    const lowerPath = normalizedPath.toLowerCase()
+
+    const withSlash = `/${normalizedSuffix}`
+    if (lowerPath.endsWith(withSlash)) {
+        return trimTrailingSlashes(
+            normalizedPath.slice(0, normalizedPath.length - withSlash.length)
+        )
+    }
+
+    if (lowerPath.endsWith(normalizedSuffix)) {
+        return trimTrailingSlashes(
+            normalizedPath.slice(0, normalizedPath.length - normalizedSuffix.length)
+        )
+    }
+
+    return null
+}
+
+async function shouldUseDefaultPath(
+    value: string | null | undefined,
+    segmentOptions: SegmentOptions
+): Promise<boolean> {
+    if (!hasValue(value) || needsDefault(value)) {
+        return true
+    }
+
+    try {
+        const normalizedValue = dedupeSrcTauriSegments(toCliPath(await normalize(value)))
+        const filesBase = dedupeSrcTauriSegments(
+            toCliPath(await normalize(await resolveFilesBase()))
+        )
+
+        for (const segments of segmentOptions) {
+            const suffix = segmentsToSuffix(segments)
+            const derivedBase = stripDefaultSuffix(normalizedValue, suffix)
+            if (!derivedBase) {
+                continue
+            }
+
+            return derivedBase.toLowerCase() !== filesBase.toLowerCase()
+        }
+
+        return false
+    } catch {
+        return true
+    }
+}
+
 async function deriveRelative(
     baseEmulatorPath: string | null | undefined,
     segments: string[]
@@ -130,8 +191,11 @@ async function deriveRelative(
 
 export async function ensureDefaultEmulatorPath(force = false) {
     const { emulatorPath, setEmulatorPath } = useSettingsStore.getState()
-    if (!force && hasValue(emulatorPath) && !needsDefault(emulatorPath)) {
-        return
+    if (!force) {
+        const needsReset = await shouldUseDefaultPath(emulatorPath, [DEV_SEGMENTS.emulator])
+        if (!needsReset) {
+            return
+        }
     }
 
     const defaults = await getDefaults()
@@ -143,8 +207,14 @@ export async function ensureDefaultTrainingPath(
     force = false
 ) {
     const { trainingPath, setTrainingPath } = useSettingsStore.getState()
-    if (!force && hasValue(trainingPath) && !needsDefault(trainingPath)) {
-        return
+    if (!force) {
+        const needsReset = await shouldUseDefaultPath(trainingPath, [
+            DEV_SEGMENTS.training,
+            LEGACY_SEGMENTS.training,
+        ])
+        if (!needsReset) {
+            return
+        }
     }
 
     const derived = await deriveRelative(emulatorPathSetting, DEV_SEGMENTS.training)
@@ -164,7 +234,8 @@ async function ensureSound(
     segments: string[],
     fallback: string
 ) {
-    if (hasValue(currentValue) && !needsDefault(currentValue)) {
+    const needsReset = await shouldUseDefaultPath(currentValue, [segments])
+    if (!needsReset) {
         return
     }
 

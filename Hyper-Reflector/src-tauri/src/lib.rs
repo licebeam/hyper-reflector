@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use serde::Serialize;
 use std::{
+    collections::HashSet,
     env,
     fs::{self, OpenOptions},
     path::{Path, PathBuf},
@@ -277,7 +278,61 @@ fn test_writable(dir: &Path) -> bool {
     }
 }
 
+fn gather_portable_candidates(app: &AppHandle) -> Vec<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(exe_dir) = app.path().executable_dir() {
+        candidates.push(exe_dir.join("files"));
+        candidates.push(exe_dir.join("_up_").join("files"));
+        if let Some(parent) = exe_dir.parent() {
+            candidates.push(parent.join("files"));
+            candidates.push(parent.join("_up_").join("files"));
+        }
+    }
+
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        candidates.push(resource_dir.join("files"));
+        candidates.push(resource_dir.join("_up_").join("files"));
+        if let Some(parent) = resource_dir.parent() {
+            candidates.push(parent.join("files"));
+            candidates.push(parent.join("_up_").join("files"));
+        }
+    }
+
+    if let Ok(mut cwd) = env::current_dir() {
+        candidates.push(cwd.join("files"));
+        candidates.push(cwd.join("_up_").join("files"));
+        for _ in 0..3 {
+            if cwd.pop() {
+                candidates.push(cwd.join("files"));
+                candidates.push(cwd.join("_up_").join("files"));
+            } else {
+                break;
+            }
+        }
+    }
+
+    candidates
+}
+
+fn find_existing_portable_files_dir(app: &AppHandle) -> Option<PathBuf> {
+    let mut seen: HashSet<PathBuf> = HashSet::new();
+    for candidate in gather_portable_candidates(app) {
+        if !seen.insert(candidate.clone()) {
+            continue;
+        }
+        if candidate.exists() && test_writable(&candidate) {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
 fn ensure_writable_files_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Some(portable_dir) = find_existing_portable_files_dir(app) {
+        return Ok(portable_dir);
+    }
+
     if let Ok(exe_dir) = app.path().executable_dir() {
         let exe_files = exe_dir.join("files");
         if exe_files.exists() && test_writable(&exe_files) {
