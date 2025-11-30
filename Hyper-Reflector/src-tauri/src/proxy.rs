@@ -259,6 +259,9 @@ impl ProxyRuntime {
     }
 
     async fn send_to_peer(self: &Arc<Self>, payload: &[u8]) -> anyhow::Result<()> {
+        if self.match_closed.load(Ordering::SeqCst) {
+            return Ok(());
+        }
         let opp = self.opponent.lock().await.clone();
         if let Some(addr) = opp {
             // start emulator on first real send if not started

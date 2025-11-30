@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 //@ts-ignore // keys exists
 import keys from "../private/keys";
 import { useNavigate } from "@tanstack/react-router";
@@ -727,6 +728,11 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   const markMatchEnded = useCallback(
     (options?: { notifyServer?: boolean }) => {
       if (!isInMatchRef.current) return;
+      const previousMode = currentMatchModeRef.current;
+      const shouldNotify = options?.notifyServer ?? true;
+      if (shouldNotify && previousMode === "live") {
+        notifyMatchStatus("end");
+      }
       isInMatchRef.current = false;
       setIsInMatch(false);
       sentMatchRequestRef.current.clear();
@@ -734,12 +740,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       activeMatchIdRef.current = null;
       localPlayerSlotRef.current = 0;
       pendingPreferredSlotRef.current = null;
-      const previousMode = currentMatchModeRef.current;
       currentMatchModeRef.current = null;
-      const shouldNotify = options?.notifyServer ?? true;
-      if (shouldNotify && previousMode === "live") {
-        notifyMatchStatus("end");
-      }
     },
     [notifyMatchStatus, setIsInMatch]
   );
@@ -2307,25 +2308,41 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   );
 
   const handleEndMatch = useCallback(() => {
-    void handleForceCloseMatch({ notifyServer: true, silent: true });
-  }, [handleForceCloseMatch]);
+    markMatchEnded({ notifyServer: true });
+    void handleForceCloseMatch({ notifyServer: false, silent: true });
+  }, [handleForceCloseMatch, markMatchEnded]);
 
   useEffect(() => {
-    const maybeApi = (window as any)?.api;
+    if (!isTauriEnv()) return;
 
-    if (maybeApi?.on && typeof maybeApi.on === "function") {
-      maybeApi.on("endMatchUI", handleEndMatch);
-      maybeApi.on("endMatch", handleEndMatch);
-    }
+    let tauriUnsubscribers: Array<() => void> = [];
+
+    const attachTauriListeners = async () => {
+      try {
+        const unlistenEndMatch = await listen("endMatch", handleEndMatch);
+        tauriUnsubscribers.push(unlistenEndMatch);
+      } catch (error) {
+        console.error("Failed to attach endMatch listener", error);
+      }
+
+      try {
+        const unlistenEndMatchUi = await listen("endMatchUI", handleEndMatch);
+        tauriUnsubscribers.push(unlistenEndMatchUi);
+      } catch (error) {
+        console.error("Failed to attach endMatchUI listener", error);
+      }
+    };
+
+    void attachTauriListeners();
 
     return () => {
-      if (
-        maybeApi?.removeListener &&
-        typeof maybeApi.removeListener === "function"
-      ) {
-        maybeApi.removeListener("endMatchUI", handleEndMatch);
-        maybeApi.removeListener("endMatch", handleEndMatch);
-      }
+      tauriUnsubscribers.forEach((unsub) => {
+        try {
+          unsub();
+        } catch (_) {
+          // ignore
+        }
+      });
     };
   }, [handleEndMatch]);
 
@@ -3419,7 +3436,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                   {statusLabel}
                 </Text>
               </Box>
-              <Text textStyle="xs">Hyper Reflector version 0.6.0a 2025</Text>
+              <Text textStyle="xs">Hyper Reflector version 0.7.0a 2025</Text>
             </Flex>
           </Box>
         </Stack>
