@@ -97,6 +97,7 @@ pub struct ProxyRuntime {
     local_sock: Arc<UdpSocket>, // random local port for holepunch + send to peer & server
     emu_listener: Arc<UdpSocket>, // bound to 7001 (or random) to receive from emulator
     opponent: Arc<Mutex<Option<SocketAddr>>>,
+    punch_match_id: Arc<Mutex<Option<String>>>,
     keepalive_task: Mutex<Option<JoinHandle<()>>>,
     // Emulator process
     child: Mutex<Option<tokio::process::Child>>,
@@ -129,6 +130,7 @@ impl ProxyRuntime {
             local_sock: Arc::new(local_sock),
             emu_listener: Arc::new(emu_listener),
             opponent: Arc::new(Mutex::new(None)),
+            punch_match_id: Arc::new(Mutex::new(None)),
             keepalive_task: Mutex::new(None),
             child: Mutex::new(None),
             stop_tx: Mutex::new(None),
@@ -365,11 +367,12 @@ impl ProxyRuntime {
     }
 
     async fn send_to_server(&self, kill: bool) -> anyhow::Result<()> {
+        let punch_match_id = self.punch_match_id.lock().await.clone();
         let msg = serde_json::to_vec(&PunchMessage {
             uid: self.args.my_uid.clone(),
             peer_uid: self.args.peer_uid.clone(),
             kill,
-            match_id: self.args.match_id.clone(),
+            match_id: punch_match_id,
         })?;
         let server = format!("{}:{}", self.args.server_host, self.args.server_port);
         let server_addr: SocketAddr = server.parse()?;
@@ -404,6 +407,9 @@ impl ProxyRuntime {
 
         if let Some(addr) = Self::extract_peer_addr(slice) {
             self.register_peer_addr(addr).await;
+            if let Some(mid) = Self::extract_match_id(slice) {
+                *self.punch_match_id.lock().await = Some(mid);
+            }
             return true;
         }
 
@@ -435,6 +441,16 @@ impl ProxyRuntime {
         None
     }
 
+    fn extract_match_id(payload: &[u8]) -> Option<String> {
+        if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(payload) {
+            return env.match_id;
+        }
+        if let Ok(env) = serde_json::from_slice::<FlatPeerEnvelope>(payload) {
+            return env.match_id;
+        }
+        None
+    }
+
     fn parse_addr(address: &str, port: u16) -> Option<SocketAddr> {
         format!("{address}:{port}").parse::<SocketAddr>().ok()
     }
@@ -460,9 +476,8 @@ impl ProxyRuntime {
         opponent_uid: Option<String>,
         match_id: Option<String>,
     ) {
-        if let (Some(expected), Some(received)) =
-            (self.args.match_id.as_ref(), match_id.as_ref())
-        {
+        let punch_match_id = self.punch_match_id.lock().await.clone();
+        if let (Some(expected), Some(received)) = (punch_match_id, match_id.clone()) {
             if expected != received {
                 let _ = self.app.emit_to(
                     EventTarget::any(),
