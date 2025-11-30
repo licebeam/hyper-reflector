@@ -20,7 +20,7 @@ const needsDefault = (value?: string | null) =>
 const DEV_BASE = 'src-tauri/files'
 const DEV_SEGMENTS = {
     emulator: ['emu', 'hyper-screw-fbneo', 'fs-fbneo.exe'],
-    training: ['lua', '3rd_training_lua', '3rd_training.lua'],
+    training: ['lua', '3rd_training_lua_effie', '3rd_training.lua'],
     match: ['lua', '3rd_training_lua', 'hyper_reflector.lua'],
     challenge: ['sounds', 'challenge.mp3'],
     mention: ['sounds', 'message.wav'],

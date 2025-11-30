@@ -1,12 +1,12 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, EventTarget, State, Manager};
 use std::{
     env,
     fs::{self, OpenOptions},
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
+use tauri::{AppHandle, Emitter, EventTarget, Manager, State};
 use tauri_plugin_shell::ShellExt;
 use walkdir::WalkDir;
 
@@ -228,7 +228,11 @@ fn find_resource_folder(app: &AppHandle, name: &str) -> Option<PathBuf> {
     None
 }
 
-fn ensure_resource_copy(app: &AppHandle, appdata_root: &Path, name: &str) -> Result<PathBuf, String> {
+fn ensure_resource_copy(
+    app: &AppHandle,
+    appdata_root: &Path,
+    name: &str,
+) -> Result<PathBuf, String> {
     let source = find_resource_folder(app, name)
         .ok_or_else(|| format!("Bundled resource folder '{}' not found", name))?;
 
@@ -291,10 +295,7 @@ fn ensure_writable_files_dir(app: &AppHandle) -> Result<PathBuf, String> {
         }
     }
 
-    let appdata_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?;
+    let appdata_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&appdata_dir).map_err(|e| e.to_string())?;
     let files_dir = ensure_resource_copy(app, &appdata_dir, "files")?;
     if test_writable(&files_dir) {
@@ -321,9 +322,7 @@ async fn prepare_user_resources(app: tauri::AppHandle) -> Result<PreparedResourc
     let lua_dir = require_subdir(&files_dir, "lua")?;
     let sounds_dir = require_subdir(&files_dir, "sounds")?;
 
-    let emulator_path = emulator_dir
-        .join("hyper-screw-fbneo")
-        .join("fs-fbneo.exe");
+    let emulator_path = emulator_dir.join("hyper-screw-fbneo").join("fs-fbneo.exe");
 
     Ok(PreparedResources {
         emulator_path: emulator_path.to_string_lossy().to_string(),
@@ -334,7 +333,6 @@ async fn prepare_user_resources(app: tauri::AppHandle) -> Result<PreparedResourc
     })
 }
 
-
 #[tauri::command]
 fn stop_sound(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(sink) = take_sink(&app) {
@@ -342,7 +340,6 @@ fn stop_sound(app: tauri::AppHandle) -> Result<(), String> {
     }
     Ok(())
 }
-
 
 #[tauri::command]
 fn play_sound(app: tauri::AppHandle, path: String) -> Result<(), String> {
@@ -358,7 +355,10 @@ fn play_sound(app: tauri::AppHandle, path: String) -> Result<(), String> {
     std::thread::spawn(move || {
         let stream = match rodio::OutputStreamBuilder::open_default_stream() {
             Ok(s) => s,
-            Err(e) => { eprintln!("audio: open stream failed: {e}"); return; }
+            Err(e) => {
+                eprintln!("audio: open stream failed: {e}");
+                return;
+            }
         };
 
         let sink = Arc::new(rodio::Sink::connect_new(&stream.mixer()));
@@ -457,10 +457,7 @@ async fn launch_emulator(
     let proc_arc = proc.inner().clone();
     let resolved = resolve_emulator_path(&app, &exe_path)?;
     resolve_lua_args(&app, &mut args)?;
-    let command = app
-        .shell()
-        .command(resolved)
-        .args(args);
+    let command = app.shell().command(resolved).args(args);
     let (mut rx, child) = command.spawn().map_err(|e| e.to_string())?;
     let pid = child.pid();
     {
