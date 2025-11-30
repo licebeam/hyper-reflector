@@ -50,6 +50,24 @@ pub struct KillEnvelope {
     pub reason: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlatPeerEnvelope {
+    pub match_id: Option<String>,
+    #[serde(
+        default,
+        alias = "peerAddress",
+        alias = "peer_address",
+        alias = "peerIp",
+        alias = "peer_ip",
+        alias = "ip",
+        alias = "host"
+    )]
+    pub address: Option<String>,
+    #[serde(default, alias = "peerPort", alias = "peer_port")]
+    pub port: Option<u16>,
+}
+
 // ---- Arguments you pass from the frontend ----
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartArgs {
@@ -378,17 +396,56 @@ impl ProxyRuntime {
             }
         }
 
-        if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(slice) {
-            if let Ok(addr) = format!("{}:{}", env.peer.address, env.peer.port).parse::<SocketAddr>()
-            {
-                *self.opponent.lock().await = Some(addr);
-                let _ = self.send_to_peer(b"ping").await;
-                self.ensure_keepalive().await;
-            }
+        if let Some(addr) = Self::extract_peer_addr(slice) {
+            self.register_peer_addr(addr).await;
+            return true;
+        }
+
+        if Self::looks_like_server_control(slice) {
+            self.ensure_keepalive().await;
             return true;
         }
 
         false
+    }
+
+    async fn register_peer_addr(self: &Arc<Self>, addr: SocketAddr) {
+        *self.opponent.lock().await = Some(addr);
+        let _ = self.send_to_peer(b"ping").await;
+        self.ensure_keepalive().await;
+    }
+
+    fn extract_peer_addr(payload: &[u8]) -> Option<SocketAddr> {
+        if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(payload) {
+            return Self::parse_addr(&env.peer.address, env.peer.port);
+        }
+
+        if let Ok(env) = serde_json::from_slice::<FlatPeerEnvelope>(payload) {
+            if let (Some(address), Some(port)) = (env.address.as_deref(), env.port) {
+                return Self::parse_addr(address, port);
+            }
+        }
+
+        None
+    }
+
+    fn parse_addr(address: &str, port: u16) -> Option<SocketAddr> {
+        format!("{address}:{port}").parse::<SocketAddr>().ok()
+    }
+
+    fn looks_like_server_control(payload: &[u8]) -> bool {
+        if payload.is_empty() {
+            return false;
+        }
+        if payload[0] != b'{' && payload[0] != b'[' {
+            return false;
+        }
+        if let Ok(text) = std::str::from_utf8(payload) {
+            let trimmed = text.trim();
+            trimmed.contains("\"port\"") || trimmed.contains("\"matchId\"")
+        } else {
+            false
+        }
     }
 
     async fn handle_remote_kill(
