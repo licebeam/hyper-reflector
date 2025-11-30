@@ -31,6 +31,8 @@ pub struct PunchMessage {
     #[serde(rename = "peerUid")]
     pub peer_uid: String,
     pub kill: bool,
+    #[serde(rename = "matchId", skip_serializing_if = "Option::is_none")]
+    pub match_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +50,8 @@ pub struct KillEnvelope {
     #[serde(rename = "opponentUid")]
     pub opponent_uid: Option<String>,
     pub reason: Option<String>,
+    #[serde(rename = "matchId")]
+    pub match_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -365,6 +369,7 @@ impl ProxyRuntime {
             uid: self.args.my_uid.clone(),
             peer_uid: self.args.peer_uid.clone(),
             kill,
+            match_id: self.args.match_id.clone(),
         })?;
         let server = format!("{}:{}", self.args.server_host, self.args.server_port);
         let server_addr: SocketAddr = server.parse()?;
@@ -391,7 +396,8 @@ impl ProxyRuntime {
     async fn process_server_packet(self: &Arc<Self>, slice: &[u8]) -> bool {
         if let Ok(env) = serde_json::from_slice::<KillEnvelope>(slice) {
             if env.kill {
-                self.handle_remote_kill(env.reason, env.opponent_uid).await;
+                self.handle_remote_kill(env.reason, env.opponent_uid, env.match_id)
+                    .await;
                 return true;
             }
         }
@@ -452,7 +458,24 @@ impl ProxyRuntime {
         self: &Arc<Self>,
         reason: Option<String>,
         opponent_uid: Option<String>,
+        match_id: Option<String>,
     ) {
+        if let (Some(expected), Some(received)) =
+            (self.args.match_id.as_ref(), match_id.as_ref())
+        {
+            if expected != received {
+                let _ = self.app.emit_to(
+                    EventTarget::any(),
+                    "proxy-log",
+                    format!(
+                        "Ignoring kill for match {} (current match {})",
+                        received, expected
+                    ),
+                );
+                return;
+            }
+        }
+
         if let Some(ref uid) = opponent_uid {
             if *uid != self.args.peer_uid {
                 let _ = self.app.emit_to(
@@ -530,6 +553,13 @@ impl ProxyRuntime {
                 };
                 if terminated {
                     watcher.notify_match_closed("emulator-exited").await;
+                    if let Err(err) = watcher.stop().await {
+                        let _ = watcher.app.emit_to(
+                            EventTarget::any(),
+                            "proxy-log",
+                            format!("Failed to stop proxy after emulator exit: {err}"),
+                        );
+                    }
                     break;
                 }
                 sleep(Duration::from_millis(750)).await;
