@@ -35,9 +35,14 @@ pub struct PunchMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ServerEnvelope {
-    pub peer: Option<PeerEndpoint>,
+pub struct OpponentEnvelope {
     pub match_id: Option<String>,
+    pub peer: PeerEndpoint,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KillEnvelope {
     #[serde(default)]
     pub kill: bool,
     #[serde(rename = "opponentUid")]
@@ -366,25 +371,23 @@ impl ProxyRuntime {
     }
 
     async fn process_server_packet(self: &Arc<Self>, slice: &[u8]) -> bool {
-        match serde_json::from_slice::<ServerEnvelope>(slice) {
-            Ok(env) => {
-                if env.kill {
-                    self.handle_remote_kill(env.reason, env.opponent_uid).await;
-                    return true;
-                }
-                if let Some(peer) = env.peer {
-                    if let Ok(addr) =
-                        format!("{}:{}", peer.address, peer.port).parse::<SocketAddr>()
-                    {
-                        *self.opponent.lock().await = Some(addr);
-                        let _ = self.send_to_peer(b"ping").await;
-                        self.ensure_keepalive().await;
-                    }
-                    return true;
-                }
+        if let Ok(env) = serde_json::from_slice::<KillEnvelope>(slice) {
+            if env.kill {
+                self.handle_remote_kill(env.reason, env.opponent_uid).await;
+                return true;
             }
-            Err(_) => {}
         }
+
+        if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(slice) {
+            if let Ok(addr) = format!("{}:{}", env.peer.address, env.peer.port).parse::<SocketAddr>()
+            {
+                *self.opponent.lock().await = Some(addr);
+                let _ = self.send_to_peer(b"ping").await;
+                self.ensure_keepalive().await;
+            }
+            return true;
+        }
+
         false
     }
 
@@ -393,6 +396,27 @@ impl ProxyRuntime {
         reason: Option<String>,
         opponent_uid: Option<String>,
     ) {
+        if let Some(ref uid) = opponent_uid {
+            if *uid != self.args.peer_uid {
+                let _ = self.app.emit_to(
+                    EventTarget::any(),
+                    "proxy-log",
+                    format!(
+                        "Ignoring kill from {} (current opponent: {})",
+                        uid, self.args.peer_uid
+                    ),
+                );
+                return;
+            }
+        } else {
+            let _ = self.app.emit_to(
+                EventTarget::any(),
+                "proxy-log",
+                "Ignoring kill for unrelated opponent".to_string(),
+            );
+            return;
+        }
+
         let description = reason.unwrap_or_else(|| "Opponent closed the match.".to_string());
         let detail = if let Some(uid) = opponent_uid {
             format!("{description} ({uid})")
