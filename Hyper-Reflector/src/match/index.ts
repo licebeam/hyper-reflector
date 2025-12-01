@@ -83,6 +83,7 @@ export async function startProxyMatch({
     })
 
     try {
+        await invoke('stop_proxy').catch(() => {})
         await invoke('start_proxy', {
             args: {
                 match_id: matchId,

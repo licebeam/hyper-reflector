@@ -725,25 +725,16 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     }
   }, []);
 
-  const markMatchEnded = useCallback(
-    (options?: { notifyServer?: boolean }) => {
-      if (!isInMatchRef.current) return;
-      const previousMode = currentMatchModeRef.current;
-      const shouldNotify = options?.notifyServer ?? true;
-      if (shouldNotify && previousMode === "live") {
-        notifyMatchStatus("end");
-      }
-      isInMatchRef.current = false;
-      setIsInMatch(false);
-      sentMatchRequestRef.current.clear();
-      lastMatchUuidRef.current = null;
-      activeMatchIdRef.current = null;
-      localPlayerSlotRef.current = 0;
-      pendingPreferredSlotRef.current = null;
-      currentMatchModeRef.current = null;
-    },
-    [notifyMatchStatus, setIsInMatch]
-  );
+  const markMatchEnded = useCallback(() => {
+    isInMatchRef.current = false;
+    setIsInMatch(false);
+    sentMatchRequestRef.current.clear();
+    lastMatchUuidRef.current = null;
+    activeMatchIdRef.current = null;
+    localPlayerSlotRef.current = 0;
+    pendingPreferredSlotRef.current = null;
+    currentMatchModeRef.current = null;
+  }, [setIsInMatch]);
 
   const markMatchStarted = useCallback(
     (
@@ -2271,31 +2262,38 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
   const handleForceCloseMatch = useCallback(
     async (options?: { notifyServer?: boolean; silent?: boolean }) => {
-      const hadActiveMatch = isInMatchRef.current;
       const shouldNotifyServer = options?.notifyServer ?? true;
       const silent = options?.silent ?? false;
+      const hadActiveMatch = isInMatchRef.current;
+      const previousMode = currentMatchModeRef.current;
 
-      if (!isTauriEnv()) {
-        if (hadActiveMatch) {
-          markMatchEnded({ notifyServer: shouldNotifyServer });
+      if (shouldNotifyServer && previousMode === "live") {
+        notifyMatchStatus("end");
+        const viewer = globalUserRef.current;
+        if (viewer?.uid) {
+          sendSocketMessage({
+            type: "matchEnd",
+            userUID: viewer.uid,
+          });
         }
-        return;
       }
 
-      try {
+      const runTeardown = async () => {
+        if (!isTauriEnv()) return;
         await Promise.all([
           invoke("kill_emulator_only").catch(() => {}),
           invoke("kill_mock_emulators").catch(() => {}),
           invoke("stop_proxy").catch(() => {}),
         ]);
+      };
+
+      try {
+        await runTeardown();
         if (!silent && hadActiveMatch) {
           toaster.info({
             title: "Closing match",
             description: "Attempting to force close the emulator.",
           });
-        }
-        if (hadActiveMatch) {
-          markMatchEnded({ notifyServer: shouldNotifyServer });
         }
       } catch (error) {
         console.error("Failed to force close emulator", error);
@@ -2305,12 +2303,11 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             description: "Please try again.",
           });
         }
-        if (hadActiveMatch) {
-          markMatchEnded({ notifyServer: shouldNotifyServer });
-        }
+      } finally {
+        markMatchEnded();
       }
     },
-    [markMatchEnded]
+    [markMatchEnded, notifyMatchStatus, sendSocketMessage]
   );
 
   const handleEndMatch = useCallback(() => {

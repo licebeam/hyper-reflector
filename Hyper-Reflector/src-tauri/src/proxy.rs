@@ -607,8 +607,8 @@ impl ProxyRuntime {
         if let Some(mut child) = self.child.lock().await.take() {
             let _ = child.start_kill();
             let _ = child.wait().await;
-            self.notify_match_closed(reason).await;
         }
+        self.notify_match_closed(reason).await;
         Ok(())
     }
 }
