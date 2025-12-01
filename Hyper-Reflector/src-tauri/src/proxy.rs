@@ -14,7 +14,7 @@ use tauri::{AppHandle, Emitter, EventTarget};
 use tokio::{
     net::UdpSocket,
     process::Command as TokioCommand,
-    sync::{oneshot, Mutex},
+    sync::{Mutex, Notify},
     task::JoinHandle,
     time::{interval, sleep},
 };
@@ -102,7 +102,7 @@ pub struct ProxyRuntime {
     // Emulator process
     child: Mutex<Option<tokio::process::Child>>,
     // Control
-    stop_tx: Mutex<Option<oneshot::Sender<()>>>,
+    stop_notify: Arc<Notify>,
     // Meta
     app: AppHandle,
     args: StartArgs,
@@ -133,7 +133,7 @@ impl ProxyRuntime {
             punch_match_id: Arc::new(Mutex::new(None)),
             keepalive_task: Mutex::new(None),
             child: Mutex::new(None),
-            stop_tx: Mutex::new(None),
+            stop_notify: Arc::new(Notify::new()),
             app,
             args,
             match_closed: AtomicBool::new(false),
@@ -147,10 +147,7 @@ impl ProxyRuntime {
         self.send_to_server(false).await?;
 
         // spawn the two proxy loops
-        let (stop_tx, stop_rx) = oneshot::channel::<()>();
-        *self.stop_tx.lock().await = Some(stop_tx);
-
-        self.spawn_local_reader(stop_rx).await?;
+        self.spawn_local_reader().await?;
         self.spawn_emulator_reader().await?;
         self.spawn_handshake_watchdog().await?;
 
@@ -158,19 +155,20 @@ impl ProxyRuntime {
         Ok(())
     }
 
-    async fn spawn_local_reader(
-        self: &Arc<Self>,
-        mut stop_rx: oneshot::Receiver<()>,
-    ) -> anyhow::Result<()> {
+    async fn spawn_local_reader(self: &Arc<Self>) -> anyhow::Result<()> {
         let this = Arc::clone(self);
         let sock = Arc::clone(&self.local_sock);
         let emu_listener = Arc::clone(&self.emu_listener);
+        let stop_notify = Arc::clone(&self.stop_notify);
 
         tokio::spawn(async move {
             let mut buf = vec![0u8; 65535];
 
             loop {
                 tokio::select! {
+                    _ = stop_notify.notified() => {
+                        break;
+                    }
                     r = sock.recv_from(&mut buf) => {
                         match r {
                             Ok((n, _from)) => {
@@ -200,9 +198,6 @@ impl ProxyRuntime {
                             }
                         }
                     }
-                    _ = &mut stop_rx => {
-                        break;
-                    }
                 }
             }
         });
@@ -213,22 +208,30 @@ impl ProxyRuntime {
     async fn spawn_emulator_reader(self: &Arc<Self>) -> anyhow::Result<()> {
         let this = Arc::clone(self);
         let emu_listener = Arc::clone(&self.emu_listener);
+        let stop_notify = Arc::clone(&self.stop_notify);
 
         tokio::spawn(async move {
             let mut buf = vec![0u8; 65535];
             loop {
-                match emu_listener.recv_from(&mut buf).await {
-                    Ok((n, _from)) => {
-                        let payload = &buf[..n];
-                        let _ = this.send_to_peer(payload).await;
-                    }
-                    Err(_e) => {
-                        let _ = this.app.emit_to(
-                            EventTarget::any(),
-                            "proxy-log",
-                            "emu recv error".to_string(),
-                        );
+                tokio::select! {
+                    _ = stop_notify.notified() => {
                         break;
+                    }
+                    r = emu_listener.recv_from(&mut buf) => {
+                        match r {
+                            Ok((n, _from)) => {
+                                let payload = &buf[..n];
+                                let _ = this.send_to_peer(payload).await;
+                            }
+                            Err(_e) => {
+                                let _ = this.app.emit_to(
+                                    EventTarget::any(),
+                                    "proxy-log",
+                                    "emu recv error".to_string(),
+                                );
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -344,6 +347,7 @@ impl ProxyRuntime {
             ];
         }
 
+        Self::rewrite_emulator_ports(&mut provided_args, emu_game_port, emu_listen_port);
         // Example args - replace with what FBNeo needs in your environment:
         //   --local-port 7000 --remote-ip 127.0.0.1 --remote-port <emu_listener_port> --player N --delay D --name user
         resolve_lua_args(&self.app, &mut provided_args).map_err(|e| anyhow!(e))?;
@@ -385,9 +389,7 @@ impl ProxyRuntime {
     }
 
     pub async fn stop(&self) -> anyhow::Result<()> {
-        if let Some(tx) = self.stop_tx.lock().await.take() {
-            let _ = tx.send(());
-        }
+        self.stop_notify.notify_waiters();
         // Stop keepalive
         if let Some(h) = self.keepalive_task.lock().await.take() {
             h.abort();
@@ -610,6 +612,60 @@ impl ProxyRuntime {
         }
         self.notify_match_closed(reason).await;
         Ok(())
+    }
+}
+
+impl ProxyRuntime {
+    fn rewrite_emulator_ports(args: &mut Vec<String>, local_port: u16, remote_port: u16) {
+        let local_addr = format!("127.0.0.1:{local_port}");
+        let remote_addr = format!("127.0.0.1:{remote_port}");
+
+        let mut idx = 0;
+        while idx < args.len() {
+            let lowered = args[idx].to_ascii_lowercase();
+            match lowered.as_str() {
+                "--local-port" => {
+                    if idx + 1 < args.len() {
+                        args[idx + 1] = local_port.to_string();
+                    }
+                    idx += 2;
+                    continue;
+                }
+                "--remote-port" => {
+                    if idx + 1 < args.len() {
+                        args[idx + 1] = remote_port.to_string();
+                    }
+                    idx += 2;
+                    continue;
+                }
+                "-l" => {
+                    if idx + 1 < args.len() {
+                        args[idx + 1] = local_addr.clone();
+                    }
+                    idx += 2;
+                    continue;
+                }
+                "-r" => {
+                    if idx + 1 < args.len() {
+                        args[idx + 1] = remote_addr.clone();
+                    }
+                    idx += 2;
+                    continue;
+                }
+                _ => {}
+            }
+
+            if args[idx].starts_with("quark:direct") {
+                let mut parts: Vec<String> = args[idx].split(',').map(|s| s.to_string()).collect();
+                if parts.len() >= 5 {
+                    parts[2] = local_port.to_string();
+                    parts[4] = remote_port.to_string();
+                    args[idx] = parts.join(",");
+                }
+            }
+
+            idx += 1;
+        }
     }
 }
 
