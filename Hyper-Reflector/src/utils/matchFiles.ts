@@ -17,6 +17,7 @@ const DEV_OVERRIDE_BASE =
         : null
 
 const normalizePath = (path: string) => path.replace(/\\/g, '/')
+const TRACKING_SEGMENTS = ['lua', '3rd_training_lua']
 
 async function ensurePaths(): Promise<MatchFilePaths | null> {
     if (!isTauriEnv()) {
@@ -25,13 +26,17 @@ async function ensurePaths(): Promise<MatchFilePaths | null> {
     if (!cachedPaths) {
         if (DEV_OVERRIDE_BASE) {
             cachedPaths = {
-                command: normalizePath(`${DEV_OVERRIDE_BASE}/hyper_read_commands.txt`),
-                stats: normalizePath(`${DEV_OVERRIDE_BASE}/hyper_track_match.txt`),
+                command: normalizePath(
+                    `${DEV_OVERRIDE_BASE}/${TRACKING_SEGMENTS.join('/')}/hyper_read_commands.txt`
+                ),
+                stats: normalizePath(
+                    `${DEV_OVERRIDE_BASE}/${TRACKING_SEGMENTS.join('/')}/hyper_track_match.txt`
+                ),
             }
         } else {
             const [command, stats] = await Promise.all([
-                resolveFilesPath('hyper_read_commands.txt'),
-                resolveFilesPath('hyper_track_match.txt'),
+                resolveFilesPath(...TRACKING_SEGMENTS, 'hyper_read_commands.txt'),
+                resolveFilesPath(...TRACKING_SEGMENTS, 'hyper_track_match.txt'),
             ])
             cachedPaths = { command, stats }
         }
