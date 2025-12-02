@@ -14,6 +14,8 @@ export type LobbySummary = {
 
 const MAX_CHAT_MESSAGES = 50
 
+type TrainingPathSource = 'auto' | 'custom'
+
 type SettingsState = {
     ggpoDelay: string
     setGgpoDelay: (d: string) => void
@@ -38,7 +40,8 @@ type SettingsState = {
     emulatorPath: string
     setEmulatorPath: (path: string) => void
     trainingPath: string
-    setTrainingPath: (path: string) => void
+    trainingPathSource: TrainingPathSource
+    setTrainingPath: (path: string, source?: TrainingPathSource) => void
     appLanguage: string
     setAppLanguage: (code: string) => void
     mutedUsers: string[]
@@ -158,7 +161,8 @@ export const useSettingsStore = create<SettingsState>()(
             theme: { colorPalette: 'orange', name: 'Orange Soda' },
             setTheme: (t) => set({ theme: t }),
             trainingPath: '',
-            setTrainingPath: (path) => set({ trainingPath: path }),
+            trainingPathSource: 'auto',
+            setTrainingPath: (path, source = 'auto') => set({ trainingPath: path, trainingPathSource: source }),
             appLanguage: 'en',
             setAppLanguage: (code) => set({ appLanguage: code }),
             mutedUsers: [],

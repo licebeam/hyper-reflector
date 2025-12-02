@@ -207,7 +207,10 @@ export async function ensureDefaultTrainingPath(
     emulatorPathSetting?: string | null,
     force = false
 ) {
-    const { trainingPath, setTrainingPath } = useSettingsStore.getState()
+    const { trainingPath, trainingPathSource, setTrainingPath } = useSettingsStore.getState()
+    if (!force && trainingPathSource === 'custom') {
+        return
+    }
     if (!force) {
         const needsReset = await shouldUseDefaultPath(trainingPath, [
             DEV_SEGMENTS.training,
@@ -220,12 +223,12 @@ export async function ensureDefaultTrainingPath(
 
     const derived = await deriveRelative(emulatorPathSetting, DEV_SEGMENTS.training)
     if (derived) {
-        setTrainingPath(derived)
+        setTrainingPath(derived, 'auto')
         return
     }
 
     const defaults = await getDefaults()
-    setTrainingPath(defaults.training)
+    setTrainingPath(defaults.training, 'auto')
 }
 
 async function ensureSound(
