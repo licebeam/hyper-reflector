@@ -131,12 +131,15 @@ const lobbyNameMatcher = new RegExpMatcher({
 const DEFAULT_RPS_ELO = 1200;
 const MOCK_RPS_ELO_DELTA = 15;
 
-function resolveMockDisplayName(uid?: string | null) {
-  if (!uid) return "Mock Opponent";
+function resolveMockDisplayName(
+  uid?: string | null,
+  fallback = "Mock Opponent"
+) {
+  if (!uid) return fallback;
   if (uid === MOCK_CHALLENGE_USER.uid) return MOCK_CHALLENGE_USER.userName;
   if (uid === MOCK_CHALLENGE_USER_TWO.uid)
     return MOCK_CHALLENGE_USER_TWO.userName;
-  return "Mock Opponent";
+  return fallback;
 }
 
 const formatMiniGameChoice = (choice?: MiniGameChoice | null) => {
@@ -623,15 +626,20 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     [resolveActiveSidePreference]
   );
 
-  const resolveUserName = useCallback((uid: string | undefined) => {
-    if (!uid) return "Unknown player";
-    const store = useUserStore.getState();
-    if (store.globalUser?.uid === uid) {
-      return store.globalUser.userName || "You";
-    }
-    const entry = store.lobbyUsers.find((user) => user.uid === uid);
-    return entry?.userName || "Unknown player";
-  }, []);
+  const resolveUserName = useCallback(
+    (uid: string | undefined) => {
+      const fallback = t("Layout.notifications.unknownPlayer");
+      const selfLabel = t("Layout.notifications.self");
+      if (!uid) return fallback;
+      const store = useUserStore.getState();
+      if (store.globalUser?.uid === uid) {
+        return store.globalUser.userName || selfLabel;
+      }
+      const entry = store.lobbyUsers.find((user) => user.uid === uid);
+      return entry?.userName || fallback;
+    },
+    [t]
+  );
 
   const applyDebugMatchInjection = useCallback(
     (matches: MatchSummary[]): MatchSummary[] => {
@@ -793,7 +801,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         const responder =
           responderName && responderName.trim().length
             ? responderName.trim()
-            : viewerSnapshot?.userName || "You";
+            : viewerSnapshot?.userName || t("Layout.notifications.self");
         const status = accepted ? "accepted" : "declined";
 
         const { chatMessages, updateMessage } = useMessageStore.getState();
@@ -820,8 +828,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             pendingChallengeByUserRef.current.delete(pendingOffer.from);
             pendingIceCandidatesRef.current.delete(pendingOffer.from);
             toaster.error({
-              title: "Unable to respond",
-              description: "Signal connection unavailable. Please try again.",
+              title: t("Layout.toast.signalUnavailable.title"),
+              description: t("Layout.toast.signalUnavailable.description"),
             });
             return;
           }
@@ -863,12 +871,16 @@ export default function Layout({ children }: { children: ReactElement[] }) {
               await answerCall(peer, socket, pendingOffer.from, globalUser.uid);
             } catch (error) {
               console.error("Failed to accept incoming challenge:", error);
+              const fallbackDescription = t(
+                "Layout.toast.acceptChallengeError.unknown"
+              );
+              const description =
+                error instanceof Error && error.message
+                  ? error.message
+                  : fallbackDescription;
               toaster.error({
-                title: "Unable to accept challenge",
-                description:
-                  error instanceof Error
-                    ? error.message
-                    : "Unknown error accepting challenge",
+                title: t("Layout.toast.acceptChallengeError.title"),
+                description,
               });
             } finally {
               pendingChallengeOffersRef.current.delete(messageId);
@@ -894,8 +906,10 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
         if (accepted) {
           toaster.success({
-            title: "Challenge accepted",
-            description: `${responder} accepted the challenge.`,
+            title: t("Layout.toast.challengeAccepted.title"),
+            description: t("Layout.toast.challengeAccepted.description", {
+              name: responder,
+            }),
           });
 
           const participantIds = [challengerId, opponentId].filter(
@@ -924,7 +938,10 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             const mockUid = isMockUserId(challengerId)
               ? challengerId
               : opponentId;
-            const mockName = resolveMockDisplayName(mockUid);
+            const mockName = resolveMockDisplayName(
+              mockUid,
+              t("Layout.mock.defaultOpponent")
+            );
             const localPlayerSlot: 0 | 1 =
               globalUser?.uid && globalUser.uid === challengerId ? 0 : 1;
 
@@ -942,8 +959,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
               console.error("Failed to start mock match:", error);
               markMatchEnded();
               toaster.error({
-                title: "Unable to start match",
-                description: "Encountered an error launching the emulator.",
+                title: t("Layout.toast.matchStartError.title"),
+                description: t("Layout.toast.matchStartError.description"),
               });
             });
           } else if (
@@ -973,8 +990,10 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           }
         } else {
           toaster.info({
-            title: "Challenge declined",
-            description: `${responder} declined the challenge.`,
+            title: t("Layout.toast.challengeDeclined.title"),
+            description: t("Layout.toast.challengeDeclined.description", {
+              name: responder,
+            }),
           });
         }
       })();
@@ -988,6 +1007,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       markMatchStarted,
       resolvePreferredSlot,
       sendSocketMessage,
+      t,
     ]
   );
 
@@ -1011,23 +1031,23 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       const viewer = globalUserRef.current;
       if (!viewer?.uid) {
         toaster.error({
-          title: "Unable to respond",
-          description: "Please log in before responding to duels.",
+          title: t("Layout.toast.authRequiredRespond.title"),
+          description: t("Layout.toast.authRequiredRespond.description"),
         });
         return;
       }
       const invite = pendingMiniGameInvitesRef.current.get(messageId);
       if (!invite) {
         toaster.error({
-          title: "Invite expired",
-          description: "This duel request is no longer available.",
+          title: t("Layout.toast.inviteExpired.title"),
+          description: t("Layout.toast.inviteExpired.description"),
         });
         return;
       }
       const responder =
         responderName && responderName.trim().length
           ? responderName.trim()
-          : viewer.userName || "You";
+          : viewer.userName || t("Layout.notifications.self");
       const status = accepted ? "accepted" : "declined";
       const { updateMessage } = useMessageStore.getState();
       updateMessage(messageId, {
@@ -1044,8 +1064,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           playerId: viewer.uid,
         });
         toaster.success({
-          title: "Duel accepted",
-          description: "Opening the side select duel...",
+          title: t("Layout.toast.duelAccepted.title"),
+          description: t("Layout.toast.duelAccepted.description"),
         });
       } else {
         sendMiniGameMessage({
@@ -1056,7 +1076,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         });
       }
     },
-    [sendMiniGameMessage]
+    [sendMiniGameMessage, t]
   );
 
   const mentionHandles = useMemo(() => {
@@ -1243,20 +1263,26 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         const viewerChoiceForState = viewerIsChallenger
           ? challengerChoice
           : opponentChoice;
+        const challengerLabel = resolveUserName(prev.challengerId);
+        const opponentLabel = resolveUserName(prev.opponentId);
+        const mockOutcomeText =
+          outcome === "draw"
+            ? t("Layout.chat.rpsOutcomeDraw")
+            : winnerUid
+            ? t("Layout.chat.rpsOutcomeWon", {
+                name: resolveUserName(winnerUid),
+              })
+            : t("Layout.chat.rpsOutcomeConcluded");
         chatMessage = {
           id: `mock-mini-game-${prev.sessionId}`,
           role: "system",
-          text: `RPS duel between ${resolveUserName(
-            prev.challengerId
-          )} (${formatMiniGameChoice(challengerChoice)}) and ${resolveUserName(
-            prev.opponentId
-          )} (${formatMiniGameChoice(opponentChoice)}) ${
-            outcome === "draw"
-              ? "ended in a draw."
-              : winnerUid
-              ? `was won by ${resolveUserName(winnerUid)}.`
-              : "has concluded."
-          }`,
+          text: t("Layout.chat.rpsResult", {
+            challenger: challengerLabel,
+            challengerChoice: formatMiniGameChoice(challengerChoice),
+            opponent: opponentLabel,
+            opponentChoice: formatMiniGameChoice(opponentChoice),
+            outcome: mockOutcomeText,
+          }),
           timeStamp: Date.now(),
         };
         const store = useUserStore.getState();
@@ -1315,7 +1341,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         useMessageStore.getState().addChatMessage(chatMessage);
       }
     },
-    [clearMockMiniGameTimer, resolveUserName]
+    [clearMockMiniGameTimer, resolveUserName, t]
   );
 
   const startMockMiniGame = useCallback(
@@ -1339,12 +1365,15 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         finalizeMockMiniGame(sessionId, null);
       }, expiresAt - Date.now());
       mockMiniGameTimers.current.set(sessionId, timerId);
+      const opponentName = resolveUserName(opponentUid);
       toaster.info({
-        title: "Mock duel started",
-        description: `Dueling ${resolveUserName(opponentUid)}.`,
+        title: t("Layout.toast.mockDuelStarted.title"),
+        description: t("Layout.toast.mockDuelStarted.description", {
+          name: opponentName,
+        }),
       });
     },
-    [finalizeMockMiniGame, resolveUserName]
+    [finalizeMockMiniGame, resolveUserName, t]
   );
 
   useEffect(() => {
@@ -1374,8 +1403,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       const viewer = globalUserRef.current;
       if (!viewer?.uid) {
         toaster.error({
-          title: "Unable to start duel",
-          description: "Please log in before initiating a duel.",
+          title: t("Layout.toast.authRequiredDuel.title"),
+          description: t("Layout.toast.authRequiredDuel.description"),
         });
         return;
       }
@@ -1389,8 +1418,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       const socket = signalSocketRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         toaster.error({
-          title: "Unable to start duel",
-          description: "Signal server is not connected.",
+          title: t("Layout.toast.signalDisconnectedDuel.title"),
+          description: t("Layout.toast.signalDisconnectedDuel.description"),
         });
         return;
       }
@@ -1403,14 +1432,17 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       const targetUser = useUserStore
         .getState()
         .lobbyUsers.find((entry) => entry.uid === targetUid);
+      const waitingLabel = targetUser
+        ? t("Layout.toast.duelInviteSent.waitingForName", {
+            name: targetUser.userName,
+          })
+        : t("Layout.toast.duelInviteSent.waiting");
       toaster.success({
-        title: "Duel invitation sent",
-        description: targetUser
-          ? `Waiting for ${targetUser.userName}`
-          : "Waiting for opponent",
+        title: t("Layout.toast.duelInviteSent.title"),
+        description: waitingLabel,
       });
     },
-    [sendMiniGameMessage, startMockMiniGame]
+    [sendMiniGameMessage, startMockMiniGame, t]
   );
 
   const handleMatchStats = useCallback(async (rawData: string) => {
@@ -1543,16 +1575,19 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   const handleJoinLobby = useCallback(
     (lobby: LobbySummary, pass: string): string | null => {
       if (!globalUser) {
+        const description = t(
+          "Layout.toast.authRequiredLobbyChange.description"
+        );
         toaster.error({
-          title: "Unable to change lobby",
-          description: "Please log in before joining a lobby.",
+          title: t("Layout.toast.authRequiredLobbyChange.title"),
+          description,
         });
-        return "Please log in before joining a lobby.";
+        return description;
       }
 
       const trimmedPass = lobby.isPrivate ? pass.trim() : "";
       if (lobby.isPrivate && !trimmedPass.length) {
-        return "Password required for private lobby.";
+        return t("Layout.errors.lobbyPasswordRequired");
       }
 
       const payloadUser = { ...globalUser, lobbyId: lobby.name };
@@ -1565,15 +1600,17 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       });
 
       if (!sent) {
-        return "Unable to reach lobby server. Please try again.";
+        return t("Layout.errors.lobbyServerUnavailable");
       }
 
       setCurrentLobbyId(lobby.name);
       clearChatMessages();
       setLobbyUsers([]);
       toaster.success({
-        title: "Lobby joined",
-        description: lobby.name,
+        title: t("Layout.toast.lobbyJoined.title"),
+        description: t("Layout.toast.lobbyJoined.description", {
+          name: lobby.name,
+        }),
       });
       return null;
     },
@@ -1583,6 +1620,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       sendSocketMessage,
       setCurrentLobbyId,
       setLobbyUsers,
+      t,
     ]
   );
 
@@ -1591,17 +1629,16 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       const viewer = globalUserRef.current;
       if (isInMatchRef.current) {
         toaster.info({
-          title: "Already in a match",
-          description:
-            "Finish your current match before starting a new challenge.",
+          title: t("Layout.toast.alreadyInMatch.title"),
+          description: t("Layout.toast.alreadyInMatch.description"),
         });
         return;
       }
 
       if (!viewer?.uid) {
         toaster.error({
-          title: "Unable to challenge",
-          description: "Please log in before sending challenges.",
+          title: t("Layout.toast.authRequiredChallenge.title"),
+          description: t("Layout.toast.authRequiredChallenge.description"),
         });
         return;
       }
@@ -1618,7 +1655,10 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         const normalizedLobby = lobbyId.trim().toLowerCase();
         const inferredGameName =
           normalizedLobby === "vampire" ? "vsavj" : undefined;
-        const mockName = resolveMockDisplayName(targetUid);
+        const mockName = resolveMockDisplayName(
+          targetUid,
+          t("Layout.mock.defaultOpponent")
+        );
 
         const mockMatchId = `mock-${Date.now()}`;
         markMatchStarted(targetUid, {
@@ -1637,8 +1677,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           console.error("Failed to start mock challenge:", error);
           markMatchEnded();
           toaster.error({
-            title: "Unable to start mock match",
-            description: "Encountered an error launching the emulator.",
+            title: t("Layout.toast.matchStartError.title"),
+            description: t("Layout.toast.matchStartError.description"),
           });
         }
         return;
@@ -1647,8 +1687,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       const socket = signalSocketRef.current;
       if (!socket || socket.readyState !== WebSocket.OPEN) {
         toaster.error({
-          title: "Unable to challenge",
-          description: "Signal server is not connected.",
+          title: t("Layout.toast.signalDisconnectedChallenge.title"),
+          description: t("Layout.toast.signalDisconnectedChallenge.description"),
         });
         return;
       }
@@ -1678,15 +1718,15 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         sentMatchRequestRef.current.delete(targetUid);
         await startCall(peer, socket, targetUid, viewer.uid, true);
         toaster.success({
-          title: "Challenge sent",
-          description: "Waiting for opponent to respond.",
+          title: t("Layout.toast.challengeSent.title"),
+          description: t("Layout.toast.challengeSent.description"),
         });
       } catch (error) {
         console.error("Failed to initiate challenge:", error);
         pendingPreferredSlotRef.current = null;
         toaster.error({
-          title: "Challenge failed",
-          description: "Unable to initiate WebRTC call.",
+          title: t("Layout.toast.challengeFailed.title"),
+          description: t("Layout.toast.challengeFailed.description"),
         });
       }
     },
@@ -1696,6 +1736,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       markMatchEnded,
       markMatchStarted,
       resolvePreferredSlot,
+      t,
     ]
   );
 
@@ -1802,18 +1843,28 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             : prev
         );
         toaster.success({
-          title: "Side selection noted",
-          description: `You will start as ${
-            side === "player1" ? "Player 1" : "Player 2"
-          } when challenging ${resolveUserName(opponentUid)} (mock).`,
+          title: t("Layout.toast.sidePreferenceSavedMock.title"),
+          description: t(
+            "Layout.toast.sidePreferenceSavedMock.description",
+            {
+              side: t(
+                side === "player1"
+                  ? "Layout.sides.player1"
+                  : "Layout.sides.player2"
+              ),
+              name: resolveUserName(opponentUid),
+            }
+          ),
         });
         return;
       }
 
       if (!auth.currentUser) {
         toaster.error({
-          title: "Unable to save side preference",
-          description: "You must be logged in to persist this choice.",
+          title: t("Layout.toast.authRequiredSidePreference.title"),
+          description: t(
+            "Layout.toast.authRequiredSidePreference.description"
+          ),
         });
         return;
       }
@@ -1834,10 +1885,14 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             });
           }
           toaster.success({
-            title: "Side selection saved",
-            description: `You will start as ${
-              side === "player1" ? "Player 1" : "Player 2"
-            } for the next hour.`,
+            title: t("Layout.toast.sidePreferenceSaved.title"),
+            description: t("Layout.toast.sidePreferenceSaved.description", {
+              side: t(
+                side === "player1"
+                  ? "Layout.sides.player1"
+                  : "Layout.sides.player2"
+              ),
+            }),
           });
           setMiniGameState((prev) =>
             prev && prev.sessionId === session.sessionId
@@ -1846,15 +1901,15 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           );
         } else {
           toaster.error({
-            title: "Unable to save side selection",
-            description: "Please try again.",
+            title: t("Layout.toast.sidePreferenceSaveError.title"),
+            description: t("Layout.toast.sidePreferenceSaveError.description"),
           });
         }
       } catch (error) {
         console.error("Failed to set side preference", error);
         toaster.error({
-          title: "Unable to save side selection",
-          description: "Please try again.",
+          title: t("Layout.toast.sidePreferenceSaveError.title"),
+          description: t("Layout.toast.sidePreferenceSaveError.description"),
         });
       } finally {
         setMiniGameSideLoading(false);
@@ -1865,6 +1920,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       clearMockMiniGameTimer,
       resolveUserName,
       sendMiniGameMessage,
+      t,
     ]
   );
 
@@ -1875,46 +1931,52 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       pass: string;
     }): string | null => {
       if (!globalUser) {
+        const description = t(
+          "Layout.toast.authRequiredLobbyCreate.description"
+        );
         toaster.error({
-          title: "Unable to create lobby",
-          description: "Please log in before creating a lobby.",
+          title: t("Layout.toast.authRequiredLobbyCreate.title"),
+          description,
         });
-        return "Please log in before creating a lobby.";
+        return description;
       }
 
       const trimmedName = input.name.trim();
       if (!trimmedName.length) {
-        return "Lobby name is required.";
+        return t("Layout.errors.lobbyNameRequired");
       }
       if (
         trimmedName.length < LOBBY_NAME_MIN_LENGTH ||
         trimmedName.length > LOBBY_NAME_MAX_LENGTH
       ) {
-        return `Lobby name must be between ${LOBBY_NAME_MIN_LENGTH} and ${LOBBY_NAME_MAX_LENGTH} characters.`;
+        return t("Layout.errors.lobbyNameLength", {
+          min: LOBBY_NAME_MIN_LENGTH,
+          max: LOBBY_NAME_MAX_LENGTH,
+        });
       }
 
       if (trimmedName === DEFAULT_LOBBY_ID) {
-        return "Choose a different name from the default lobby.";
+        return t("Layout.errors.lobbyNameDefault");
       }
 
       if (lobbyNameMatcher.hasMatch(trimmedName)) {
-        return "Lobby name contains inappropriate language.";
+        return t("Layout.errors.lobbyNameInappropriate");
       }
 
       const trimmedPass = input.isPrivate ? input.pass.trim() : "";
       if (input.isPrivate && !trimmedPass.length) {
-        return "Private lobbies require a password.";
+        return t("Layout.errors.privateLobbyPasswordRequired");
       }
 
       if (input.isPrivate && trimmedPass.length > 150) {
-        return "Passwords are limited to 150 characters.";
+        return t("Layout.errors.passwordMaxLength");
       }
 
       const exists = availableLobbies.some(
         (lobby) => lobby.name.toLowerCase() === trimmedName.toLowerCase()
       );
       if (exists) {
-        return "A lobby with that name already exists.";
+        return t("Layout.errors.lobbyNameExists");
       }
 
       const payloadUser = { ...globalUser, lobbyId: trimmedName };
@@ -1927,7 +1989,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       });
 
       if (!sent) {
-        return "Unable to reach lobby server. Please try again.";
+        return t("Layout.errors.lobbyServerUnavailable");
       }
 
       const optimisticLobby: LobbySummary = {
@@ -1946,8 +2008,10 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       clearChatMessages();
       setLobbyUsers([]);
       toaster.success({
-        title: "Lobby created",
-        description: trimmedName,
+        title: t("Layout.toast.lobbyCreated.title"),
+        description: t("Layout.toast.lobbyCreated.description", {
+          name: trimmedName,
+        }),
       });
       return null;
     },
@@ -1959,6 +2023,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       setCurrentLobbyId,
       setLobbyList,
       setLobbyUsers,
+      t,
     ]
   );
 
@@ -2053,8 +2118,10 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     }
 
     closeNotifications();
-    toaster.success({ title: "Notifications cleared" });
-  }, [closeNotifications, globalUser?.uid, notificationEntries]);
+    toaster.success({
+      title: t("Layout.toast.notificationsCleared.title"),
+    });
+  }, [closeNotifications, globalUser?.uid, notificationEntries, t]);
 
   const unreadCount = notificationEntries.length;
   const seenNotificationIdsRef = useRef<Set<string>>(new Set());
@@ -2116,10 +2183,14 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           MOCK_CHALLENGE_LINES[
             mockActionIndexRef.current % MOCK_CHALLENGE_LINES.length
           ];
+        const challengeText = t("Layout.chat.mockChallengeDescription", {
+          name: mockUser.userName,
+          line: challengeLine,
+        });
         const challengeMessage: TMessage & { sender: TUser } = {
           id: `mock-challenge-${now}`,
           role: "challenge",
-          text: `${mockUser.userName} ${challengeLine}`,
+          text: challengeText,
           timeStamp: now,
           userName: mockUser.userName,
           sender: mockUser,
@@ -2130,8 +2201,11 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         addChatMessage(challengeMessage);
         if (!mutedUsers.includes(mockUser.uid)) {
           toaster.info({
-            title: "Challenge incoming",
-            description: `${mockUser.userName} ${challengeLine}`,
+            title: t("Layout.toast.mockChallengeIncoming.title"),
+            description: t("Layout.toast.mockChallengeIncoming.description", {
+              name: mockUser.userName,
+              line: challengeLine,
+            }),
           });
         }
         mockActionIndexRef.current += 1;
@@ -2144,8 +2218,9 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
       const chatTemplate =
         MOCK_CHAT_LINES[mockActionIndexRef.current % MOCK_CHAT_LINES.length];
+      const friendFallback = t("Layout.chat.friendFallback");
       const playerName =
-        (viewerSnapshot?.userName ?? "friend").trim() || "friend";
+        (viewerSnapshot?.userName ?? friendFallback).trim() || friendFallback;
       const chatMessage: TMessage = {
         id: `mock-message-${now}`,
         role: "user",
@@ -2170,6 +2245,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     currentLobbyId,
     hasRealOpponent,
     mutedUsers,
+    t,
   ]);
 
   const statusColor =
@@ -2184,12 +2260,12 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
       const trimmed = detail.text?.trim();
       if (!trimmed) {
-        detail.onError?.("Message cannot be empty.");
+        detail.onError?.(t("Layout.errors.messageEmpty"));
         return;
       }
 
       if (!globalUser?.uid) {
-        detail.onError?.("Please log in before chatting.");
+        detail.onError?.(t("Layout.errors.loginRequiredChat"));
         return;
       }
 
@@ -2206,7 +2282,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
       const sent = sendSocketMessage(payload);
       if (!sent) {
-        detail.onError?.("Unable to reach message server.");
+        detail.onError?.(t("Layout.errors.messageServer"));
         return;
       }
 
@@ -2216,7 +2292,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     window.addEventListener("ws:send-message", handler as EventListener);
     return () =>
       window.removeEventListener("ws:send-message", handler as EventListener);
-  }, [globalUser, sendSocketMessage]);
+  }, [globalUser, sendSocketMessage, t]);
 
   useEffect(() => {
     const handler = (event: Event) => {
@@ -2308,23 +2384,23 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         await runTeardown();
         if (!silent && hadActiveMatch) {
           toaster.info({
-            title: "Closing match",
-            description: "Attempting to force close the emulator.",
+            title: t("Layout.toast.forceClosingMatch.title"),
+            description: t("Layout.toast.forceClosingMatch.description"),
           });
         }
       } catch (error) {
         console.error("Failed to force close emulator", error);
         if (!silent && hadActiveMatch) {
           toaster.error({
-            title: "Unable to close match",
-            description: "Please try again.",
+            title: t("Layout.toast.forceCloseFailed.title"),
+            description: t("Layout.toast.forceCloseFailed.description"),
           });
         }
       } finally {
         markMatchEnded();
       }
     },
-    [markMatchEnded, notifyMatchStatus, sendSocketMessage]
+    [markMatchEnded, notifyMatchStatus, sendSocketMessage, t]
   );
 
   const handleEndMatch = useCallback(() => {
@@ -2542,7 +2618,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 sender.userName ||
                 sender.name ||
                 sender.uid ||
-                "Unknown user",
+                t("Layout.notifications.unknownUser"),
             };
 
             useMessageStore.getState().addChatMessage(message);
@@ -2760,7 +2836,9 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 const baseMessage: TMessage = {
                   id: payload.sessionId,
                   role: "challenge",
-                  text: `${challengerName} challenged you to a side select duel.`,
+                  text: t("Layout.chat.sideSelectChallengePrompt", {
+                    name: challengerName,
+                  }),
                   timeStamp: Date.now(),
                   userName: challengerName,
                   senderUid: payload.challengerId,
@@ -2778,8 +2856,11 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                   addChatMessage(baseMessage);
                 }
                 toaster.info({
-                  title: "Side select duel request",
-                  description: `Accept or decline ${challengerName}'s duel from chat.`,
+                  title: t("Layout.toast.sideSelectRequest.title"),
+                  description: t(
+                    "Layout.toast.sideSelectRequest.description",
+                    { name: challengerName }
+                  ),
                 });
               } else {
                 setMiniGameState({
@@ -2816,14 +2897,13 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             if (!viewerId || payload?.challengerId !== viewerId) {
               break;
             }
-            let description = "Unable to send duel request.";
+            let description = t("Layout.toast.duelNotSent.unknown");
             switch (payload.reason) {
               case "muted":
-                description = "That player has muted you.";
+                description = t("Layout.toast.duelNotSent.muted");
                 break;
               case "pending":
-                description =
-                  "You already have a duel pending with this player.";
+                description = t("Layout.toast.duelNotSent.pending");
                 break;
               case "cooldown":
                 if (typeof payload.retryInMs === "number") {
@@ -2831,16 +2911,18 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                     1,
                     Math.ceil(payload.retryInMs / 1000)
                   );
-                  description = `Please wait ${seconds}s before challenging again.`;
+                  description = t("Layout.toast.duelNotSent.cooldown", {
+                    seconds,
+                  });
                 } else {
-                  description = "Please wait a bit before challenging again.";
+                  description = t("Layout.toast.duelNotSent.cooldownUnknown");
                 }
                 break;
               default:
                 break;
             }
             toaster.error({
-              title: "Duel not sent",
+              title: t("Layout.toast.duelNotSent.title"),
               description,
             });
             break;
@@ -2894,18 +2976,26 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             const opponentChoice = formatMiniGameChoice(
               resultPayload.choices[resultPayload.opponentId]
             );
+            const winnerName =
+              resultPayload.winnerUid === resultPayload.challengerId
+                ? challengerName
+                : opponentName;
             const outcomeText =
               resultPayload.outcome === "draw"
-                ? "ended in a draw"
+                ? t("Layout.chat.rpsOutcomeDraw")
                 : resultPayload.outcome === "declined"
-                ? "was declined"
-                : resultPayload.winnerUid === resultPayload.challengerId
-                ? `was won by ${challengerName}`
-                : `was won by ${opponentName}`;
+                ? t("Layout.chat.rpsOutcomeDeclined")
+                : t("Layout.chat.rpsOutcomeWon", { name: winnerName });
             useMessageStore.getState().addChatMessage({
               id: `mini-game-${resultPayload.sessionId}`,
               role: "system",
-              text: `RPS duel between ${challengerName} (${challengerChoice}) and ${opponentName} (${opponentChoice}) ${outcomeText}.`,
+              text: t("Layout.chat.rpsResult", {
+                challenger: challengerName,
+                challengerChoice,
+                opponent: opponentName,
+                opponentChoice,
+                outcome: outcomeText,
+              }),
               timeStamp: Date.now(),
             });
             break;
@@ -2957,8 +3047,13 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 );
               }
               toaster.info({
-                title: "Already in a match",
-                description: `You are currently busy and cannot accept ${payload.from}'s challenge.`,
+                title: t("Layout.toast.incomingChallengeBusy.title"),
+                description: t(
+                  "Layout.toast.incomingChallengeBusy.description",
+                  {
+                    name: payload.from,
+                  }
+                ),
               });
               break;
             }
@@ -2987,7 +3082,9 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             if (existingMessageId) {
               updateMessage(existingMessageId, {
                 timeStamp: Date.now(),
-                text: `${challengerName} challenged you to a match.`,
+                text: t("Layout.chat.challengePrompt", {
+                  name: challengerName,
+                }),
                 userName: challengerName,
                 challengeStatus: undefined,
                 challengeResponder: undefined,
@@ -2996,7 +3093,9 @@ export default function Layout({ children }: { children: ReactElement[] }) {
               addChatMessage({
                 id: messageId,
                 role: "challenge",
-                text: `${challengerName} challenged you to a match.`,
+                text: t("Layout.chat.challengePrompt", {
+                  name: challengerName,
+                }),
                 timeStamp: Date.now(),
                 userName: challengerName,
                 senderUid: payload.from,
@@ -3007,8 +3106,10 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
             if (!mutedUsers.includes(payload.from)) {
               toaster.info({
-                title: "Incoming challenge",
-                description: `Accept or decline ${challengerName}'s challenge from the chat.`,
+                title: t("Layout.toast.incomingChallenge.title"),
+                description: t("Layout.toast.incomingChallenge.description", {
+                  name: challengerName,
+                }),
               });
             }
             break;
@@ -3111,8 +3212,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
               console.error("Failed to launch proxy match:", error);
               markMatchEnded();
               toaster.error({
-                title: "Unable to start match",
-                description: "Encountered an error launching the emulator.",
+                title: t("Layout.toast.matchStartError.title"),
+                description: t("Layout.toast.matchStartError.description"),
               });
             }
             break;
@@ -3126,11 +3227,11 @@ export default function Layout({ children }: { children: ReactElement[] }) {
               silent: true,
             });
             toaster.info({
-              title: "Match ended",
+              title: t("Layout.toast.matchEnded.title"),
               description:
                 typeof payload?.reason === "string"
                   ? payload.reason
-                  : "Opponent closed the match.",
+                  : t("Layout.toast.matchEnded.opponentClosed"),
             });
             break;
           }
@@ -3145,7 +3246,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             markMatchEnded();
             if (typeof payload?.reason === "string") {
               toaster.error({
-                title: "Unable to start match",
+                title: t("Layout.toast.matchStartError.title"),
                 description: payload.reason,
               });
             }
@@ -3198,8 +3299,11 @@ export default function Layout({ children }: { children: ReactElement[] }) {
               opponentUidRef.current = null;
               sentMatchRequestRef.current.delete(payload.from);
               toaster.info({
-                title: "Challenge declined",
-                description: `User ${payload.from} is unavailable.`,
+                title: t("Layout.toast.challengeDeclinedUnavailable.title"),
+                description: t(
+                  "Layout.toast.challengeDeclinedUnavailable.description",
+                  { name: payload.from }
+                ),
               });
             }
             break;
@@ -3207,7 +3311,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           case "error":
             if (payload.message) {
               toaster.error({
-                title: "Lobby server error",
+                title: t("Layout.toast.lobbyServerError.title"),
                 description: payload.message,
               });
             }
@@ -3239,6 +3343,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     resolveUserName,
     sendMiniGameMessage,
     applyDebugMatchInjection,
+    t,
   ]);
 
   return (
@@ -3259,7 +3364,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 width={"40px"}
                 height={"40px"}
                 onClick={() => changeRoute("/home")}
-                aria-label="Home"
+                aria-label={t("Layout.aria.home")}
               >
                 <LucideHome />
               </IconButton>
@@ -3268,7 +3373,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 width={"40px"}
                 height={"40px"}
                 onClick={() => changeRoute("/lobby")}
-                aria-label="Lobby"
+                aria-label={t("Layout.aria.lobby")}
               >
                 <MessageCircle />
               </IconButton>
@@ -3277,7 +3382,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 width={"40px"}
                 height={"40px"}
                 onClick={() => changeRoute("/lab")}
-                aria-label="Lab"
+                aria-label={t("Layout.aria.lab")}
               >
                 <FlaskConical />
               </IconButton>
@@ -3286,7 +3391,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 width={"40px"}
                 height={"40px"}
                 onClick={() => changeRoute("/profile")}
-                aria-label="Profiles"
+                aria-label={t("Layout.aria.profile")}
               >
                 <UserRound />
               </IconButton>
@@ -3296,7 +3401,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                   width={"40px"}
                   height={"40px"}
                   onClick={() => changeRoute("/admin")}
-                  aria-label="Admin"
+                  aria-label={t("Layout.aria.admin")}
                 >
                   <ShieldHalf />
                 </IconButton>
@@ -3315,7 +3420,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 width={"40px"}
                 height={"40px"}
                 onClick={() => changeRoute("/settings")}
-                aria-label="Settings"
+                aria-label={t("Layout.aria.settings")}
               >
                 <Settings />
               </IconButton>
@@ -3338,27 +3443,31 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 colorPalette={accentColor}
                 onClick={handleLobbyManagerOpen}
               >
-                Lobby: {currentLobbyId || DEFAULT_LOBBY_ID}
+                {t("Layout.buttons.lobbyLabel", {
+                  lobby: currentLobbyId || DEFAULT_LOBBY_ID,
+                })}
               </Button>
             ) : null}
             <Flex display="flex" alignItems="center" gap="3">
               <UserCard />
               {globalLoggedIn ? (
                 <Box position="relative">
-                  <IconButton
-                    colorPalette={accentColor}
-                    width={"40px"}
-                    height={"40px"}
-                    onClick={openNotifications}
-                    aria-label="Open notifications"
-                  >
-                    <Float placement="bottom-end">
-                      <Circle size="5" bg="bg.muted" color="white">
-                        <Text fontSize="xs">
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </Text>
-                      </Circle>
-                    </Float>
+                <IconButton
+                  colorPalette={accentColor}
+                  width={"40px"}
+                  height={"40px"}
+                  onClick={openNotifications}
+                  aria-label={t("Layout.aria.notifications")}
+                >
+                  <Float placement="bottom-end">
+                    <Circle size="5" bg="bg.muted" color="white">
+                      <Text fontSize="xs">
+                        {unreadCount > 99
+                          ? t("Layout.notifications.countOverflow")
+                          : unreadCount}
+                      </Text>
+                    </Circle>
+                  </Float>
                     {notificationsMuted ? <BellOff /> : <Bell />}
                   </IconButton>
                 </Box>
@@ -3395,7 +3504,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                   colorPalette="red"
                   onClick={handleForceCloseMatch}
                 >
-                  Force Close Match
+                  {t("Layout.buttons.forceCloseMatch")}
                 </Button>
               ) : null}
             </Flex>
@@ -3425,21 +3534,21 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 target="_blank"
                 rel="noreferrer"
               >
-                <Text textStyle="xs">Hyper Reflector on:</Text>
+                <Text textStyle="xs">{t("Layout.footer.linksLabel")}</Text>
               </a>
               <a
                 href="https://discord.gg/fsQEVzXwbt"
                 target="_blank"
                 rel="noreferrer"
               >
-                <Text textStyle="xs">Discord</Text>
+                <Text textStyle="xs">{t("Layout.footer.discord")}</Text>
               </a>
               <a
                 href="https://github.com/Hyper-Reflector-Team"
                 target="_blank"
                 rel="noreferrer"
               >
-                <Text textStyle="xs">Github</Text>
+                <Text textStyle="xs">{t("Layout.footer.github")}</Text>
               </a>
             </Box>
 
@@ -3455,7 +3564,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                   {statusLabel}
                 </Text>
               </Box>
-              <Text textStyle="xs">Hyper Reflector version 0.7.0a 2025</Text>
+              <Text textStyle="xs">{t("Layout.footer.version")}</Text>
             </Flex>
           </Box>
         </Stack>
@@ -3504,7 +3613,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                   onClick={() => handleClearNotifications()}
                   disabled={notificationEntries.length === 0}
                 >
-                  Clear
+                  {t("Layout.buttons.clear")}
                 </Button>
               </Flex>
               <Switch.Root
@@ -3522,7 +3631,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
               >
                 <Switch.HiddenInput />
                 <Switch.Label fontSize="sm" color="gray.400">
-                  Mute notifications
+                  {t("Layout.notifications.mute")}
                 </Switch.Label>
                 <Switch.Control>
                   <Switch.Thumb />
@@ -3544,7 +3653,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                     const responderLabel =
                       msg.challengeResponder && msg.challengeResponder.length
                         ? msg.challengeResponder
-                        : "Unknown player";
+                        : t("Layout.notifications.unknownPlayer");
 
                     return (
                       <Stack
@@ -3562,7 +3671,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                             fontWeight="semibold"
                             color={isSelf ? `${accentColor}.500` : undefined}
                           >
-                            {msg.userName ?? "Unknown user"}
+                            {msg.userName ?? t("Layout.notifications.unknownUser")}
                           </Text>
                           <Text fontSize="xs" color="gray.500">
                             {formatTimestamp(msg.timeStamp)}
@@ -3572,7 +3681,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                         <Flex alignItems="center" gap="2">
                           {isChallenge ? <Swords size={16} /> : null}
                           <Text fontSize="sm" whiteSpace="pre-wrap">
-                            {msg.text || "No message content"}
+                            {msg.text || t("Layout.notifications.noMessage")}
                           </Text>
                         </Flex>
                         {isChallenge ? (
@@ -3585,7 +3694,14 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                                   : "red.300"
                               }
                             >
-                              {`Challenge ${challengeStatus} by ${responderLabel}.`}
+                              {challengeStatus === "accepted"
+                                ? t("Layout.notifications.challengeAccepted", {
+                                    name: responderLabel,
+                                  })
+                                : t(
+                                    "Layout.notifications.challengeDeclined",
+                                    { name: responderLabel }
+                                  )}
                             </Text>
                           ) : (
                             (() => {
