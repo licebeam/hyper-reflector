@@ -1485,8 +1485,20 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       if (!auth.currentUser) {
         return;
       }
+      const opponentUid = opponentUidRef.current;
+      const involvesMockOpponent = opponentUid ? isMockUserId(opponentUid) : false;
+      if (!isPlayerOne && opponentUid && !involvesMockOpponent) {
+        console.info(
+          "[match-tracker] skipping upload because this client is not the designated uploader",
+          {
+            slot: localPlayerSlotRef.current,
+            opponent: opponentUid,
+          }
+        );
+        return;
+      }
 
-      const opponentUid = opponentUidRef.current || "unknown-opponent";
+      const resolvedOpponentUid = opponentUid || "unknown-opponent";
       const shouldUseDevMatch =
         !activeMatchIdRef.current || isMockUserId(opponentUidRef.current || "");
       const matchId =
@@ -1498,8 +1510,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       const limitedRaw = JSON.stringify(condensed);
       await api.uploadMatchData(auth, {
         matchId,
-        player1: isPlayerOne ? viewer.uid : opponentUid,
-        player2: isPlayerOne ? opponentUid : viewer.uid,
+        player1: isPlayerOne ? viewer.uid : resolvedOpponentUid,
+        player2: isPlayerOne ? resolvedOpponentUid : viewer.uid,
         matchData: { raw: limitedRaw },
       });
     } catch (error) {
