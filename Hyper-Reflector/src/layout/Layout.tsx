@@ -789,10 +789,11 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   const handleChallengeResponse = useCallback(
     (messageId: string, accepted: boolean, responderName?: string) => {
       void (async () => {
+        const viewerSnapshot = globalUserRef.current;
         const responder =
           responderName && responderName.trim().length
             ? responderName.trim()
-            : globalUser?.userName || "You";
+            : viewerSnapshot?.userName || "You";
         const status = accepted ? "accepted" : "declined";
 
         const { chatMessages, updateMessage } = useMessageStore.getState();
@@ -906,7 +907,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
               participantIds,
               excludeMessageIds: [messageId],
               reason: AUTO_RESOLVE_RESPONDER,
-              currentUserId: globalUser?.uid,
+              currentUserId: viewerSnapshot?.uid,
               declineChallenge: declineChallengeWithSocket,
             });
           }
@@ -946,17 +947,28 @@ export default function Layout({ children }: { children: ReactElement[] }) {
               });
             });
           } else if (
-            globalUser?.uid &&
+            viewerSnapshot?.uid &&
             opponentId &&
-            globalUser.uid === opponentId
+            viewerSnapshot.uid === opponentId
           ) {
+            const preferenceTarget =
+              typeof challengerId === "string" ? challengerId : undefined;
+            let preferredSlot: 0 | 1 | null = null;
+            if (viewerSnapshot && preferenceTarget) {
+              preferredSlot = resolvePreferredSlot(
+                viewerSnapshot,
+                preferenceTarget
+              );
+            }
             sendSocketMessage({
               type: "request-match",
               challengerId,
               opponentId,
-              requestedBy: globalUser.uid,
+              requestedBy: viewerSnapshot.uid,
               lobbyId: activeLobbyId,
               gameName: inferredGameName,
+              preferredSlot:
+                typeof preferredSlot === "number" ? preferredSlot : undefined,
             });
           }
         } else {
@@ -974,6 +986,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       globalUser?.userName,
       markMatchEnded,
       markMatchStarted,
+      resolvePreferredSlot,
       sendSocketMessage,
     ]
   );
@@ -1575,6 +1588,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
   const startChallenge = useCallback(
     async (targetUid: string) => {
+      const viewer = globalUserRef.current;
       if (isInMatchRef.current) {
         toaster.info({
           title: "Already in a match",
@@ -1584,7 +1598,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         return;
       }
 
-      if (!globalUser?.uid) {
+      if (!viewer?.uid) {
         toaster.error({
           title: "Unable to challenge",
           description: "Please log in before sending challenges.",
@@ -1593,9 +1607,9 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       }
 
       cancelPendingChallengesForChallenger({
-        challengerId: globalUser.uid,
+        challengerId: viewer.uid,
         reason: AUTO_DECLINE_RESPONDER,
-        currentUserId: globalUser.uid,
+        currentUserId: viewer.uid,
         declineChallenge: declineChallengeWithSocket,
       });
 
@@ -1653,14 +1667,16 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           peerConnectionRef.current = null;
         }
 
-        const peer = await initWebRTC(globalUser.uid, targetUid, socket);
+        const peer = await initWebRTC(viewer.uid, targetUid, socket);
         peerConnectionRef.current = peer;
         opponentUidRef.current = targetUid;
         pendingPreferredSlotRef.current = null;
-        const preferredSlot = resolvePreferredSlot(globalUser, targetUid);
+        const preferredSlot = viewer
+          ? resolvePreferredSlot(viewer, targetUid)
+          : null;
         pendingPreferredSlotRef.current = preferredSlot;
         sentMatchRequestRef.current.delete(targetUid);
-        await startCall(peer, socket, targetUid, globalUser.uid, true);
+        await startCall(peer, socket, targetUid, viewer.uid, true);
         toaster.success({
           title: "Challenge sent",
           description: "Waiting for opponent to respond.",
@@ -1679,6 +1695,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       globalUser?.uid,
       markMatchEnded,
       markMatchStarted,
+      resolvePreferredSlot,
     ]
   );
 
