@@ -9,12 +9,15 @@ type MatchFilePaths = {
 let cachedPaths: MatchFilePaths | null = null
 let loggedPaths = false
 
+
+// TODO replace this code with a way to get the paths for our txt files.
 const DEV_OVERRIDE_BASE =
     import.meta.env.DEV
-        ? 'C:/Users/dusti/Desktop/hyper-reflector/Hyper-Reflector/src-tauri/files'
+        ? 'C:/Users/dusti/Desktop/HRprojects/hyper-reflector/Hyper-Reflector/src-tauri/files'
         : null
 
 const normalizePath = (path: string) => path.replace(/\\/g, '/')
+const TRACKING_SEGMENTS = ['lua', '3rd_training_lua']
 
 async function ensurePaths(): Promise<MatchFilePaths | null> {
     if (!isTauriEnv()) {
@@ -23,13 +26,17 @@ async function ensurePaths(): Promise<MatchFilePaths | null> {
     if (!cachedPaths) {
         if (DEV_OVERRIDE_BASE) {
             cachedPaths = {
-                command: normalizePath(`${DEV_OVERRIDE_BASE}/hyper_read_commands.txt`),
-                stats: normalizePath(`${DEV_OVERRIDE_BASE}/hyper_track_match.txt`),
+                command: normalizePath(
+                    `${DEV_OVERRIDE_BASE}/${TRACKING_SEGMENTS.join('/')}/hyper_read_commands.txt`
+                ),
+                stats: normalizePath(
+                    `${DEV_OVERRIDE_BASE}/${TRACKING_SEGMENTS.join('/')}/hyper_track_match.txt`
+                ),
             }
         } else {
             const [command, stats] = await Promise.all([
-                resolveFilesPath('hyper_read_commands.txt'),
-                resolveFilesPath('hyper_track_match.txt'),
+                resolveFilesPath(...TRACKING_SEGMENTS, 'hyper_read_commands.txt'),
+                resolveFilesPath(...TRACKING_SEGMENTS, 'hyper_track_match.txt'),
             ])
             cachedPaths = { command, stats }
         }
@@ -46,10 +53,9 @@ export async function readMatchCommandFile(): Promise<string | null> {
     if (!paths) return null
     try {
         if (import.meta.env.DEV) {
-            console.log('[match-files] reading command', paths.command)
+            //console.log('[match-files] reading command', paths.command)
         }
         const contents = await invoke<string>('read_files_text', { relativePath: paths.command })
-        console.log('contents', JSON.stringify(contents))
         return contents ?? null
     } catch (error) {
         console.error('Failed to read match command file', error)

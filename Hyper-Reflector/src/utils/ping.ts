@@ -1,6 +1,12 @@
 import type { TUser } from '../types/user'
 
-type PingRecord = { id: string; ping: number | string; isUnstable?: boolean; countryCode?: string }
+type PingRecord = {
+    id: string
+    ping: number | string
+    isUnstable?: boolean
+    countryCode?: string
+    networkType?: string
+}
 
 const toNumber = (value: number | string | undefined): number | null => {
     if (typeof value === 'number') {

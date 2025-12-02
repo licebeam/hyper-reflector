@@ -7,6 +7,8 @@ export const FALLBACK_USER_TITLE: TUser['userTitle'] = {
     title: 'Contender',
 }
 
+export const DEBUG_MOCK_MATCH_ID = 'mock-debug-match';
+
 export const MOCK_CHALLENGE_USER: TUser = {
     uid: 'mock-opponent',
     userName: 'Mock Opponent',
@@ -19,7 +21,10 @@ export const MOCK_CHALLENGE_USER: TUser = {
     userEmail: 'mock@hyper-reflector.test',
     userProfilePic: '',
     userTitle: { ...FALLBACK_USER_TITLE, title: 'Training Partner' },
-    winstreak: 0,
+    role: 'user',
+    winStreak: 0,
+    rpsElo: 1200,
+    sidePreferences: {},
     lastKnownPings: [{ id: 'mock-opponent-2', ping: 92 }],
 }
 
@@ -35,7 +40,10 @@ export const MOCK_CHALLENGE_USER_TWO: TUser = {
     userEmail: 'mock2@hyper-reflector.test',
     userProfilePic: '',
     userTitle: { ...FALLBACK_USER_TITLE, title: 'Training Rival' },
-    winstreak: 0,
+    role: 'user',
+    winStreak: 0,
+    rpsElo: 1200,
+    sidePreferences: {},
     stability: true,
     lastKnownPings: [{ id: 'mock-opponent', ping: 92 }],
 }
@@ -60,6 +68,31 @@ export const buildMockForLobby = (lobbyId: string, index = 0): TUser | null => {
     if (!normalized.length || normalized !== 'debug') return null
 
     return index % 2 === 0 ? MOCK_CHALLENGE_USER : MOCK_CHALLENGE_USER_TWO
+}
+
+const RESOLVED_RPS_ELO = 1200
+
+const sanitizeSidePreferences = (input: unknown) => {
+    if (!input || typeof input !== 'object') return {}
+    const now = Date.now()
+    return Object.entries(input as Record<string, any>).reduce<Record<string, {
+        side: 'player1' | 'player2'
+        ownerUid: string
+        opponentUid: string
+        expiresAt: number
+    }>>((acc, [key, value]) => {
+        if (!value || typeof value !== 'object') return acc
+        const side = value.side === 'player2' ? 'player2' : value.side === 'player1' ? 'player1' : null
+        const expiresAt = typeof value.expiresAt === 'number' ? value.expiresAt : 0
+        if (!side || expiresAt <= now) return acc
+        const ownerUid =
+            typeof value.ownerUid === 'string' && value.ownerUid.length ? value.ownerUid : ''
+        const opponentUid =
+            typeof value.opponentUid === 'string' && value.opponentUid.length ? value.opponentUid : key
+        if (!ownerUid || !opponentUid) return acc
+        acc[key] = { side, ownerUid, opponentUid, expiresAt }
+        return acc
+    }, {})
 }
 
 export const normalizeSocketUser = (candidate: any): TUser | null => {
@@ -185,12 +218,21 @@ export const normalizeSocketUser = (candidate: any): TUser | null => {
         userProfilePic:
             typeof candidate.userProfilePic === 'string' ? candidate.userProfilePic : '',
         userTitle,
-        winstreak:
-            typeof candidate.winstreak === 'number'
-                ? candidate.winstreak
-                : typeof candidate.winStreak === 'number'
-                    ? candidate.winStreak
-                    : 0,
+        role:
+            typeof candidate.role === 'string' && candidate.role.trim().length
+                ? candidate.role.trim()
+                : 'user',
+        winStreak: typeof candidate.winStreak === 'number' ? candidate.winStreak : 0,
+        longestWinStreak:
+            typeof candidate.longestWinStreak === 'number'
+                ? candidate.longestWinStreak
+                : undefined,
+        rpsElo: typeof candidate.rpsElo === 'number' ? candidate.rpsElo : RESOLVED_RPS_ELO,
+        sidePreferences: sanitizeSidePreferences(candidate.sidePreferences),
+        currentMatchId:
+            typeof candidate.currentMatchId === 'string' && candidate.currentMatchId.length
+                ? candidate.currentMatchId
+                : undefined,
     }
 
     if (lastKnownPings) {
@@ -229,6 +271,7 @@ export const appendMockUsers = (
         const mockClone: TUser = {
             ...mock,
             ping: pingValue,
+            currentMatchId: DEBUG_MOCK_MATCH_ID,
             lastKnownPings: viewer?.uid
                 ? [
                       ...(Array.isArray(mock.lastKnownPings) ? mock.lastKnownPings : []),

@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
   const isDev = mode === "development";
-  const host = "127.0.0.1"; // <= pin to IPv4
+  const host = "127.0.0.1";
 
   return {
     plugins: [react()],
@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 1420,
       strictPort: true,
-      host, // <= important
+      host,
       hmr: { protocol: "ws", host, port: 1421 },
       watch: { ignored: ["**/src-tauri/**"] }
     },

@@ -1,9 +1,10 @@
 // WARNING this is likely to be deprecated and removed at some point as it's not necessary long term
 // I did not write this, this is a port by chatGPT of the our original node proxy
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use crate::{resolve_emulator_path, resolve_lua_args};
 use anyhow::anyhow;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
@@ -13,9 +14,9 @@ use tauri::{AppHandle, Emitter, EventTarget};
 use tokio::{
     net::UdpSocket,
     process::Command as TokioCommand,
-    sync::{oneshot, Mutex},
+    sync::{Mutex, Notify},
     task::JoinHandle,
-    time::interval,
+    time::{interval, sleep},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,13 +31,45 @@ pub struct PunchMessage {
     #[serde(rename = "peerUid")]
     pub peer_uid: String,
     pub kill: bool,
+    #[serde(rename = "matchId", skip_serializing_if = "Option::is_none")]
+    pub match_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpponentEnvelope {
     pub match_id: Option<String>,
-    pub peer: PeerEndpoint, // { address, port }
+    pub peer: PeerEndpoint,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KillEnvelope {
+    #[serde(default)]
+    pub kill: bool,
+    #[serde(rename = "opponentUid")]
+    pub opponent_uid: Option<String>,
+    pub reason: Option<String>,
+    #[serde(rename = "matchId")]
+    pub match_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlatPeerEnvelope {
+    pub match_id: Option<String>,
+    #[serde(
+        default,
+        alias = "peerAddress",
+        alias = "peer_address",
+        alias = "peerIp",
+        alias = "peer_ip",
+        alias = "ip",
+        alias = "host"
+    )]
+    pub address: Option<String>,
+    #[serde(default, alias = "peerPort", alias = "peer_port")]
+    pub port: Option<u16>,
 }
 
 // ---- Arguments you pass from the frontend ----
@@ -56,7 +89,7 @@ pub struct StartArgs {
     // ports (defaults to 7000/7001 like your code)
     pub emulator_game_port: Option<u16>, // where emulator expects its peer (default 7000)
     pub emulator_listen_port: Option<u16>, // where we listen for emulator (default 7001)
-    pub emulator_args: Vec<String>, // exact CLI args to launch emulator
+    pub emulator_args: Vec<String>,      // exact CLI args to launch emulator
 }
 
 pub struct ProxyRuntime {
@@ -64,14 +97,16 @@ pub struct ProxyRuntime {
     local_sock: Arc<UdpSocket>, // random local port for holepunch + send to peer & server
     emu_listener: Arc<UdpSocket>, // bound to 7001 (or random) to receive from emulator
     opponent: Arc<Mutex<Option<SocketAddr>>>,
+    punch_match_id: Arc<Mutex<Option<String>>>,
     keepalive_task: Mutex<Option<JoinHandle<()>>>,
     // Emulator process
     child: Mutex<Option<tokio::process::Child>>,
     // Control
-    stop_tx: Mutex<Option<oneshot::Sender<()>>>,
+    stop_notify: Arc<Notify>,
     // Meta
     app: AppHandle,
     args: StartArgs,
+    match_closed: AtomicBool,
 }
 
 impl ProxyRuntime {
@@ -95,11 +130,13 @@ impl ProxyRuntime {
             local_sock: Arc::new(local_sock),
             emu_listener: Arc::new(emu_listener),
             opponent: Arc::new(Mutex::new(None)),
+            punch_match_id: Arc::new(Mutex::new(None)),
             keepalive_task: Mutex::new(None),
             child: Mutex::new(None),
-            stop_tx: Mutex::new(None),
+            stop_notify: Arc::new(Notify::new()),
             app,
             args,
+            match_closed: AtomicBool::new(false),
         });
 
         Ok(rt)
@@ -110,10 +147,7 @@ impl ProxyRuntime {
         self.send_to_server(false).await?;
 
         // spawn the two proxy loops
-        let (stop_tx, stop_rx) = oneshot::channel::<()>();
-        *self.stop_tx.lock().await = Some(stop_tx);
-
-        self.spawn_local_reader(stop_rx).await?;
+        self.spawn_local_reader().await?;
         self.spawn_emulator_reader().await?;
         self.spawn_handshake_watchdog().await?;
 
@@ -121,42 +155,38 @@ impl ProxyRuntime {
         Ok(())
     }
 
-    async fn spawn_local_reader(
-        self: &Arc<Self>,
-        mut stop_rx: oneshot::Receiver<()>,
-    ) -> anyhow::Result<()> {
+    async fn spawn_local_reader(self: &Arc<Self>) -> anyhow::Result<()> {
         let this = Arc::clone(self);
         let sock = Arc::clone(&self.local_sock);
         let emu_listener = Arc::clone(&self.emu_listener);
+        let stop_notify = Arc::clone(&self.stop_notify);
 
         tokio::spawn(async move {
             let mut buf = vec![0u8; 65535];
 
             loop {
                 tokio::select! {
+                    _ = stop_notify.notified() => {
+                        break;
+                    }
                     r = sock.recv_from(&mut buf) => {
                         match r {
                             Ok((n, _from)) => {
                                 let slice = &buf[..n];
+                                if this.process_server_packet(slice).await {
+                                    continue;
+                                }
+
                                 let as_str = std::str::from_utf8(slice).unwrap_or("");
-
-                                // Learn opponent addr
-                                if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(slice) {
-                                    if let Ok(addr) = format!("{}:{}", env.peer.address, env.peer.port).parse::<SocketAddr>() {
-                                        *this.opponent.lock().await = Some(addr);
-                                        let _ = this.send_to_peer(b"ping").await;
-                                    }
+                                if as_str == "ping" {
+                                    this.ensure_keepalive().await;
+                                    continue;
                                 }
 
-                                // Keepalive or forward to emulator
-                                if as_str == "ping" || as_str.contains("\"port\"") {
-                                    this.ensure_keepalive().await; // takes &Arc<Self>
-                                } else {
-                                    let emu_game_port = this.args.emulator_game_port.unwrap_or(7000);
-                                    let _ = emu_listener
-                                        .send_to(slice, SocketAddr::from((Ipv4Addr::LOCALHOST, emu_game_port)))
-                                        .await;
-                                }
+                                let emu_game_port = this.args.emulator_game_port.unwrap_or(7000);
+                                let _ = emu_listener
+                                    .send_to(slice, SocketAddr::from((Ipv4Addr::LOCALHOST, emu_game_port)))
+                                    .await;
                             }
                             Err(_e) => {
                                 let _ = this.app.emit_to(
@@ -168,9 +198,6 @@ impl ProxyRuntime {
                             }
                         }
                     }
-                    _ = &mut stop_rx => {
-                        break;
-                    }
                 }
             }
         });
@@ -181,23 +208,30 @@ impl ProxyRuntime {
     async fn spawn_emulator_reader(self: &Arc<Self>) -> anyhow::Result<()> {
         let this = Arc::clone(self);
         let emu_listener = Arc::clone(&self.emu_listener);
+        let stop_notify = Arc::clone(&self.stop_notify);
 
         tokio::spawn(async move {
             let mut buf = vec![0u8; 65535];
             loop {
-                match emu_listener.recv_from(&mut buf).await {
-                    Ok((n, _from)) => {
-                        let payload = &buf[..n];
-                        let _ = this.send_to_peer(payload).await; // ✅ use `this`
-                    }
-                    Err(_e) => {
-                        let _ = this.app.emit_to(
-                            // ✅ use `this`
-                            EventTarget::any(),
-                            "proxy-log",
-                            "emu recv error".to_string(),
-                        );
+                tokio::select! {
+                    _ = stop_notify.notified() => {
                         break;
+                    }
+                    r = emu_listener.recv_from(&mut buf) => {
+                        match r {
+                            Ok((n, _from)) => {
+                                let payload = &buf[..n];
+                                let _ = this.send_to_peer(payload).await;
+                            }
+                            Err(_e) => {
+                                let _ = this.app.emit_to(
+                                    EventTarget::any(),
+                                    "proxy-log",
+                                    "emu recv error".to_string(),
+                                );
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -245,7 +279,7 @@ impl ProxyRuntime {
             return;
         }
 
-        let this = Arc::clone(self); // ✅ now valid
+        let this = Arc::clone(self);
         let handle = tokio::spawn(async move {
             let mut ticker = interval(Duration::from_secs(1));
             loop {
@@ -256,7 +290,10 @@ impl ProxyRuntime {
         *guard = Some(handle);
     }
 
-    async fn send_to_peer(&self, payload: &[u8]) -> anyhow::Result<()> {
+    async fn send_to_peer(self: &Arc<Self>, payload: &[u8]) -> anyhow::Result<()> {
+        if self.match_closed.load(Ordering::SeqCst) {
+            return Ok(());
+        }
         let opp = self.opponent.lock().await.clone();
         if let Some(addr) = opp {
             // start emulator on first real send if not started
@@ -277,7 +314,7 @@ impl ProxyRuntime {
         Ok(())
     }
 
-    async fn start_emulator(&self) -> anyhow::Result<()> {
+    async fn start_emulator(self: &Arc<Self>) -> anyhow::Result<()> {
         // Your JS called startPlayingOnline with params; here we just show a spawn.
         // You can craft the exact CLI args your emulator expects.
         let emu_listen_port = self.emu_listener.local_addr()?.port();
@@ -310,6 +347,7 @@ impl ProxyRuntime {
             ];
         }
 
+        Self::rewrite_emulator_ports(&mut provided_args, emu_game_port, emu_listen_port);
         // Example args - replace with what FBNeo needs in your environment:
         //   --local-port 7000 --remote-ip 127.0.0.1 --remote-port <emu_listener_port> --player N --delay D --name user
         resolve_lua_args(&self.app, &mut provided_args).map_err(|e| anyhow!(e))?;
@@ -317,6 +355,7 @@ impl ProxyRuntime {
 
         let child = cmd.spawn()?;
         *self.child.lock().await = Some(child);
+        self.spawn_emulator_watchdog();
         let _ = self.app.emit_to(
             EventTarget::any(),
             "sendAlert",
@@ -332,10 +371,12 @@ impl ProxyRuntime {
     }
 
     async fn send_to_server(&self, kill: bool) -> anyhow::Result<()> {
+        let punch_match_id = self.punch_match_id.lock().await.clone();
         let msg = serde_json::to_vec(&PunchMessage {
             uid: self.args.my_uid.clone(),
             peer_uid: self.args.peer_uid.clone(),
             kill,
+            match_id: punch_match_id,
         })?;
         let server = format!("{}:{}", self.args.server_host, self.args.server_port);
         let server_addr: SocketAddr = server.parse()?;
@@ -348,20 +389,283 @@ impl ProxyRuntime {
     }
 
     pub async fn stop(&self) -> anyhow::Result<()> {
-        if let Some(tx) = self.stop_tx.lock().await.take() {
-            let _ = tx.send(());
-        }
+        self.stop_notify.notify_waiters();
         // Stop keepalive
         if let Some(h) = self.keepalive_task.lock().await.take() {
             h.abort();
         }
-        // Kill emulator
+        self.kill_emulator_process("proxy-stop").await?;
+        Ok(())
+    }
+
+    async fn process_server_packet(self: &Arc<Self>, slice: &[u8]) -> bool {
+        if let Ok(env) = serde_json::from_slice::<KillEnvelope>(slice) {
+            if env.kill {
+                self.handle_remote_kill(env.reason, env.opponent_uid, env.match_id)
+                    .await;
+                return true;
+            }
+        }
+
+        if let Some(addr) = Self::extract_peer_addr(slice) {
+            self.register_peer_addr(addr).await;
+            if let Some(mid) = Self::extract_match_id(slice) {
+                *self.punch_match_id.lock().await = Some(mid);
+            }
+            return true;
+        }
+
+        if Self::looks_like_server_control(slice) {
+            self.ensure_keepalive().await;
+            return true;
+        }
+
+        false
+    }
+
+    async fn register_peer_addr(self: &Arc<Self>, addr: SocketAddr) {
+        *self.opponent.lock().await = Some(addr);
+        let _ = self.send_to_peer(b"ping").await;
+        self.ensure_keepalive().await;
+    }
+
+    fn extract_peer_addr(payload: &[u8]) -> Option<SocketAddr> {
+        if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(payload) {
+            return Self::parse_addr(&env.peer.address, env.peer.port);
+        }
+
+        if let Ok(env) = serde_json::from_slice::<FlatPeerEnvelope>(payload) {
+            if let (Some(address), Some(port)) = (env.address.as_deref(), env.port) {
+                return Self::parse_addr(address, port);
+            }
+        }
+
+        None
+    }
+
+    fn extract_match_id(payload: &[u8]) -> Option<String> {
+        if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(payload) {
+            return env.match_id;
+        }
+        if let Ok(env) = serde_json::from_slice::<FlatPeerEnvelope>(payload) {
+            return env.match_id;
+        }
+        None
+    }
+
+    fn parse_addr(address: &str, port: u16) -> Option<SocketAddr> {
+        format!("{address}:{port}").parse::<SocketAddr>().ok()
+    }
+
+    fn looks_like_server_control(payload: &[u8]) -> bool {
+        if payload.is_empty() {
+            return false;
+        }
+        if payload[0] != b'{' && payload[0] != b'[' {
+            return false;
+        }
+        if let Ok(text) = std::str::from_utf8(payload) {
+            let trimmed = text.trim();
+            trimmed.contains("\"port\"") || trimmed.contains("\"matchId\"")
+        } else {
+            false
+        }
+    }
+
+    async fn handle_remote_kill(
+        self: &Arc<Self>,
+        reason: Option<String>,
+        opponent_uid: Option<String>,
+        match_id: Option<String>,
+    ) {
+        let punch_match_id = self.punch_match_id.lock().await.clone();
+        if let (Some(expected), Some(received)) = (punch_match_id, match_id.clone()) {
+            if expected != received {
+                let _ = self.app.emit_to(
+                    EventTarget::any(),
+                    "proxy-log",
+                    format!(
+                        "Ignoring kill for match {} (current match {})",
+                        received, expected
+                    ),
+                );
+                return;
+            }
+        }
+
+        if let Some(ref uid) = opponent_uid {
+            if *uid != self.args.peer_uid {
+                let _ = self.app.emit_to(
+                    EventTarget::any(),
+                    "proxy-log",
+                    format!(
+                        "Ignoring kill from {} (current opponent: {})",
+                        uid, self.args.peer_uid
+                    ),
+                );
+                return;
+            }
+        } else {
+            let _ = self.app.emit_to(
+                EventTarget::any(),
+                "proxy-log",
+                "Ignoring kill for unrelated opponent".to_string(),
+            );
+            return;
+        }
+
+        let description = reason.unwrap_or_else(|| "Opponent closed the match.".to_string());
+        let detail = if let Some(uid) = opponent_uid {
+            format!("{description} ({uid})")
+        } else {
+            description.clone()
+        };
+        let _ = self.app.emit_to(
+            EventTarget::any(),
+            "sendAlert",
+            json!({
+                "type": "info",
+                "message": {
+                    "title": "Match ended",
+                    "description": detail
+                }
+            }),
+        );
+
+        if let Err(err) = self.stop().await {
+            let _ = self.app.emit_to(
+                EventTarget::any(),
+                "proxy-log",
+                format!("Failed to stop proxy after remote kill: {err}"),
+            );
+        }
+    }
+
+    fn spawn_emulator_watchdog(self: &Arc<Self>) {
+        let watcher = Arc::clone(self);
+        tokio::spawn(async move {
+            loop {
+                let terminated = {
+                    let mut guard = watcher.child.lock().await;
+                    if let Some(child) = guard.as_mut() {
+                        match child.try_wait() {
+                            Ok(Some(_status)) => {
+                                guard.take();
+                                true
+                            }
+                            Ok(None) => false,
+                            Err(err) => {
+                                let _ = watcher.app.emit_to(
+                                    EventTarget::any(),
+                                    "proxy-log",
+                                    format!("Emulator error: {err}"),
+                                );
+                                guard.take();
+                                true
+                            }
+                        }
+                    } else {
+                        false
+                    }
+                };
+                if terminated {
+                    watcher.notify_match_closed("emulator-exited").await;
+                    if let Err(err) = watcher.stop().await {
+                        let _ = watcher.app.emit_to(
+                            EventTarget::any(),
+                            "proxy-log",
+                            format!("Failed to stop proxy after emulator exit: {err}"),
+                        );
+                    }
+                    break;
+                }
+                sleep(Duration::from_millis(750)).await;
+            }
+        });
+    }
+
+    async fn notify_match_closed(&self, reason: &str) {
+        if self.match_closed.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let payload = json!({
+            "reason": reason,
+            "matchId": self.args.match_id,
+        });
+        let _ = self
+            .app
+            .emit_to(EventTarget::any(), "endMatch", payload.clone());
+        let _ = self.app.emit_to(EventTarget::any(), "endMatchUI", payload);
+        if let Err(err) = self.send_to_server(true).await {
+            let _ = self.app.emit_to(
+                EventTarget::any(),
+                "proxy-log",
+                format!("Failed to notify holepunch server about match close: {err}"),
+            );
+        }
+    }
+
+    async fn kill_emulator_process(&self, reason: &str) -> anyhow::Result<()> {
         if let Some(mut child) = self.child.lock().await.take() {
-            // try graceful
-            let _ = child.start_kill(); // sends SIGKILL on Unix; on Windows, terminates the process
+            let _ = child.start_kill();
             let _ = child.wait().await;
         }
+        self.notify_match_closed(reason).await;
         Ok(())
+    }
+}
+
+impl ProxyRuntime {
+    fn rewrite_emulator_ports(args: &mut Vec<String>, local_port: u16, remote_port: u16) {
+        let local_addr = format!("127.0.0.1:{local_port}");
+        let remote_addr = format!("127.0.0.1:{remote_port}");
+
+        let mut idx = 0;
+        while idx < args.len() {
+            let lowered = args[idx].to_ascii_lowercase();
+            match lowered.as_str() {
+                "--local-port" => {
+                    if idx + 1 < args.len() {
+                        args[idx + 1] = local_port.to_string();
+                    }
+                    idx += 2;
+                    continue;
+                }
+                "--remote-port" => {
+                    if idx + 1 < args.len() {
+                        args[idx + 1] = remote_port.to_string();
+                    }
+                    idx += 2;
+                    continue;
+                }
+                "-l" => {
+                    if idx + 1 < args.len() {
+                        args[idx + 1] = local_addr.clone();
+                    }
+                    idx += 2;
+                    continue;
+                }
+                "-r" => {
+                    if idx + 1 < args.len() {
+                        args[idx + 1] = remote_addr.clone();
+                    }
+                    idx += 2;
+                    continue;
+                }
+                _ => {}
+            }
+
+            if args[idx].starts_with("quark:direct") {
+                let mut parts: Vec<String> = args[idx].split(',').map(|s| s.to_string()).collect();
+                if parts.len() >= 5 {
+                    parts[2] = local_port.to_string();
+                    parts[4] = remote_port.to_string();
+                    args[idx] = parts.join(",");
+                }
+            }
+
+            idx += 1;
+        }
     }
 }
 
@@ -388,11 +692,25 @@ pub async fn start_proxy(
     let resolved_path = resolve_emulator_path(&app, &args.emulator_path)?;
     args.emulator_path = resolved_path.to_string_lossy().to_string();
 
+    let existing = {
+        let mut guard = state.inner.lock().await;
+        guard.take()
+    };
+    if let Some(existing_rt) = existing {
+        existing_rt
+            .stop()
+            .await
+            .map_err(|e| format!("Failed to stop previous proxy instance: {e}"))?;
+    }
+
     let rt = ProxyRuntime::new(app, args)
         .await
         .map_err(|e| e.to_string())?;
     rt.start().await.map_err(|e| e.to_string())?;
-    *state.inner.lock().await = Some(rt.clone());
+    {
+        let mut guard = state.inner.lock().await;
+        *guard = Some(rt.clone());
+    }
     Ok(format!(
         "proxy started: local={} emu_listener={}",
         rt.local_sock.local_addr().unwrap(),
@@ -410,11 +728,14 @@ pub async fn stop_proxy(state: tauri::State<'_, ProxyManager>) -> Result<(), Str
 
 #[tauri::command]
 pub async fn kill_emulator_only(state: tauri::State<'_, ProxyManager>) -> Result<(), String> {
-    if let Some(rt) = &*state.inner.lock().await {
-        if let Some(mut child) = rt.child.lock().await.take() {
-            let _ = child.start_kill();
-            let _ = child.wait().await;
-        }
+    let runtime = {
+        let guard = state.inner.lock().await;
+        guard.clone()
+    };
+    if let Some(rt) = runtime {
+        rt.kill_emulator_process("manual-force")
+            .await
+            .map_err(|e| e.to_string())?;
     }
     Ok(())
 }

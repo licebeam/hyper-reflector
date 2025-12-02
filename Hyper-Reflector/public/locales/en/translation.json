@@ -18,7 +18,9 @@
       "challengeSound": "Challenge Sound",
       "setCustomChallenge": " Set custom challenge sound",
       "messageSound": "@ Message Sound",
-      "setCustomMessage": "Set custom @ message sound"
+      "setCustomMessage": "Set custom @ message sound",
+      "winSound": "Win Sound",
+      "setCustomWin": "Set custom win sound"
     },
     "Theme": {
       "title": "Theme Settings",
@@ -29,7 +31,8 @@
     "Emu": {
       "title": "Emulator Settings",
       "desc": "Warning this is deprecated and will be removed",
-      "setEmuPath": "Set Custom Emulator Path"
+      "setEmuPath": "Set Custom Emulator Path",
+      "setRomPath": "Set ROM Directory"
     },
     "Danger": {
       "title": "Danger",
@@ -60,6 +63,221 @@
       "rookie": "Below 1500",
       "intermediate": "1500 - 1999",
       "expert": "2000+"
+    }
+  },
+  "Layout": {
+    "aria": {
+      "home": "Home",
+      "lobby": "Lobby",
+      "lab": "Lab",
+      "profile": "Profiles",
+      "admin": "Admin",
+      "settings": "Settings",
+      "notifications": "Open notifications"
+    },
+    "mock": {
+      "defaultOpponent": "Mock Opponent"
+    },
+    "buttons": {
+      "lobbyLabel": "Lobby: {{lobby}}",
+      "forceCloseMatch": "Force Close Match",
+      "clear": "Clear"
+    },
+    "footer": {
+      "linksLabel": "Hyper Reflector on:",
+      "discord": "Discord",
+      "github": "GitHub",
+      "version": "Hyper Reflector version 0.7.1a 2025"
+    },
+    "notifications": {
+      "mute": "Mute notifications",
+      "unknownUser": "Unknown user",
+      "unknownPlayer": "Unknown player",
+      "self": "You",
+      "noMessage": "No message content",
+      "challengeAccepted": "Challenge accepted by {{name}}.",
+      "challengeDeclined": "Challenge declined by {{name}}.",
+      "countOverflow": "99+",
+      "waitingForOpponent": "Waiting for opponent",
+      "waitingForName": "Waiting for {{name}}"
+    },
+    "chat": {
+      "challengePrompt": "{{name}} challenged you to a match.",
+      "sideSelectChallengePrompt": "{{name}} challenged you to a side select duel.",
+      "mockChallengeDescription": "{{name}} {{line}}",
+      "friendFallback": "friend",
+      "rpsResult": "RPS duel between {{challenger}} ({{challengerChoice}}) and {{opponent}} ({{opponentChoice}}) {{outcome}}",
+      "rpsOutcomeDraw": "ended in a draw.",
+      "rpsOutcomeDeclined": "was declined.",
+      "rpsOutcomeWon": "was won by {{name}}.",
+      "rpsOutcomeConcluded": "has concluded."
+    },
+    "sides": {
+      "player1": "Player 1",
+      "player2": "Player 2"
+    },
+    "errors": {
+      "messageEmpty": "Message cannot be empty.",
+      "loginRequiredChat": "Please log in before chatting.",
+      "messageServer": "Unable to reach message server.",
+      "lobbyPasswordRequired": "Password required for private lobby.",
+      "lobbyServerUnavailable": "Unable to reach lobby server. Please try again.",
+      "lobbyNameRequired": "Lobby name is required.",
+      "lobbyNameLength": "Lobby name must be between {{min}} and {{max}} characters.",
+      "lobbyNameDefault": "Choose a different name from the default lobby.",
+      "lobbyNameInappropriate": "Lobby name contains inappropriate language.",
+      "privateLobbyPasswordRequired": "Private lobbies require a password.",
+      "passwordMaxLength": "Passwords are limited to 150 characters.",
+      "lobbyNameExists": "A lobby with that name already exists."
+    },
+    "toast": {
+      "signalUnavailable": {
+        "title": "Unable to respond",
+        "description": "Signal connection unavailable. Please try again."
+      },
+      "acceptChallengeError": {
+        "title": "Unable to accept challenge",
+        "unknown": "Unknown error accepting challenge"
+      },
+      "challengeAccepted": {
+        "title": "Challenge accepted",
+        "description": "{{name}} accepted the challenge."
+      },
+      "challengeDeclined": {
+        "title": "Challenge declined",
+        "description": "{{name}} declined the challenge."
+      },
+      "matchStartError": {
+        "title": "Unable to start match",
+        "description": "Encountered an error launching the emulator."
+      },
+      "authRequiredRespond": {
+        "title": "Unable to respond",
+        "description": "Please log in before responding to duels."
+      },
+      "inviteExpired": {
+        "title": "Invite expired",
+        "description": "This duel request is no longer available."
+      },
+      "duelAccepted": {
+        "title": "Duel accepted",
+        "description": "Opening the side select duel..."
+      },
+      "mockDuelStarted": {
+        "title": "Mock duel started",
+        "description": "Dueling {{name}}."
+      },
+      "authRequiredDuel": {
+        "title": "Unable to start duel",
+        "description": "Please log in before initiating a duel."
+      },
+      "signalDisconnectedDuel": {
+        "title": "Unable to start duel",
+        "description": "Signal server is not connected."
+      },
+      "duelInviteSent": {
+        "title": "Duel invitation sent",
+        "waitingForName": "Waiting for {{name}}",
+        "waiting": "Waiting for opponent"
+      },
+      "authRequiredLobbyChange": {
+        "title": "Unable to change lobby",
+        "description": "Please log in before joining a lobby."
+      },
+      "lobbyJoined": {
+        "title": "Lobby joined",
+        "description": "{{name}}"
+      },
+      "alreadyInMatch": {
+        "title": "Already in a match",
+        "description": "Finish your current match before starting a new challenge."
+      },
+      "authRequiredChallenge": {
+        "title": "Unable to challenge",
+        "description": "Please log in before sending challenges."
+      },
+      "signalDisconnectedChallenge": {
+        "title": "Unable to challenge",
+        "description": "Signal server is not connected."
+      },
+      "challengeSent": {
+        "title": "Challenge sent",
+        "description": "Waiting for opponent to respond."
+      },
+      "challengeFailed": {
+        "title": "Challenge failed",
+        "description": "Unable to initiate WebRTC call."
+      },
+      "sidePreferenceSavedMock": {
+        "title": "Side selection noted",
+        "description": "You will start as {{side}} when challenging {{name}} (mock)."
+      },
+      "authRequiredSidePreference": {
+        "title": "Unable to save side preference",
+        "description": "You must be logged in to persist this choice."
+      },
+      "sidePreferenceSaved": {
+        "title": "Side selection saved",
+        "description": "You will start as {{side}} for the next hour."
+      },
+      "sidePreferenceSaveError": {
+        "title": "Unable to save side selection",
+        "description": "Please try again."
+      },
+      "authRequiredLobbyCreate": {
+        "title": "Unable to create lobby",
+        "description": "Please log in before creating a lobby."
+      },
+      "lobbyCreated": {
+        "title": "Lobby created",
+        "description": "{{name}}"
+      },
+      "notificationsCleared": {
+        "title": "Notifications cleared"
+      },
+      "mockChallengeIncoming": {
+        "title": "Challenge incoming",
+        "description": "{{name}} {{line}}"
+      },
+      "forceClosingMatch": {
+        "title": "Closing match",
+        "description": "Attempting to force close the emulator."
+      },
+      "forceCloseFailed": {
+        "title": "Unable to close match",
+        "description": "Please try again."
+      },
+      "sideSelectRequest": {
+        "title": "Side select duel request",
+        "description": "Accept or decline {{name}}'s duel from chat."
+      },
+      "duelNotSent": {
+        "title": "Duel not sent",
+        "unknown": "Unknown error sending duel request.",
+        "muted": "That player has muted you.",
+        "pending": "You already have a duel pending with this player.",
+        "cooldown": "Please wait {{seconds}}s before challenging again.",
+        "cooldownUnknown": "Please wait a bit before challenging again."
+      },
+      "incomingChallengeBusy": {
+        "title": "Already in a match",
+        "description": "You are currently busy and cannot accept {{name}}'s challenge."
+      },
+      "incomingChallenge": {
+        "title": "Incoming challenge",
+        "description": "Accept or decline {{name}}'s challenge from the chat."
+      },
+      "matchEnded": {
+        "title": "Match ended",
+        "opponentClosed": "Opponent closed the match."
+      },
+      "challengeDeclinedUnavailable": {
+        "title": "Challenge declined",
+        "description": "User {{name}} is unavailable."
+      },
+      "lobbyServerError": {
+        "title": "Lobby server error"
+      }
     }
   }
 }
