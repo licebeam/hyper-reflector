@@ -12,6 +12,7 @@ export const isTauriEnv = () => {
 }
 
 const toCliPath = (path: string) => path.replace(/\\/g, '/')
+const trimTrailingSlashes = (path: string) => path.replace(/\/+$/, '')
 const dedupeSrcTauriSegments = (path: string) => path.replace(/src-tauri\/src-tauri/g, 'src-tauri')
 const hasValue = (value?: string | null): value is string => Boolean(value && value.trim().length)
 const needsDefault = (value?: string | null) =>
@@ -20,10 +21,15 @@ const needsDefault = (value?: string | null) =>
 const DEV_BASE = 'src-tauri/files'
 const DEV_SEGMENTS = {
     emulator: ['emu', 'hyper-screw-fbneo', 'fs-fbneo.exe'],
-    training: ['lua', '3rd_training_lua', '3rd_training.lua'],
+    training: ['lua', '3rd_training_lua_effie', '3rd_training.lua'],
     match: ['lua', '3rd_training_lua', 'hyper_reflector.lua'],
     challenge: ['sounds', 'challenge.mp3'],
     mention: ['sounds', 'message.wav'],
+    win: ['sounds', 'win.wav'],
+}
+
+const LEGACY_SEGMENTS = {
+    training: ['lua', '3rd_training_lua', '3rd_training.lua'],
 }
 
 type PreparedResources = {
@@ -44,6 +50,11 @@ type DefaultPaths = {
 
 let cachedDefaults: DefaultPaths | null = null
 let cachedFilesBase: string | null = null
+
+type SegmentSet = string[]
+type SegmentOptions = SegmentSet[]
+
+const segmentsToSuffix = (segments: SegmentSet) => segments.join('/')
 
 async function toAbsolute(path: string): Promise<string> {
     const resolved = await resolve(path)
@@ -110,6 +121,57 @@ async function resolveFilesBase(): Promise<string> {
     }
 }
 
+function stripDefaultSuffix(pathValue: string, suffix: string): string | null {
+    const normalizedPath = trimTrailingSlashes(pathValue)
+    const normalizedSuffix = trimTrailingSlashes(suffix).toLowerCase()
+    const lowerPath = normalizedPath.toLowerCase()
+
+    const withSlash = `/${normalizedSuffix}`
+    if (lowerPath.endsWith(withSlash)) {
+        return trimTrailingSlashes(
+            normalizedPath.slice(0, normalizedPath.length - withSlash.length)
+        )
+    }
+
+    if (lowerPath.endsWith(normalizedSuffix)) {
+        return trimTrailingSlashes(
+            normalizedPath.slice(0, normalizedPath.length - normalizedSuffix.length)
+        )
+    }
+
+    return null
+}
+
+async function shouldUseDefaultPath(
+    value: string | null | undefined,
+    segmentOptions: SegmentOptions
+): Promise<boolean> {
+    if (!hasValue(value) || needsDefault(value)) {
+        return true
+    }
+
+    try {
+        const normalizedValue = dedupeSrcTauriSegments(toCliPath(await normalize(value)))
+        const filesBase = dedupeSrcTauriSegments(
+            toCliPath(await normalize(await resolveFilesBase()))
+        )
+
+        for (const segments of segmentOptions) {
+            const suffix = segmentsToSuffix(segments)
+            const derivedBase = stripDefaultSuffix(normalizedValue, suffix)
+            if (!derivedBase) {
+                continue
+            }
+
+            return derivedBase.toLowerCase() !== filesBase.toLowerCase()
+        }
+
+        return false
+    } catch {
+        return true
+    }
+}
+
 async function deriveRelative(
     baseEmulatorPath: string | null | undefined,
     segments: string[]
@@ -130,8 +192,11 @@ async function deriveRelative(
 
 export async function ensureDefaultEmulatorPath(force = false) {
     const { emulatorPath, setEmulatorPath } = useSettingsStore.getState()
-    if (!force && hasValue(emulatorPath) && !needsDefault(emulatorPath)) {
-        return
+    if (!force) {
+        const needsReset = await shouldUseDefaultPath(emulatorPath, [DEV_SEGMENTS.emulator])
+        if (!needsReset) {
+            return
+        }
     }
 
     const defaults = await getDefaults()
@@ -142,19 +207,28 @@ export async function ensureDefaultTrainingPath(
     emulatorPathSetting?: string | null,
     force = false
 ) {
-    const { trainingPath, setTrainingPath } = useSettingsStore.getState()
-    if (!force && hasValue(trainingPath) && !needsDefault(trainingPath)) {
+    const { trainingPath, trainingPathSource, setTrainingPath } = useSettingsStore.getState()
+    if (!force && trainingPathSource === 'custom') {
         return
+    }
+    if (!force) {
+        const needsReset = await shouldUseDefaultPath(trainingPath, [
+            DEV_SEGMENTS.training,
+            LEGACY_SEGMENTS.training,
+        ])
+        if (!needsReset) {
+            return
+        }
     }
 
     const derived = await deriveRelative(emulatorPathSetting, DEV_SEGMENTS.training)
     if (derived) {
-        setTrainingPath(derived)
+        setTrainingPath(derived, 'auto')
         return
     }
 
     const defaults = await getDefaults()
-    setTrainingPath(defaults.training)
+    setTrainingPath(defaults.training, 'auto')
 }
 
 async function ensureSound(
@@ -164,7 +238,8 @@ async function ensureSound(
     segments: string[],
     fallback: string
 ) {
-    if (hasValue(currentValue) && !needsDefault(currentValue)) {
+    const needsReset = await shouldUseDefaultPath(currentValue, [segments])
+    if (!needsReset) {
         return
     }
 
@@ -199,6 +274,12 @@ export async function ensureDefaultMentionSound(emulatorPathSetting?: string | n
         DEV_SEGMENTS.mention,
         defaults.mention
     )
+}
+
+export async function ensureDefaultWinSound(emulatorPathSetting?: string | null) {
+    const { winSoundPath, setWinSoundPath } = useSettingsStore.getState()
+    const defaults = await getDefaults()
+    await ensureSound(winSoundPath, setWinSoundPath, emulatorPathSetting, DEV_SEGMENTS.win, defaults.win)
 }
 
 export async function resolveMatchLuaPath(emulatorPathSetting?: string | null) {

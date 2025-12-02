@@ -83,6 +83,7 @@ export async function startProxyMatch({
     })
 
     try {
+        await invoke('stop_proxy').catch(() => {})
         await invoke('start_proxy', {
             args: {
                 match_id: matchId,
@@ -176,10 +177,12 @@ export async function startMockMatch({
             invoke('launch_emulator', {
                 exePath: emulatorPath,
                 args: playerArgs,
+                matchId,
             }),
             invoke('launch_emulator', {
                 exePath: emulatorPath,
                 args: opponentArgs,
+                matchId,
             }),
         ])
         toaster.success({

@@ -61,7 +61,7 @@ export default function LabPage() {
                 filters: [{ name: 'Lua scripts', extensions: ['lua', 'luac'] }],
             })
             console.log('res', res)
-            if (typeof res === 'string') setTrainingPath(res)
+            if (typeof res === 'string') setTrainingPath(res, 'custom')
         } catch (err: any) {
             toaster.error({
                 title: t('Lab.errorPath'),
@@ -94,7 +94,7 @@ export default function LabPage() {
                                 colorPalette={'red'}
                                 colorScheme="blue"
                                 onClick={() => {
-                                    setTrainingPath('')
+                                    setTrainingPath('', 'auto')
                                 }}
                             >
                                 <Trash2 />

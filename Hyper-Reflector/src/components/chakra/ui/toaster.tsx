@@ -7,12 +7,48 @@ import {
   Stack,
   Toast,
   createToaster,
-} from "@chakra-ui/react"
+} from "@chakra-ui/react";
+import { useSettingsStore } from "../../../state/store";
 
-export const toaster = createToaster({
+const baseToaster = createToaster({
   placement: "bottom-end",
   pauseOnPageIdle: true,
-})
+});
+
+const shouldMuteNotifications = () =>
+  useSettingsStore.getState().notificationsMuted;
+
+const interceptedMethods = new Set([
+  "create",
+  "error",
+  "success",
+  "info",
+  "warning",
+  "loading",
+  "promise",
+]);
+
+export const toaster = new Proxy(baseToaster, {
+  get(target, prop, receiver) {
+    const value = Reflect.get(target, prop, receiver);
+    if (
+      typeof prop === "string" &&
+      interceptedMethods.has(prop) &&
+      typeof value === "function"
+    ) {
+      return (...args: unknown[]) => {
+        if (shouldMuteNotifications()) {
+          return undefined;
+        }
+        return (value as (...fnArgs: unknown[]) => unknown).apply(
+          target,
+          args
+        );
+      };
+    }
+    return value;
+  },
+}) as typeof baseToaster;
 
 export const Toaster = () => {
   return (
@@ -39,5 +75,5 @@ export const Toaster = () => {
         )}
       </ChakraToaster>
     </Portal>
-  )
-}
+  );
+};

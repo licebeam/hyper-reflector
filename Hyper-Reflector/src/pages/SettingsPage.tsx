@@ -20,6 +20,7 @@ import { useSettingsStore } from '../state/store'
 import { Check, Moon, Play, Square, Sun, Volume2, VolumeX, X, LogOut } from 'lucide-react'
 import { toaster } from '../components/chakra/ui/toaster'
 import { useTauriSoundPlayer } from '../utils/useTauriSoundPlayer'
+import { applyRomPath, formatRomPathDisplay } from '../utils/romPaths'
 
 const MARGIN_SECTION = '12px'
 
@@ -37,6 +38,10 @@ export default function SettingsPage() {
     const setNotifAtSound = useSettingsStore((s) => s.setNotifAtSound)
     const notifAtSoundPath = useSettingsStore((s) => s.notifAtSoundPath)
     const setNotifAtSoundPath = useSettingsStore((s) => s.setNotifAtSoundPath)
+    const winSound = useSettingsStore((s) => s.winSound)
+    const setWinSound = useSettingsStore((s) => s.setWinSound)
+    const winSoundPath = useSettingsStore((s) => s.winSoundPath)
+    const setWinSoundPath = useSettingsStore((s) => s.setWinSoundPath)
     const darkMode = useSettingsStore((s) => s.darkMode)
     const setDarkMode = useSettingsStore((s) => s.setDarkMode)
     const theme = useSettingsStore((s) => s.theme)
@@ -45,6 +50,8 @@ export default function SettingsPage() {
     const emulatorPath = useSettingsStore((s) => s.emulatorPath)
     const setAppLanguage = useSettingsStore((s) => s.setAppLanguage)
     const appLanguage = useSettingsStore((s) => s.appLanguage)
+    const romPath = useSettingsStore((s) => s.romPath)
+    const setRomPath = useSettingsStore((s) => s.setRomPath)
     const { playSound: playSoundFile } = useTauriSoundPlayer()
 
     const themes = createListCollection({
@@ -98,6 +105,9 @@ export default function SettingsPage() {
             if (type === 'at') {
                 if (typeof res === 'string') setNotifAtSoundPath(res)
             }
+            if (type === 'win') {
+                if (typeof res === 'string') setWinSoundPath(res)
+            }
         } catch (err: any) {
             toaster.error({
                 title: 'Error Opening Dialog',
@@ -147,6 +157,33 @@ export default function SettingsPage() {
         }
         if (type === 'at') {
             await playSoundFile(notifAtSoundPath)
+        }
+        if (type === 'win') {
+            await playSoundFile(winSoundPath)
+        }
+    }
+
+    const pickRomDirectory = async () => {
+        try {
+            const res = await open({
+                multiple: false,
+                directory: true,
+                title: 'Select ROM Directory',
+            })
+            if (typeof res === 'string') {
+                const sanitized = formatRomPathDisplay(res)
+                await applyRomPath(sanitized)
+                setRomPath(sanitized)
+                toaster.success({
+                    title: 'ROM path updated',
+                    description: sanitized,
+                })
+            }
+        } catch (err: any) {
+            toaster.error({
+                title: 'Failed to update ROM path',
+                description: err instanceof Error ? err.message : String(err),
+            })
         }
     }
 
@@ -346,6 +383,50 @@ export default function SettingsPage() {
                             </IconButton>
                         </Box>
                     </Stack>
+                    <Switch.Root
+                        colorPalette={theme.colorPalette}
+                        marginTop={MARGIN_SECTION}
+                        size="lg"
+                        checked={winSound}
+                        onCheckedChange={(e) => setWinSound(e.checked)}
+                    >
+                        <Switch.HiddenInput />
+                        <Switch.Control>
+                            <Switch.Thumb>
+                                <Switch.ThumbIndicator fallback={<X color="black" />}>
+                                    <Check />
+                                </Switch.ThumbIndicator>
+                            </Switch.Thumb>
+                        </Switch.Control>
+                        {winSound ? <Volume2 /> : <VolumeX />}
+                        <Switch.Label>{t('Settings.Notification.winSound')}</Switch.Label>
+                    </Switch.Root>
+                    <Stack>
+                        <Text textStyle="xs">{winSoundPath}</Text>
+                        <Box gap="2" display="flex">
+                            <Button
+                                colorPalette={theme.colorPalette}
+                                maxW="1/2"
+                                onClick={() => pickSoundFile('win')}
+                            >
+                                {t('Settings.Notification.setCustomWin')}
+                            </Button>
+                            <IconButton
+                                colorPalette={theme.colorPalette}
+                                colorScheme="blue"
+                                onClick={() => playSound('win')}
+                            >
+                                <Play />
+                            </IconButton>
+                            <IconButton
+                                colorPalette={theme.colorPalette}
+                                colorScheme="blue"
+                                onClick={() => pauseSound()}
+                            >
+                                <Square />
+                            </IconButton>
+                        </Box>
+                    </Stack>
                 </Card.Body>
             </Card.Root>
             <Card.Root overflow="hidden" flex={'1'}>
@@ -425,6 +506,15 @@ export default function SettingsPage() {
                         onClick={pickExe}
                     >
                         {t('Settings.Emu.setEmuPath')}
+                    </Button>
+                    <Text textStyle="xs">{romPath}</Text>
+                    <Button
+                        colorPalette={theme.colorPalette}
+                        marginTop={MARGIN_SECTION}
+                        maxW="1/2"
+                        onClick={pickRomDirectory}
+                    >
+                        {t('Settings.Emu.setRomPath')}
                     </Button>
                 </Card.Body>
             </Card.Root>

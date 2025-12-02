@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { TUser } from '../types/user'
+import type { MatchSummary } from '../types/match'
 
 export const DEFAULT_LOBBY_ID = 'Hyper Reflector'
 
@@ -13,6 +14,8 @@ export type LobbySummary = {
 
 const MAX_CHAT_MESSAGES = 50
 
+type TrainingPathSource = 'auto' | 'custom'
+
 type SettingsState = {
     ggpoDelay: string
     setGgpoDelay: (d: string) => void
@@ -24,6 +27,10 @@ type SettingsState = {
     setNotifAtSound: (on: boolean) => void
     notifAtSoundPath: string
     setNotifAtSoundPath: (path: string) => void
+    winSound: boolean
+    setWinSound: (on: boolean) => void
+    winSoundPath: string
+    setWinSoundPath: (path: string) => void
     notificationsMuted: boolean
     setNotificationsMuted: (on: boolean) => void
     darkMode: boolean
@@ -33,12 +40,15 @@ type SettingsState = {
     emulatorPath: string
     setEmulatorPath: (path: string) => void
     trainingPath: string
-    setTrainingPath: (path: string) => void
+    trainingPathSource: TrainingPathSource
+    setTrainingPath: (path: string, source?: TrainingPathSource) => void
     appLanguage: string
     setAppLanguage: (code: string) => void
     mutedUsers: string[]
     toggleMutedUser: (uid: string) => void
     isUserMuted: (uid: string) => boolean
+    romPath: string
+    setRomPath: (path: string) => void
 }
 
 type SignalStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -47,12 +57,14 @@ type UserState = {
     globalUser: TUser | undefined
     globalLoggedIn: boolean
     lobbyUsers: TUser[]
+    currentMatches: MatchSummary[]
     signalStatus: SignalStatus
     currentLobbyId: string
     lobbies: LobbySummary[]
     setGlobalUser: (user: TUser | undefined) => void
     setGlobalLoggedIn: (info: boolean) => void
     setLobbyUsers: (users: TUser[]) => void
+    setCurrentMatches: (matches: MatchSummary[]) => void
     setSignalStatus: (status: SignalStatus) => void
     setCurrentLobbyId: (id: string) => void
     setLobbies: (lobbies: LobbySummary[]) => void
@@ -70,6 +82,7 @@ export type TMessage = {
     challengeResponder?: string
     challengeChallengerId?: string
     challengeOpponentId?: string
+    challengeKind?: 'match' | 'rps'
 }
 
 type MessageState = {
@@ -108,12 +121,14 @@ export const useUserStore = create<UserState>((set) => ({
     globalUser: undefined,
     globalLoggedIn: false,
     lobbyUsers: [],
+    currentMatches: [],
     signalStatus: 'disconnected',
     currentLobbyId: DEFAULT_LOBBY_ID,
     lobbies: [],
     setGlobalUser: (user) => set({ globalUser: user }),
     setGlobalLoggedIn: (info) => set({ globalLoggedIn: info }),
     setLobbyUsers: (users) => set({ lobbyUsers: users }),
+    setCurrentMatches: (matches) => set({ currentMatches: matches }),
     setSignalStatus: (status) => set({ signalStatus: status }),
     setCurrentLobbyId: (id) => set({ currentLobbyId: id || DEFAULT_LOBBY_ID }),
     setLobbies: (lobbies) => set({ lobbies }),
@@ -133,6 +148,10 @@ export const useSettingsStore = create<SettingsState>()(
             setNotifAtSound: (on) => set({ notifiAtSound: on }),
             notifAtSoundPath: '',
             setNotifAtSoundPath: (path) => set({ notifAtSoundPath: path }),
+            winSound: true,
+            setWinSound: (on) => set({ winSound: on }),
+            winSoundPath: '',
+            setWinSoundPath: (path) => set({ winSoundPath: path }),
             notificationsMuted: false,
             setNotificationsMuted: (on) => set({ notificationsMuted: on }),
             emulatorPath: '',
@@ -142,7 +161,8 @@ export const useSettingsStore = create<SettingsState>()(
             theme: { colorPalette: 'orange', name: 'Orange Soda' },
             setTheme: (t) => set({ theme: t }),
             trainingPath: '',
-            setTrainingPath: (path) => set({ trainingPath: path }),
+            trainingPathSource: 'auto',
+            setTrainingPath: (path, source = 'auto') => set({ trainingPath: path, trainingPathSource: source }),
             appLanguage: 'en',
             setAppLanguage: (code) => set({ appLanguage: code }),
             mutedUsers: [],
@@ -160,6 +180,8 @@ export const useSettingsStore = create<SettingsState>()(
                 const current = get().mutedUsers || []
                 return current.includes(uid)
             },
+            romPath: '',
+            setRomPath: (path) => set({ romPath: path }),
         }),
         {
             name: 'settings',

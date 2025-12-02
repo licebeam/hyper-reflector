@@ -12,7 +12,13 @@ export type TUser = {
     knownAliases: string[]
     pingLat?: number | null
     pingLon?: number | null
-    lastKnownPings?: Array<{ id: string; ping: number | string; isUnstable?: boolean; countryCode?: string }>
+    lastKnownPings?: Array<{
+        id: string
+        ping: number | string
+        isUnstable?: boolean
+        countryCode?: string
+        networkType?: string
+    }>
     stability?: boolean
     ip?: string
     ping?: number
@@ -21,5 +27,19 @@ export type TUser = {
     userName: string
     userProfilePic: string
     userTitle: TUserTitle
-    winstreak: number
+    role?: string
+    assignedFlairs?: TUserTitle[]
+    winStreak?: number
+    longestWinStreak?: number
+    rpsElo?: number
+    currentMatchId?: string
+    sidePreferences?: Record<
+        string,
+        {
+            side: 'player1' | 'player2'
+            ownerUid: string
+            opponentUid: string
+            expiresAt: number
+        }
+    >
 }
