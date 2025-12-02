@@ -118,7 +118,7 @@ import {
   readMatchStatsFile,
 } from "../utils/matchFiles";
 import { parseMatchData } from "../utils/matchParser";
-import { isTauriEnv, resolveFilesPath } from "../utils/pathSettings";
+import { isTauriEnv } from "../utils/pathSettings";
 import { peerLatencyManager } from "../webRTC/peerLatencyManager";
 
 const DEV_MATCH_ID = "dev-matches-and-bugs";
@@ -486,6 +486,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   );
   const notifMentionSoundEnabled = useSettingsStore((s) => s.notifiAtSound);
   const notifMentionSoundPath = useSettingsStore((s) => s.notifAtSoundPath);
+  const winSoundEnabled = useSettingsStore((s) => s.winSound);
+  const winSoundPath = useSettingsStore((s) => s.winSoundPath);
   const mutedUsers = useSettingsStore((s) => s.mutedUsers);
   const accentColor = theme?.colorPalette ?? "orange";
   const { t } = useTranslation();
@@ -534,7 +536,6 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   const mockMiniGameTimers = useRef<Map<string, number>>(new Map());
   const isInMatchRef = useRef(false);
   const currentMatchModeRef = useRef<"live" | "mock" | null>(null);
-  const winSoundPathRef = useRef<string | null>(null);
   const declineChallengeWithSocket = useCallback(
     (targetId: string, challengerId: string) => {
       const socket = signalSocketRef.current;
@@ -667,24 +668,6 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       window.clearTimeout(timer);
       mockMiniGameTimers.current.delete(sessionId);
     }
-  }, []);
-
-  useEffect(() => {
-    if (!isTauriEnv()) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const resolved = await resolveFilesPath("sounds", "win.wav");
-        if (!cancelled) {
-          winSoundPathRef.current = resolved;
-        }
-      } catch (error) {
-        console.warn("Failed to resolve win sound path", error);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const sendSocketMessage = useCallback((payload: Record<string, unknown>) => {
@@ -1552,9 +1535,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           return;
         }
 
-        const resolvedWinSound = winSoundPathRef.current;
-        if (resolvedWinSound) {
-          void playSoundFile(resolvedWinSound);
+        if (winSoundEnabled && winSoundPath) {
+          void playSoundFile(winSoundPath);
         }
 
         const rawStats = await readMatchStatsFile();
@@ -1578,7 +1560,14 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [globalLoggedIn, globalUser?.uid, handleMatchStats, playSoundFile]);
+  }, [
+    globalLoggedIn,
+    globalUser?.uid,
+    handleMatchStats,
+    playSoundFile,
+    winSoundEnabled,
+    winSoundPath,
+  ]);
 
   const handleLobbyManagerClose = useCallback(() => {
     closeLobbyManager();

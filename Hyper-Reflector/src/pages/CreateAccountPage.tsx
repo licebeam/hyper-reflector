@@ -97,7 +97,7 @@ export default function CreateAccountPage() {
       if (!user) throw new Error("Missing user profile");
       setGlobalUser(user);
       setGlobalLoggedIn(true);
-      navigate({ to: "/home" });
+      navigate({ to: "/lobby" });
     } catch (err) {
       console.warn("create account failed", err);
       if ("code" in (err as FirebaseError)) {

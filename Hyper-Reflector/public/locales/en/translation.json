@@ -18,7 +18,9 @@
       "challengeSound": "Challenge Sound",
       "setCustomChallenge": " Set custom challenge sound",
       "messageSound": "@ Message Sound",
-      "setCustomMessage": "Set custom @ message sound"
+      "setCustomMessage": "Set custom @ message sound",
+      "winSound": "Win Sound",
+      "setCustomWin": "Set custom win sound"
     },
     "Theme": {
       "title": "Theme Settings",
@@ -29,7 +31,8 @@
     "Emu": {
       "title": "Emulator Settings",
       "desc": "Warning this is deprecated and will be removed",
-      "setEmuPath": "Set Custom Emulator Path"
+      "setEmuPath": "Set Custom Emulator Path",
+      "setRomPath": "Set ROM Directory"
     },
     "Danger": {
       "title": "Danger",

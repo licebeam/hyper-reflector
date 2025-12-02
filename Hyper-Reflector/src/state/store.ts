@@ -25,6 +25,10 @@ type SettingsState = {
     setNotifAtSound: (on: boolean) => void
     notifAtSoundPath: string
     setNotifAtSoundPath: (path: string) => void
+    winSound: boolean
+    setWinSound: (on: boolean) => void
+    winSoundPath: string
+    setWinSoundPath: (path: string) => void
     notificationsMuted: boolean
     setNotificationsMuted: (on: boolean) => void
     darkMode: boolean
@@ -40,6 +44,8 @@ type SettingsState = {
     mutedUsers: string[]
     toggleMutedUser: (uid: string) => void
     isUserMuted: (uid: string) => boolean
+    romPath: string
+    setRomPath: (path: string) => void
 }
 
 type SignalStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -139,6 +145,10 @@ export const useSettingsStore = create<SettingsState>()(
             setNotifAtSound: (on) => set({ notifiAtSound: on }),
             notifAtSoundPath: '',
             setNotifAtSoundPath: (path) => set({ notifAtSoundPath: path }),
+            winSound: true,
+            setWinSound: (on) => set({ winSound: on }),
+            winSoundPath: '',
+            setWinSoundPath: (path) => set({ winSoundPath: path }),
             notificationsMuted: false,
             setNotificationsMuted: (on) => set({ notificationsMuted: on }),
             emulatorPath: '',
@@ -166,6 +176,8 @@ export const useSettingsStore = create<SettingsState>()(
                 const current = get().mutedUsers || []
                 return current.includes(uid)
             },
+            romPath: '',
+            setRomPath: (path) => set({ romPath: path }),
         }),
         {
             name: 'settings',

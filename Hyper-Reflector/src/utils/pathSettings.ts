@@ -25,6 +25,7 @@ const DEV_SEGMENTS = {
     match: ['lua', '3rd_training_lua', 'hyper_reflector.lua'],
     challenge: ['sounds', 'challenge.mp3'],
     mention: ['sounds', 'message.wav'],
+    win: ['sounds', 'win.wav'],
 }
 
 const LEGACY_SEGMENTS = {
@@ -270,6 +271,12 @@ export async function ensureDefaultMentionSound(emulatorPathSetting?: string | n
         DEV_SEGMENTS.mention,
         defaults.mention
     )
+}
+
+export async function ensureDefaultWinSound(emulatorPathSetting?: string | null) {
+    const { winSoundPath, setWinSoundPath } = useSettingsStore.getState()
+    const defaults = await getDefaults()
+    await ensureSound(winSoundPath, setWinSoundPath, emulatorPathSetting, DEV_SEGMENTS.win, defaults.win)
 }
 
 export async function resolveMatchLuaPath(emulatorPathSetting?: string | null) {

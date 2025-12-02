@@ -273,7 +273,7 @@ export default function AdminPanelPage() {
         <Text color="gray.400">
           You need admin privileges to view this page.
         </Text>
-        <Button onClick={() => navigate({ to: "/home" })}>
+        <Button onClick={() => navigate({ to: "/lobby" })}>
           Back to dashboard
         </Button>
       </Stack>

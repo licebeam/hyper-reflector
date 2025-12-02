@@ -61,7 +61,7 @@ export default function LoginPage() {
         setSessionUser(user);
         setGlobalUser(user);
         setGlobalLoggedIn(true);
-        navigate({ to: "/home" });
+        navigate({ to: "/lobby" });
       } catch (err) {
         console.warn("failed to hydrate user session", err);
         handleFailUser("Unable to finish signing you in. Please try again.");
@@ -216,10 +216,7 @@ export default function LoginPage() {
                   started.
                 </AlertDescription>
               </AlertRoot>
-              <Button
-                colorScheme="orange"
-                onClick={() => navigate({ to: "/home" })}
-              >
+              <Button colorScheme="orange" onClick={() => navigate({ to: "/lobby" })}>
                 Go to dashboard
               </Button>
             </Stack>

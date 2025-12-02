@@ -31,6 +31,7 @@ import {
     ensureDefaultEmulatorPath,
     ensureDefaultMentionSound,
     ensureDefaultTrainingPath,
+    ensureDefaultWinSound,
 } from './utils/pathSettings'
 
 const rootRoute = createRootRoute({
@@ -162,6 +163,7 @@ function App() {
     useEffect(() => {
         void ensureDefaultChallengeSound(emulatorPathSetting)
         void ensureDefaultMentionSound(emulatorPathSetting)
+        void ensureDefaultWinSound(emulatorPathSetting)
     }, [emulatorPathSetting])
 
     return (
