@@ -1,12 +1,12 @@
 ## Welcome to Hyper Reflector
 
-I'll add details about how to contribute and build later.
-
 ### Prerequisites
+
 - Node.js 18+ (or newer) with npm for the Vite frontend.
 - Rust toolchain (via [rustup](https://rustup.rs/)) and the Tauri CLI (`cargo install tauri-cli`) for packaging the desktop app.
 
 ### Install & Run
+
 ```bash
 npm install           # install dependencies
 npm run dev           # vite dev server
