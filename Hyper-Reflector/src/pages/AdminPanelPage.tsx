@@ -215,7 +215,7 @@ export default function AdminPanelPage() {
 
   if (!globalLoggedIn || !auth.currentUser) {
     return (
-      <Stack gap={4} px={{ base: 4, md: 8 }} py={{ base: 6, md: 8 }}>
+      <Stack gap={4}>
         <Heading size="lg">Admin tools</Heading>
         <Text color="gray.400">
           Sign in as an admin to manage title flairs and experiments.
@@ -227,7 +227,7 @@ export default function AdminPanelPage() {
 
   if (globalLoggedIn && !globalUser) {
     return (
-      <Stack gap={4} px={{ base: 4, md: 8 }} py={{ base: 6, md: 8 }}>
+      <Stack gap={4}>
         <Heading size="lg">Admin tools</Heading>
         <Spinner />
         <Text color="gray.400">Loading your account details.</Text>
@@ -237,7 +237,7 @@ export default function AdminPanelPage() {
 
   if (!isAdmin) {
     return (
-      <Stack gap={4} px={{ base: 4, md: 8 }} py={{ base: 6, md: 8 }}>
+      <Stack gap={4}>
         <Heading size="lg">Admin tools</Heading>
         <Text color="gray.400">
           You need admin privileges to view this page.
@@ -250,7 +250,7 @@ export default function AdminPanelPage() {
   }
 
   return (
-    <Stack gap={6} px={{ base: 4, md: 8 }} py={{ base: 6, md: 8 }}>
+    <Stack gap={6}>
       <Stack gap={2}>
         <Heading size="lg">Admin Panel</Heading>
         <Text color="gray.400" maxW="2xl">

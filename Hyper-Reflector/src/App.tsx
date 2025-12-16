@@ -174,7 +174,7 @@ function App() {
         <main className="container">
             <ChakraProvider value={chakraTheme}>
                 <ColorModeProvider>
-                    <Box>
+                    <Box bg="bg.canvas" color="fg.default" minH="100vh">
                         <RouterProvider router={router} />
                     </Box>
                 </ColorModeProvider>

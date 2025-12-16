@@ -245,7 +245,7 @@ export default function HomePage() {
     }
 
     return (
-        <Stack gap={8} py={4}>
+        <Stack gap={8}>
             <Stack gap={2}>
                 <Heading size="lg">Global stats</Heading>
                 <Text color="whiteAlpha.700">

@@ -112,12 +112,7 @@ export default function CreateAccountPage() {
   };
 
   return (
-    <Flex
-      justify="center"
-      align="center"
-      minH="calc(100vh - 160px)"
-      px={{ base: 4, md: 8 }}
-    >
+    <Flex justify="center" align="center" minH="calc(100vh - 160px)">
       <Box
         w="full"
         maxW="640px"

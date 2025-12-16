@@ -27,6 +27,7 @@ import type {
   ThemeColorRampKey,
 } from "../../theme/types"
 import { createChakraThemeFromDefinition } from "../../theme/factory"
+import { useDebouncedValue } from "../../hooks/useDebouncedValue"
 
 const RAMP_KEYS: ThemeColorRampKey[] = [
   "50",
@@ -118,9 +119,10 @@ export function ThemeWorkshopPanel() {
     () => JSON.stringify(themeDraft, null, 2),
     [themeDraft]
   )
+  const previewSource = useDebouncedValue(themeDraft, 150)
   const previewTheme = useMemo(
-    () => createChakraThemeFromDefinition(themeDraft),
-    [themeDraft]
+    () => createChakraThemeFromDefinition(previewSource),
+    [previewSource]
   )
   const themeOptions = useMemo(
     () => [

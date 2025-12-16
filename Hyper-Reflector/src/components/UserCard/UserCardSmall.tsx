@@ -29,6 +29,8 @@ export default function UserCardSmall({
   const viewer = useUserStore((state) => state.globalUser);
   const mutedUsers = useSettingsStore((state) => state.mutedUsers);
   const toggleMutedUser = useSettingsStore((state) => state.toggleMutedUser);
+  const accentColor =
+    useSettingsStore((state) => state.theme.colorPalette) ?? "accent";
   const isMuted = Boolean(user && mutedUsers.includes(user.uid));
 
   useEffect(() => {
@@ -110,10 +112,15 @@ export default function UserCardSmall({
   return (
     <Stack
       borderWidth="1px"
-      borderColor="gray.800"
+      borderColor="border"
       borderRadius="l2"
-      bg="bg.canvas"
-      _hover={isInteractive ? { borderColor: "gray.500" } : undefined}
+      bg="bg.surface"
+      transition="border-color 0.2s ease, background-color 0.2s ease"
+      _hover={
+        isInteractive
+          ? { borderColor: "accent.default", bg: "bg.emphasized" }
+          : undefined
+      }
     >
       <Flex
         alignItems="center"
@@ -141,7 +148,7 @@ export default function UserCardSmall({
           </Stack>
           <Box gap="1" display="flex">
             <Stack>
-              <Text fontSize="xs" color="gray.500">
+              <Text fontSize="xs" color="fg.muted">
                 ELO {user.accountElo ?? "--"}
               </Text>
               <WinStreakIndicator value={user.winStreak ?? 0} size="sm" />
@@ -200,31 +207,37 @@ export default function UserCardSmall({
           </Stack>
           <Stack gap="2">
             {/* {user.knownAliases.length ? (
-              <Text fontSize="xs" color="gray.400">
+              <Text fontSize="xs" color="fg.muted">
                 Also known as: {user.knownAliases.join(", ")}
               </Text>
             ) : null} */}
-            <Button size="sm" onClick={handleChallenge}>
+            <Button size="sm" colorPalette={accentColor} onClick={handleChallenge}>
               Challenge player
             </Button>
             {onRpsChallenge ? (
               <Button
                 size="sm"
                 variant="outline"
+                colorPalette={accentColor}
                 onClick={handleRpsChallenge}
               >
                 Side Select Duel
               </Button>
             ) : null}
             {onViewProfile ? (
-              <Button size="sm" variant="subtle" onClick={handleViewProfile}>
+              <Button
+                size="sm"
+                variant="subtle"
+                colorPalette={accentColor}
+                onClick={handleViewProfile}
+              >
                 View profile
               </Button>
             ) : null}
             <Button
               size="sm"
-              variant={isMuted ? "solid" : "outline"}
-              colorPalette={isMuted ? "green" : "neutral"}
+              variant={isMuted ? "surface" : "outline"}
+              colorPalette={accentColor}
               onClick={handleToggleMute}
             >
               {isMuted ? "Unmute player" : "Mute player"}
