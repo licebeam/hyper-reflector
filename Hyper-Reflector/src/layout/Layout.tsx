@@ -37,7 +37,7 @@ import type { LobbySummary, TMessage } from "../state/store";
 import type { MatchSummary } from "../types/match";
 import type { TUser } from "../types/user";
 import { useTranslation } from "react-i18next";
-import bgImage from "../assets/bgImage.svg";
+import { useActiveThemeDefinition } from "../theme/hooks";
 import hrLogo from "../assets/logo.svg";
 import {
   Bell,
@@ -474,6 +474,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   const setCurrentMatches = useUserStore((s) => s.setCurrentMatches);
   const setLobbyUsers = useUserStore((s) => s.setLobbyUsers);
   const theme = useSettingsStore((s) => s.theme);
+  const activeThemeDefinition = useActiveThemeDefinition();
+  const semanticColors = activeThemeDefinition?.semanticColors;
   const notificationsMuted = useSettingsStore((s) => s.notificationsMuted);
   const setNotificationsMuted = useSettingsStore(
     (s) => s.setNotificationsMuted
@@ -490,6 +492,54 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   const winSoundPath = useSettingsStore((s) => s.winSoundPath);
   const mutedUsers = useSettingsStore((s) => s.mutedUsers);
   const accentColor = theme?.colorPalette ?? "hyperOrange";
+  const layoutBackground = useMemo(() => {
+    if (!semanticColors) {
+      return { bg: "bg.canvas" as const, bgImage: undefined as string | undefined };
+    }
+    const canvas = semanticColors.canvas ?? semanticColors.background;
+    const surface = semanticColors.surface ?? canvas;
+    const background = semanticColors.background ?? canvas;
+    const gradient = `radial-gradient(circle at top, ${surface} 0%, ${background} 80%)`;
+    return { bg: canvas ?? "bg.canvas", bgImage: gradient };
+  }, [semanticColors]);
+  const borderColorValue = semanticColors?.border ?? "border";
+  const popoverBgValue = semanticColors?.popover ?? "bg.popover";
+  const mutedBgValue = semanticColors?.muted ?? "bg.muted";
+  const popoverSurfaceStyles = useMemo(
+    () => ({
+      bg: popoverBgValue,
+      borderColor: borderColorValue,
+      borderWidth: "1px",
+      borderRadius: "xl",
+    }),
+    [popoverBgValue, borderColorValue]
+  );
+  const navPanelStyles = useMemo(
+    () => ({
+      bg: popoverBgValue,
+      borderWidth: "1px",
+      borderColor: borderColorValue,
+      borderRadius: "xl",
+      borderRightWidth: "1px",
+    }),
+    [popoverBgValue, borderColorValue]
+  );
+  const headerStyles = useMemo(
+    () => ({
+      bg: mutedBgValue,
+      borderBottom: "1px solid",
+      borderColor: borderColorValue,
+    }),
+    [mutedBgValue, borderColorValue]
+  );
+  const footerStyles = useMemo(
+    () => ({
+      bg: mutedBgValue,
+      borderColor: borderColorValue,
+    }),
+    [mutedBgValue, borderColorValue]
+  );
+  const mutedLabelColor = semanticColors?.textMuted ?? "fg.muted";
   const { t } = useTranslation();
   const {
     open: notificationsOpen,
@@ -3351,10 +3401,11 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     <>
       <Box
         display="flex"
-        bgImage={`url(${bgImage})`}
-        bgBlendMode={"color-dodge"}
+        bg={layoutBackground.bg}
+        bgImage={layoutBackground.bgImage}
+        color="fg.default"
       >
-        <Stack gap="24px" padding={"12px"} bgColor={"bg.emphasized"}>
+        <Stack gap="24px" padding={"12px"} {...navPanelStyles}>
           <Box height={"64px"} alignSelf={"center"} flex="1">
             <Image src={hrLogo} height={"64px"} />
           </Box>
@@ -3431,7 +3482,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         <Stack flex="1" height={"100vh"}>
           <Flex
             height={"48px"}
-            bgColor={"bg.muted"}
+            {...headerStyles}
             alignItems={"center"}
             px="4"
             gap="3"
@@ -3461,7 +3512,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                   aria-label={t("Layout.aria.notifications")}
                 >
                   <Float placement="bottom-end">
-                    <Circle size="5" bg="bg.muted" color="white">
+                    <Circle size="5" bg="accent.default" color="fg.on-accent">
                       <Text fontSize="xs">
                         {unreadCount > 99
                           ? t("Layout.notifications.countOverflow")
@@ -3516,7 +3567,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             flexDirection="column"
             height="calc(100vh - 120px)"
           >
-            <Box flex="1" overflowY="auto" p="4" scrollbarWidth={"thin"}>
+            <Box flex="1" overflowY="auto" p="2" scrollbarWidth={"thin"}>
               {children}
             </Box>
           </Box>
@@ -3527,6 +3578,9 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             alignItems="center"
             px="4"
             flexShrink={0}
+            bg={footerStyles.bg}
+            borderTop="1px solid"
+            borderColor={footerStyles.borderColor}
           >
             {/* These links no longer work, needs to be resolved */}
             <Box display="flex" gap="8px">
@@ -3561,7 +3615,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                   borderRadius="9999px"
                   backgroundColor={statusColor}
                 />
-                <Text textStyle="xs" color="gray.400">
+                <Text textStyle="xs" color={mutedLabelColor}>
                   {statusLabel}
                 </Text>
               </Box>
@@ -3603,7 +3657,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       >
         <Drawer.Backdrop />
         <Drawer.Positioner>
-          <Drawer.Content>
+          <Drawer.Content {...popoverSurfaceStyles} color="fg.default">
             <Drawer.CloseTrigger />
             <Drawer.Header>
               <Flex justify="space-between" align="center" gap="3">
@@ -3631,7 +3685,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                 }
               >
                 <Switch.HiddenInput />
-                <Switch.Label fontSize="sm" color="gray.400">
+                <Switch.Label fontSize="sm" color={mutedLabelColor}>
                   {t("Layout.notifications.mute")}
                 </Switch.Label>
                 <Switch.Control>
@@ -3642,7 +3696,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             <Drawer.Body>
               <VStack align="stretch">
                 {notificationEntries.length === 0 ? (
-                  <Text fontSize="sm" color="gray.500">
+                  <Text fontSize="sm" color={mutedLabelColor}>
                     {NO_NOTIFICATIONS_MESSAGE}
                   </Text>
                 ) : (
@@ -3662,7 +3716,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                         borderWidth="1px"
                         borderRadius="md"
                         padding="3"
-                        bg="bg.canvas"
+                        bg="bg.surface"
+                        borderColor="border"
                       >
                         <Flex
                           justifyContent="space-between"
@@ -3674,7 +3729,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                           >
                             {msg.userName ?? t("Layout.notifications.unknownUser")}
                           </Text>
-                          <Text fontSize="xs" color="gray.500">
+                          <Text fontSize="xs" color={mutedLabelColor}>
                             {formatTimestamp(msg.timeStamp)}
                           </Text>
                         </Flex>

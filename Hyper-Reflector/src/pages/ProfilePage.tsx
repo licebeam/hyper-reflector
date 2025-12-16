@@ -369,7 +369,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <Stack gap={8} padding={{ base: 4, md: 8 }}>
+    <Stack gap={8}>
       <Flex
         justify="space-between"
         align={{ base: "stretch", md: "center" }}
