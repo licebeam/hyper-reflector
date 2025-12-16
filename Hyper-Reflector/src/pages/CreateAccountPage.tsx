@@ -22,7 +22,7 @@ import {
 } from "obscenity";
 import { auth } from "../utils/firebase";
 import api from "../external-api/requests";
-import { useUserStore } from "../state/store";
+import { useUserStore, useSettingsStore } from "../state/store";
 
 const matcher = new RegExpMatcher({
   ...englishDataset.build(),
@@ -33,6 +33,7 @@ export default function CreateAccountPage() {
   const navigate = useNavigate();
   const setGlobalUser = useUserStore((s) => s.setGlobalUser);
   const setGlobalLoggedIn = useUserStore((s) => s.setGlobalLoggedIn);
+  const accentColor = useSettingsStore((s) => s.theme.colorPalette);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -129,7 +130,7 @@ export default function CreateAccountPage() {
       >
         <Stack gap={6}>
           <Stack gap={1}>
-            <Text fontSize="sm" color="orange.300">
+            <Text fontSize="sm" color={`${accentColor}.300`}>
               <Link to="/" className="[&.active]:font-semibold">
                 Back to sign in
               </Link>
@@ -200,7 +201,7 @@ export default function CreateAccountPage() {
           </Stack>
 
           <Button
-            colorScheme="orange"
+            colorPalette={accentColor}
             size="lg"
             onClick={createAccount}
             loading={isLoading}

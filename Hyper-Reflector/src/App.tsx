@@ -9,7 +9,6 @@ import {
 import './i18n'
 import { ChakraProvider, Box } from '@chakra-ui/react'
 import { ColorModeProvider } from './components/chakra/ui/color-mode'
-import theme from './theme'
 // import ErrorBoundary from './ErrorBoundary'
 import Layout from './layout/Layout'
 import { Toaster } from './components/chakra/ui/toaster'
@@ -20,7 +19,7 @@ import HomePage from './pages/HomePage'
 import SettingsPage from './pages/SettingsPage'
 import LobbyPage from './pages/LobbyPage'
 import LabPage from './pages/LabPage'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useSettingsStore } from './state/store'
 import { useTranslation } from 'react-i18next'
 import ProfilePage from './pages/ProfilePage'
@@ -33,6 +32,8 @@ import {
     ensureDefaultTrainingPath,
     ensureDefaultWinSound,
 } from './utils/pathSettings'
+import { useActiveThemeDefinition } from './theme/hooks'
+import { createChakraThemeFromDefinition } from './theme/factory'
 
 const rootRoute = createRootRoute({
     component: () => (
@@ -166,9 +167,12 @@ function App() {
         void ensureDefaultWinSound(emulatorPathSetting)
     }, [emulatorPathSetting])
 
+    const activeThemeDefinition = useActiveThemeDefinition()
+    const chakraTheme = useMemo(() => createChakraThemeFromDefinition(activeThemeDefinition), [activeThemeDefinition])
+
     return (
         <main className="container">
-            <ChakraProvider value={theme}>
+            <ChakraProvider value={chakraTheme}>
                 <ColorModeProvider>
                     <Box>
                         <RouterProvider router={router} />

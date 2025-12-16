@@ -489,7 +489,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   const winSoundEnabled = useSettingsStore((s) => s.winSound);
   const winSoundPath = useSettingsStore((s) => s.winSoundPath);
   const mutedUsers = useSettingsStore((s) => s.mutedUsers);
-  const accentColor = theme?.colorPalette ?? "orange";
+  const accentColor = theme?.colorPalette ?? "hyperOrange";
   const { t } = useTranslation();
   const {
     open: notificationsOpen,

@@ -18,13 +18,14 @@ import type { FirebaseError } from "firebase/app";
 import { auth, loginEmail, loginGoogle } from "../utils/firebase";
 import api from "../external-api/requests";
 import type { TUser } from "../types/user";
-import { useUserStore } from "../state/store";
+import { useUserStore, useSettingsStore } from "../state/store";
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const globalLoggedIn = useUserStore((s) => s.globalLoggedIn);
   const setGlobalUser = useUserStore((s) => s.setGlobalUser);
   const setGlobalLoggedIn = useUserStore((s) => s.setGlobalLoggedIn);
+  const accentColor = useSettingsStore((s) => s.theme.colorPalette);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionUser, setSessionUser] = useState<TUser | undefined>();
   const [authError, setAuthError] = useState<string | null>(null);
@@ -183,7 +184,7 @@ export default function LoginPage() {
                 />
               </Field>
               <Button
-                colorScheme="orange"
+                colorPalette={accentColor}
                 size="lg"
                 onClick={loginEmailHelper}
                 disabled={
@@ -216,7 +217,7 @@ export default function LoginPage() {
                   started.
                 </AlertDescription>
               </AlertRoot>
-              <Button colorScheme="orange" onClick={() => navigate({ to: "/lobby" })}>
+              <Button colorPalette={accentColor} onClick={() => navigate({ to: "/lobby" })}>
                 Go to dashboard
               </Button>
             </Stack>
@@ -226,7 +227,7 @@ export default function LoginPage() {
           <Text fontSize="sm" color="whiteAlpha.700" textAlign="center">
             Need an account?{" "}
             <Link to="/create" className="[&.active]:font-semibold">
-              <Text as="span" color="orange.300" fontWeight="semibold">
+              <Text as="span" color={`${accentColor}.300`} fontWeight="semibold">
                 Create one now
               </Text>
             </Link>

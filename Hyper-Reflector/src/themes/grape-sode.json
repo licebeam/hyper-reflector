@@ -1,0 +1,56 @@
+{
+  "id": "grape",
+  "name": "Grape Soda",
+  "description": "Grape",
+  "mode": "dark",
+  "accentPalette": {
+    "name": "holoViolet",
+    "colors": {
+      "50": "#f5e9ff",
+      "100": "#ead3ff",
+      "200": "#d6a8ff",
+      "300": "#c17eff",
+      "400": "#ac55ff",
+      "500": "#9730ff",
+      "600": "#7a0edb",
+      "700": "#5d0aa8",
+      "800": "#3e086f",
+      "900": "#200338"
+    }
+  },
+  "neutralPalette": {
+    "name": "holoCarbon",
+    "colors": {
+      "50": "#f4fbfb",
+      "100": "#d7f3f4",
+      "200": "#aee4e9",
+      "300": "#7dd1da",
+      "400": "#54b9c7",
+      "500": "#399dae",
+      "600": "#287a8c",
+      "700": "#1c5965",
+      "800": "#113640",
+      "900": "#071a1f"
+    }
+  },
+  "semanticColors": {
+    "background": "#030615",
+    "canvas": "#05091f",
+    "muted": "#09122c",
+    "emphasized": "#0f1d3f",
+    "surface": "#162654",
+    "border": "#1f2f66",
+    "card": "#101a3a",
+    "popover": "#0b1329",
+    "overlay": "#01020a",
+    "text": "#fdf4ff",
+    "textMuted": "#cdbaf7",
+    "heading": "#f4faff",
+    "primary": "#9730ff",
+    "secondary": "#3dd5ff",
+    "success": "#34d399",
+    "warning": "#fde047",
+    "danger": "#fb7185",
+    "info": "#7dd3fc"
+  }
+}

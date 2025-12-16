@@ -17,7 +17,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Search, ArrowRight, Award, Trophy, RefreshCcw } from "lucide-react";
 import { auth } from "../utils/firebase";
 import api from "../external-api/requests";
-import { useUserStore } from "../state/store";
+import { useUserStore, useSettingsStore } from "../state/store";
 import TitleBadge from "../components/TitleBadge";
 import WinStreakIndicator from "../components/WinStreakIndicator";
 import type { TUser } from "../types/user";
@@ -62,6 +62,7 @@ export default function ProfilePage() {
     elo: INITIAL_LEADERBOARD_STATE,
     wins: INITIAL_LEADERBOARD_STATE,
   });
+  const accentColor = useSettingsStore((s) => s.theme.colorPalette);
 
   const isAuthenticated = Boolean(globalUser && auth.currentUser);
   const trimmedTerm = useMemo(() => searchTerm.trim(), [searchTerm]);
@@ -182,7 +183,7 @@ export default function ProfilePage() {
           Sign in to browse player profiles, leaderboards, and personalize your
           own stats page.
         </Text>
-        <Button colorPalette="orange" onClick={() => navigate({ to: "/" })}>
+        <Button colorPalette={accentColor} onClick={() => navigate({ to: "/" })}>
           Go to sign in
         </Button>
       </Stack>
@@ -234,7 +235,7 @@ export default function ProfilePage() {
               </Box>
               <Button
                 variant="ghost"
-                colorPalette="orange"
+                colorPalette={accentColor}
                 onClick={() => handleViewProfile(user.uid)}
               >
                 <Flex align="center" gap="2">
@@ -384,7 +385,7 @@ export default function ProfilePage() {
         </Stack>
         {globalUser?.uid ? (
           <Button
-            colorPalette="orange"
+            colorPalette={accentColor}
             onClick={() => handleViewProfile(globalUser.uid)}
           >
             <Flex align="center" gap="2">

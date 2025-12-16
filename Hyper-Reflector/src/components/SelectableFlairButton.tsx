@@ -2,6 +2,7 @@ import { Button, Flex, Text } from "@chakra-ui/react";
 import TitleBadge from "./TitleBadge";
 import { Check } from "lucide-react";
 import type { TUserTitle } from "../types/user";
+import { useSettingsStore } from "../state/store";
 
 type SelectableFlairButtonProps = {
   flair: TUserTitle;
@@ -16,10 +17,12 @@ export default function SelectableFlairButton({
   isActive,
   onClick,
 }: SelectableFlairButtonProps) {
+  const accentColor = useSettingsStore((s) => s.theme.colorPalette);
+
   return (
     <Button
       variant={isActive ? "solid" : "outline"}
-      colorPalette={isActive ? "orange" : undefined}
+      colorPalette={isActive ? accentColor : undefined}
       justifyContent="space-between"
       size="sm"
       onClick={onClick}

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogRoot,
 } from "../components/chakra/ui/dialog";
+import { useSettingsStore } from "../state/store";
 
 const INVITE_WINDOW_SECONDS = 30;
 const CHOICE_WINDOW_SECONDS = 10;
@@ -36,6 +37,7 @@ export default function MiniGameArena({
   sideSelectionPending,
 }: MiniGameArenaProps) {
   const [countdown, setCountdown] = useState(0);
+  const accentColor = useSettingsStore((s) => s.theme.colorPalette);
 
   useEffect(() => {
     if (!state) return;
@@ -173,7 +175,7 @@ export default function MiniGameArena({
       open={Boolean(state)}
       onOpenChange={(details) => !details.open && onClose()}
     >
-      <DialogContent bg="gray.900" color="white" maxW="560px">
+      <DialogContent bg="bg.emphasized" color="fg.default" maxW="560px">
         <DialogHeader>
           <Flex align="center" gap="2">
             {hasResult ? <Trophy size={20} /> : null}
@@ -183,16 +185,16 @@ export default function MiniGameArena({
         <DialogBody>
           {!hasResult || !result ? (
             <Stack gap="4">
-              <Box bg="gray.700" borderRadius="full" h="2">
+              <Box bg="bg.muted" borderRadius="full" h="2">
                 <Box
-                  bg="orange.400"
+                  bg={`${accentColor}.400`}
                   h="100%"
                   borderRadius="full"
                   transition="width 0.2s linear"
                   width={`${progressPercent}%`}
                 />
               </Box>
-              <Text textAlign="center" fontSize="sm" color="gray.300">
+              <Text textAlign="center" fontSize="sm" color="fg.muted">
                 {awaitingActivation
                   ? state.isInitiator
                     ? `Waiting for ${
@@ -255,7 +257,7 @@ export default function MiniGameArena({
               </Text>
               <Flex w="100%" justify="space-between" gap="3">
                 <Button
-                  colorPalette="orange"
+                  colorPalette={accentColor}
                   flex="1"
                   loading={sideSelectionPending}
                   onClick={() => onChooseSide?.("player1")}
@@ -263,7 +265,8 @@ export default function MiniGameArena({
                   Claim Player 1
                 </Button>
                 <Button
-                  colorPalette="purple"
+                  colorPalette={accentColor}
+                  variant="outline"
                   flex="1"
                   loading={sideSelectionPending}
                   onClick={() => onChooseSide?.("player2")}
@@ -294,11 +297,13 @@ function OptionCard({
   isDisabled: boolean;
   onSelect: () => void;
 }) {
+  const accentColor = useSettingsStore((s) => s.theme.colorPalette);
+
   return (
     <Button
       flex="1"
       variant={isSelected ? "solid" : "outline"}
-      colorPalette={isSelected ? "orange" : "gray"}
+      colorPalette={isSelected ? accentColor : "gray"}
       onClick={onSelect}
       disabled={isDisabled}
       display="flex"

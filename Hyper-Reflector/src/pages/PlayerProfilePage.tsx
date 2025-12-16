@@ -39,7 +39,7 @@ import {
 } from "recharts";
 import { auth } from "../utils/firebase";
 import api from "../external-api/requests";
-import { useUserStore } from "../state/store";
+import { useUserStore, useSettingsStore } from "../state/store";
 import TitleBadge from "../components/TitleBadge";
 import WinStreakIndicator from "../components/WinStreakIndicator";
 import SelectableFlairButton from "../components/SelectableFlairButton";
@@ -165,6 +165,7 @@ export default function PlayerProfilePage() {
   const globalUser = useUserStore((s) => s.globalUser);
   const setGlobalUser = useUserStore((s) => s.setGlobalUser);
   const setLobbyUsers = useUserStore((s) => s.setLobbyUsers);
+  const accentColor = useSettingsStore((s) => s.theme.colorPalette);
   const navigate = useNavigate();
   const profileUid = requestedUserId || globalUser?.uid || null;
   const isSelf = Boolean(profileUid && profileUid === globalUser?.uid);
@@ -592,7 +593,7 @@ export default function PlayerProfilePage() {
                       </Stack>
                     </Box>
                     <Button
-                      colorPalette="orange"
+                      colorPalette={accentColor}
                       onClick={saveProfileChanges}
                       loading={saving}
                     >
@@ -802,7 +803,7 @@ export default function PlayerProfilePage() {
               Close
             </Button>
             <Button
-              colorPalette="orange"
+              colorPalette={accentColor}
               onClick={() => setTitleDrawerOpen(false)}
             >
               Use selected flair
