@@ -174,13 +174,13 @@ export default function UserCardSmall({
                   >
                     <Text
                       fontSize="xs"
-                      color={pingInfo.isUnstable ? "orange.300" : "gray.400"}
+                      color={pingInfo.isUnstable ? "warning" : "fg.muted"}
                     >
                       {pingLabel}
                     </Text>
                   </Tooltip>
                 ) : (
-                  <Text fontSize="xs" color="gray.600">
+                  <Text fontSize="xs" color="fg.muted">
                     Ping unknown
                   </Text>
                 )}
@@ -193,7 +193,7 @@ export default function UserCardSmall({
         <Box paddingX="3" paddingBottom="3">
           <Stack gap="0">
             {preferenceLabel ? (
-              <Text fontSize="xs" color="orange.300">
+              <Text fontSize="xs" color="accent.muted">
                 Side lock: {preferenceLabel}
               </Text>
             ) : null}
@@ -204,13 +204,12 @@ export default function UserCardSmall({
                 Also known as: {user.knownAliases.join(", ")}
               </Text>
             ) : null} */}
-            <Button size="sm" colorPalette="orange" onClick={handleChallenge}>
+            <Button size="sm" onClick={handleChallenge}>
               Challenge player
             </Button>
             {onRpsChallenge ? (
               <Button
                 size="sm"
-                colorPalette="purple"
                 variant="outline"
                 onClick={handleRpsChallenge}
               >

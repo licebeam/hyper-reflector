@@ -21,6 +21,8 @@ import { Check, Moon, Play, Square, Sun, Volume2, VolumeX, X, LogOut } from 'luc
 import { toaster } from '../components/chakra/ui/toaster'
 import { useTauriSoundPlayer } from '../utils/useTauriSoundPlayer'
 import { applyRomPath, formatRomPathDisplay } from '../utils/romPaths'
+import { themeRegistry } from '../theme/registry'
+import { toThemePreference } from '../theme/utils'
 
 const MARGIN_SECTION = '12px'
 
@@ -53,20 +55,16 @@ export default function SettingsPage() {
     const romPath = useSettingsStore((s) => s.romPath)
     const setRomPath = useSettingsStore((s) => s.setRomPath)
     const { playSound: playSoundFile } = useTauriSoundPlayer()
+    const accentColor =
+        theme.colorPalette || themeRegistry[0]?.accentPalette.name || 'hyperOrange'
+    const selectedThemeId = theme.id || themeRegistry[0]?.id || 'hyper-dark'
 
     const themes = createListCollection({
-        items: [
-            {
-                label: 'Orange Soda',
-                value: 'Orange Soda',
-                data: { colorPalette: 'orange', name: 'Orange Soda' },
-            },
-            {
-                label: 'Grape Soda',
-                value: 'Grape Soda',
-                data: { colorPalette: 'purple', name: 'Grape Soda' },
-            },
-        ],
+        items: themeRegistry.map((definition) => ({
+            label: definition.name,
+            value: definition.id,
+            data: toThemePreference(definition),
+        })),
     })
 
     const delays = createListCollection({
@@ -207,7 +205,7 @@ export default function SettingsPage() {
                     <Card.Title>{t('Settings.GGPO.title')}</Card.Title>
                     <Card.Description>{t('Settings.GGPO.desc')}</Card.Description>
                     <Select.Root
-                        colorPalette={theme.colorPalette}
+                        colorPalette={accentColor}
                         marginTop={MARGIN_SECTION}
                         maxW="1/2"
                         key={'test'}
@@ -245,7 +243,7 @@ export default function SettingsPage() {
                 <Card.Body gap="2">
                     <Card.Title>{t('Settings.Language.title')}</Card.Title>
                     <Select.Root
-                        colorPalette={theme.colorPalette}
+                        colorPalette={accentColor}
                         marginTop={MARGIN_SECTION}
                         maxW="1/2"
                         key={'test'}
@@ -288,7 +286,7 @@ export default function SettingsPage() {
                     <Card.Title>{t('Settings.Notification.title')}</Card.Title>
                     <Card.Description>{t('Settings.Notification.desc')}</Card.Description>
                     <Switch.Root
-                        colorPalette={theme.colorPalette}
+                        colorPalette={accentColor}
                         marginTop={MARGIN_SECTION}
                         size="lg"
                         checked={notifChallengeSound}
@@ -309,14 +307,14 @@ export default function SettingsPage() {
                         <Text textStyle="xs">{notifChallengeSoundPath}</Text>
                         <Box gap="2" display={'flex'}>
                             <Button
-                                colorPalette={theme.colorPalette}
+                                colorPalette={accentColor}
                                 maxW="1/2"
                                 onClick={() => pickSoundFile('challenge')}
                             >
                                 {t('Settings.Notification.setCustomChallenge')}
                             </Button>
                             <IconButton
-                                colorPalette={theme.colorPalette}
+                                colorPalette={accentColor}
                                 colorScheme="blue"
                                 onClick={() => {
                                     playSound('challenge')
@@ -325,7 +323,7 @@ export default function SettingsPage() {
                                 <Play />
                             </IconButton>
                             <IconButton
-                                colorPalette={theme.colorPalette}
+                                colorPalette={accentColor}
                                 colorScheme="blue"
                                 onClick={() => {
                                     pauseSound()
@@ -336,7 +334,7 @@ export default function SettingsPage() {
                         </Box>
                     </Stack>
                     <Switch.Root
-                        colorPalette={theme.colorPalette}
+                        colorPalette={accentColor}
                         marginTop={MARGIN_SECTION}
                         size="lg"
                         checked={notifiAtSound}
@@ -357,14 +355,14 @@ export default function SettingsPage() {
                         <Text textStyle="xs">{notifAtSoundPath}</Text>
                         <Box gap="2" display={'flex'}>
                             <Button
-                                colorPalette={theme.colorPalette}
+                                colorPalette={accentColor}
                                 maxW="1/2"
                                 onClick={() => pickSoundFile('at')}
                             >
                                 {t('Settings.Notification.setCustomMessage')}
                             </Button>
                             <IconButton
-                                colorPalette={theme.colorPalette}
+                                colorPalette={accentColor}
                                 colorScheme="blue"
                                 onClick={() => {
                                     playSound('at')
@@ -373,7 +371,7 @@ export default function SettingsPage() {
                                 <Play />
                             </IconButton>
                             <IconButton
-                                colorPalette={theme.colorPalette}
+                                colorPalette={accentColor}
                                 colorScheme="blue"
                                 onClick={() => {
                                     pauseSound()
@@ -384,7 +382,7 @@ export default function SettingsPage() {
                         </Box>
                     </Stack>
                     <Switch.Root
-                        colorPalette={theme.colorPalette}
+                        colorPalette={accentColor}
                         marginTop={MARGIN_SECTION}
                         size="lg"
                         checked={winSound}
@@ -405,21 +403,21 @@ export default function SettingsPage() {
                         <Text textStyle="xs">{winSoundPath}</Text>
                         <Box gap="2" display="flex">
                             <Button
-                                colorPalette={theme.colorPalette}
+                                colorPalette={accentColor}
                                 maxW="1/2"
                                 onClick={() => pickSoundFile('win')}
                             >
                                 {t('Settings.Notification.setCustomWin')}
                             </Button>
                             <IconButton
-                                colorPalette={theme.colorPalette}
+                                colorPalette={accentColor}
                                 colorScheme="blue"
                                 onClick={() => playSound('win')}
                             >
                                 <Play />
                             </IconButton>
                             <IconButton
-                                colorPalette={theme.colorPalette}
+                                colorPalette={accentColor}
                                 colorScheme="blue"
                                 onClick={() => pauseSound()}
                             >
@@ -434,7 +432,7 @@ export default function SettingsPage() {
                     <Card.Title>{t('Settings.Theme.title')}</Card.Title>
                     <Card.Description>{t('Settings.Theme.desc')}</Card.Description>
                     <Switch.Root
-                        colorPalette={theme.colorPalette}
+                        colorPalette={accentColor}
                         marginTop={MARGIN_SECTION}
                         maxW="1/2"
                         size="lg"
@@ -458,13 +456,13 @@ export default function SettingsPage() {
                         <Switch.Label>{t('Settings.Theme.darkMode')}</Switch.Label>
                     </Switch.Root>
                     <Select.Root
-                        colorPalette={theme.colorPalette}
+                        colorPalette={accentColor}
                         marginTop={MARGIN_SECTION}
                         maxW="1/2"
                         key={'test'}
                         variant={'outline'}
                         collection={themes}
-                        value={[theme.name]}
+                        value={[selectedThemeId]}
                         onValueChange={(e) => {
                             setTheme(e.items[0].data)
                         }}
@@ -509,7 +507,7 @@ export default function SettingsPage() {
                     </Button>
                     <Text textStyle="xs">{romPath}</Text>
                     <Button
-                        colorPalette={theme.colorPalette}
+                        colorPalette={accentColor}
                         marginTop={MARGIN_SECTION}
                         maxW="1/2"
                         onClick={pickRomDirectory}
