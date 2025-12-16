@@ -27,6 +27,7 @@ import {
   Float,
   Circle,
 } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import {
   DEFAULT_LOBBY_ID,
   useMessageStore,
@@ -38,6 +39,7 @@ import type { MatchSummary } from "../types/match";
 import type { TUser } from "../types/user";
 import { useTranslation } from "react-i18next";
 import { useActiveThemeDefinition } from "../theme/hooks";
+import bgImage from "../assets/bgImage.svg";
 import hrLogo from "../assets/logo.svg";
 import {
   Bell,
@@ -492,16 +494,33 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   const winSoundPath = useSettingsStore((s) => s.winSoundPath);
   const mutedUsers = useSettingsStore((s) => s.mutedUsers);
   const accentColor = theme?.colorPalette ?? "hyperOrange";
+  const withAlpha = useCallback((color: string | undefined, alpha: number) => {
+    if (!color) {
+      return `rgba(0,0,0,${alpha})`;
+    }
+    const hex = color.replace("#", "");
+    if (hex.length === 3) {
+      const [r, g, b] = hex.split("").map((ch) => parseInt(ch + ch, 16));
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    return color;
+  }, []);
   const layoutBackground = useMemo(() => {
     if (!semanticColors) {
-      return { bg: "bg.canvas" as const, bgImage: undefined as string | undefined };
+      return { bg: "bg.canvas" as const, overlay: undefined as string | undefined };
     }
     const canvas = semanticColors.canvas ?? semanticColors.background;
-    const surface = semanticColors.surface ?? canvas;
-    const background = semanticColors.background ?? canvas;
-    const gradient = `radial-gradient(circle at top, ${surface} 0%, ${background} 80%)`;
-    return { bg: canvas ?? "bg.canvas", bgImage: gradient };
-  }, [semanticColors]);
+    const surface = withAlpha(semanticColors.surface ?? canvas, 0.7);
+    const background = withAlpha(semanticColors.background ?? canvas, 0.95);
+    const overlay = `radial-gradient(circle at top, ${surface} 0%, ${background} 80%)`;
+    return { bg: canvas ?? "bg.canvas", overlay };
+  }, [semanticColors, withAlpha]);
   const borderColorValue = semanticColors?.border ?? "border";
   const popoverBgValue = semanticColors?.popover ?? "bg.popover";
   const mutedBgValue = semanticColors?.muted ?? "bg.muted";
@@ -540,6 +559,20 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     [mutedBgValue, borderColorValue]
   );
   const mutedLabelColor = semanticColors?.textMuted ?? "fg.muted";
+  const scrollBackgroundAnimation = useMemo(
+    () =>
+      keyframes`
+        from { background-position: center center, 0 0; }
+        to { background-position: center center, -800px 800px; }
+      `,
+    []
+  );
+  const backgroundImageValue = useMemo(() => {
+    if (layoutBackground.overlay) {
+      return `${layoutBackground.overlay}, url(${bgImage})`;
+    }
+    return `url(${bgImage})`;
+  }, [layoutBackground.overlay]);
   const { t } = useTranslation();
   const {
     open: notificationsOpen,
@@ -3402,8 +3435,12 @@ export default function Layout({ children }: { children: ReactElement[] }) {
       <Box
         display="flex"
         bg={layoutBackground.bg}
-        bgImage={layoutBackground.bgImage}
+        bgImage={backgroundImageValue}
+        bgRepeat={layoutBackground.overlay ? "no-repeat, repeat" : "repeat"}
+        bgSize={layoutBackground.overlay ? "cover, 300% auto" : "300% auto"}
         color="fg.default"
+        bgPosition={layoutBackground.overlay ? "center center, 0 0" : "0 0"}
+        animation={`${scrollBackgroundAnimation} 60s linear infinite`}
       >
         <Stack gap="24px" padding={"12px"} {...navPanelStyles}>
           <Box height={"64px"} alignSelf={"center"} flex="1">
