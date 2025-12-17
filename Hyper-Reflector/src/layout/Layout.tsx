@@ -11,22 +11,7 @@ import { listen } from "@tauri-apps/api/event";
 //@ts-ignore // keys exists
 import keys from "../private/keys";
 import { useNavigate } from "@tanstack/react-router";
-import {
-  Box,
-  Stack,
-  IconButton,
-  Image,
-  Text,
-  Flex,
-  Drawer,
-  useDisclosure,
-  VStack,
-  HStack,
-  Button,
-  Switch,
-  Float,
-  Circle,
-} from "@chakra-ui/react";
+import { Box, Stack, useDisclosure } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import {
   DEFAULT_LOBBY_ID,
@@ -40,20 +25,11 @@ import type { TUser } from "../types/user";
 import { useTranslation } from "react-i18next";
 import { useActiveThemeDefinition } from "../theme/hooks";
 import bgImage from "../assets/bgImage.svg";
-import hrLogo from "../assets/logo.svg";
-import {
-  Bell,
-  BellOff,
-  FlaskConical,
-  LucideHome,
-  MessageCircle,
-  Settings,
-  ShieldHalf,
-  Swords,
-  UserRound,
-} from "lucide-react";
-import UserCard from "../components/UserCard/UserCard";
 import { LobbyManagerDialog } from "./components/LobbyManagerDialog";
+import { NavigationRail } from "./components/NavigationRail";
+import { HeaderBar } from "./components/HeaderBar";
+import { FooterBar } from "./components/FooterBar";
+import { NotificationsDrawer } from "./components/NotificationsDrawer";
 import { useTauriSoundPlayer } from "../utils/useTauriSoundPlayer";
 import { buildMentionRegexes } from "../utils/chatFormatting";
 import { toaster } from "../components/chakra/ui/toaster";
@@ -79,17 +55,12 @@ import {
   MOCK_CHAT_LINES,
   normalizeSocketUser,
 } from "./helpers/mockUsers";
-import { formatTimestamp } from "./helpers/time";
 import { STATUS_COLOR_MAP, STATUS_LABEL_MAP } from "./helpers/status";
 import {
   AUTO_DECLINE_RESPONDER,
   AUTO_RESOLVE_RESPONDER,
-  CHALLENGE_ACCEPT_LABEL,
-  CHALLENGE_DECLINE_LABEL,
   LOBBY_NAME_MAX_LENGTH,
   LOBBY_NAME_MIN_LENGTH,
-  NOTIFICATIONS_TITLE,
-  NO_NOTIFICATIONS_MESSAGE,
 } from "./helpers/constants";
 
 import {
@@ -122,6 +93,15 @@ import {
 import { parseMatchData } from "../utils/matchParser";
 import { isTauriEnv } from "../utils/pathSettings";
 import { peerLatencyManager } from "../webRTC/peerLatencyManager";
+import {
+  buildCondensedMatchPayload,
+  buildDebugMockMatches,
+  formatMiniGameChoice,
+  normalizeMatchSummary,
+  randomMiniGameChoice,
+  resolveMockDisplayName,
+} from "./helpers/matchUtils";
+import type { NotificationEntry } from "./types";
 
 const DEV_MATCH_ID = "dev-matches-and-bugs";
 
@@ -133,303 +113,6 @@ const lobbyNameMatcher = new RegExpMatcher({
 const DEFAULT_RPS_ELO = 1200;
 const MOCK_RPS_ELO_DELTA = 15;
 
-function resolveMockDisplayName(
-  uid?: string | null,
-  fallback = "Mock Opponent"
-) {
-  if (!uid) return fallback;
-  if (uid === MOCK_CHALLENGE_USER.uid) return MOCK_CHALLENGE_USER.userName;
-  if (uid === MOCK_CHALLENGE_USER_TWO.uid)
-    return MOCK_CHALLENGE_USER_TWO.userName;
-  return fallback;
-}
-
-const formatMiniGameChoice = (choice?: MiniGameChoice | null) => {
-  if (!choice) return "—";
-  return choice.charAt(0).toUpperCase() + choice.slice(1);
-};
-
-const MINI_GAME_CHOICES: MiniGameChoice[] = ["rock", "paper", "scissors"];
-const randomMiniGameChoice = (): MiniGameChoice =>
-  MINI_GAME_CHOICES[Math.floor(Math.random() * MINI_GAME_CHOICES.length)];
-
-const createDebugPlayer = (
-  uid: string,
-  userName: string,
-  countryCode: string,
-  accountElo: number,
-  title: string
-): TUser => ({
-  uid,
-  userName,
-  accountElo,
-  countryCode,
-  gravEmail: "",
-  knownAliases: [],
-  pingLat: undefined,
-  pingLon: undefined,
-  userEmail: `${uid}@mock.local`,
-  userProfilePic: "",
-  userTitle: { ...FALLBACK_USER_TITLE, title },
-  role: "user",
-  winStreak: 0,
-  rpsElo: 1200,
-  sidePreferences: {},
-});
-
-const DEBUG_MATCH_PLAYER_PROFILES: TUser[] = [
-  MOCK_CHALLENGE_USER,
-  MOCK_CHALLENGE_USER_TWO,
-  createDebugPlayer("mock-apollo", "Apollo Bot", "BR", 1780, "Solar Ace"),
-  createDebugPlayer("mock-luna", "Luna Bot", "CA", 1650, "Moonlit Duelist"),
-  createDebugPlayer("mock-rico", "Rico Bot", "MX", 1820, "Border King"),
-  createDebugPlayer("mock-sora", "Sora Bot", "JP", 1900, "Wind Walker"),
-  createDebugPlayer("mock-iris", "Iris Bot", "FR", 1725, "Arcane Bloom"),
-];
-
-const DEBUG_MATCH_BLUEPRINTS: Array<{
-  id: string;
-  gameName: string;
-  players: Array<{ uid: string; playerSlot: 0 | 1 }>;
-}> = [
-  {
-    id: `${DEBUG_MOCK_MATCH_ID}-alpha`,
-    gameName: "Training Match",
-    players: [
-      { uid: "mock-opponent", playerSlot: 0 },
-      { uid: "mock-opponent-2", playerSlot: 1 },
-    ],
-  },
-  {
-    id: `${DEBUG_MOCK_MATCH_ID}-beta`,
-    gameName: "First to 5",
-    players: [
-      { uid: "mock-apollo", playerSlot: 0 },
-      { uid: "mock-luna", playerSlot: 1 },
-    ],
-  },
-  {
-    id: `${DEBUG_MOCK_MATCH_ID}-gamma`,
-    gameName: "Gauntlet Prep",
-    players: [
-      { uid: "mock-rico", playerSlot: 0 },
-      { uid: "mock-sora", playerSlot: 1 },
-    ],
-  },
-  {
-    id: `${DEBUG_MOCK_MATCH_ID}-delta`,
-    gameName: "Arcade Classics",
-    players: [
-      { uid: "mock-iris", playerSlot: 0 },
-      { uid: "mock-apollo", playerSlot: 1 },
-    ],
-  },
-  {
-    id: `${DEBUG_MOCK_MATCH_ID}-epsilon`,
-    gameName: "Lunch Break Sets",
-    players: [
-      { uid: "mock-luna", playerSlot: 0 },
-      { uid: "mock-rico", playerSlot: 1 },
-    ],
-  },
-];
-
-const normalizeMatchSummary = (raw: any): MatchSummary | null => {
-  if (!raw || typeof raw !== "object") return null;
-  const id = typeof raw.id === "string" ? raw.id : undefined;
-  if (!id) return null;
-  const lobbyId =
-    typeof raw.lobbyId === "string" && raw.lobbyId.length
-      ? raw.lobbyId
-      : DEFAULT_LOBBY_ID;
-  const startedAt =
-    typeof raw.startedAt === "number" ? raw.startedAt : Date.now();
-  const gameName =
-    typeof raw.gameName === "string" || raw.gameName === null
-      ? raw.gameName
-      : undefined;
-  const players = Array.isArray(raw.players)
-    ? raw.players
-        .map((player: any) => {
-          if (!player || typeof player !== "object") return null;
-          const uid = typeof player.uid === "string" ? player.uid : undefined;
-          if (!uid) return null;
-          const slot =
-            player.playerSlot === 1 || player.playerSlot === "1" ? 1 : 0;
-          return {
-            uid,
-            playerSlot: slot as 0 | 1,
-            userName:
-              typeof player.userName === "string" ? player.userName : undefined,
-            userProfilePic:
-              typeof player.userProfilePic === "string"
-                ? player.userProfilePic
-                : undefined,
-            countryCode:
-              typeof player.countryCode === "string"
-                ? player.countryCode
-                : undefined,
-            userTitle: player.userTitle,
-            accountElo:
-              typeof player.accountElo === "number"
-                ? player.accountElo
-                : undefined,
-          };
-        })
-        .filter(
-          (
-            entry: MatchSummary["players"][number] | null
-          ): entry is MatchSummary["players"][number] => Boolean(entry)
-        )
-    : [];
-  return {
-    id,
-    lobbyId,
-    startedAt,
-    gameName,
-    players,
-  };
-};
-
-const buildMockMatchPlayer = (
-  source: TUser,
-  playerSlot: 0 | 1
-): MatchSummary["players"][number] => ({
-  uid: source.uid,
-  userName: source.userName,
-  userProfilePic: source.userProfilePic,
-  countryCode: source.countryCode,
-  userTitle: source.userTitle,
-  accountElo: source.accountElo,
-  playerSlot,
-});
-
-const findDebugMatchPlayer = (uid: string): TUser => {
-  const candidate = DEBUG_MATCH_PLAYER_PROFILES.find(
-    (player) => player.uid === uid
-  );
-  return candidate ?? MOCK_CHALLENGE_USER;
-};
-
-const buildDebugMockMatches = (lobbyId: string): MatchSummary[] => {
-  const now = Date.now();
-  return DEBUG_MATCH_BLUEPRINTS.map((blueprint, index) => ({
-    id: blueprint.id,
-    lobbyId,
-    startedAt: now - index * 90_000,
-    gameName: blueprint.gameName,
-    players: blueprint.players.map(({ uid, playerSlot }) =>
-      buildMockMatchPlayer(findDebugMatchPlayer(uid), playerSlot)
-    ),
-  }));
-};
-
-const MAX_METER_EVENTS = 200;
-const MAX_RAW_PAYLOAD_LENGTH = 450_000;
-
-function coerceBooleanFlag(value: unknown): boolean | undefined {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) return undefined;
-    return value !== 0;
-  }
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    if (!normalized.length) return undefined;
-    return normalized === "true" || normalized === "1";
-  }
-  return undefined;
-}
-
-const coerceNumber = (value: unknown): number | undefined => {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : undefined;
-  }
-  return undefined;
-};
-
-const coerceString = (value: unknown): string | undefined => {
-  if (typeof value === "string" && value.trim().length) {
-    return value.trim();
-  }
-  if (typeof value === "number") {
-    return String(value);
-  }
-  return undefined;
-};
-
-const limitArray = (value: unknown, limit = MAX_METER_EVENTS) => {
-  if (!Array.isArray(value)) return [];
-  const mapped = value
-    .map((entry) => coerceNumber(entry))
-    .filter((entry): entry is number => typeof entry === "number");
-  if (mapped.length <= limit) return mapped;
-  return mapped.slice(mapped.length - limit);
-};
-
-const buildCondensedMatchPayload = (source: Record<string, unknown>) => {
-  const matchUuid = coerceString(source["match-uuid"]);
-  const createdAt = coerceNumber(source["created-at"]) ?? Date.now();
-  const explicitP1Win = coerceBooleanFlag(source["p1-win"]);
-  const explicitP2Win = coerceBooleanFlag(source["p2-win"]);
-
-  let resolvedWinner: "player1" | "player2";
-  if (explicitP1Win === true) {
-    resolvedWinner = "player1";
-  } else if (explicitP2Win === true) {
-    resolvedWinner = "player2";
-  } else {
-    const fallbackWinner =
-      coerceString(source["winner"]) ||
-      (coerceBooleanFlag(source["p1-win"]) ? "player1" : "player2");
-    resolvedWinner = fallbackWinner === "player2" ? "player2" : "player1";
-  }
-
-  const p1WinFinal = resolvedWinner === "player1";
-  const p2WinFinal = !p1WinFinal;
-
-  const safeNumber = (value: unknown) => coerceNumber(value) ?? 0;
-
-  return {
-    matchUuid,
-    createdAt,
-    winner: resolvedWinner,
-    "p1-win": p1WinFinal,
-    "p2-win": p2WinFinal,
-    // legacy keys to keep backend parser happy
-    "player1-char": safeNumber(source["player1-char"]),
-    "player2-char": safeNumber(source["player2-char"]),
-    "player1-super": safeNumber(source["player1-super"]),
-    "player2-super": safeNumber(source["player2-super"]),
-    "p1-total-meter-gained": safeNumber(source["p1-total-meter-gained"]),
-    "p2-total-meter-gained": safeNumber(source["p2-total-meter-gained"]),
-    "p1-meter-gained": limitArray(source["p1-meter-gained"]),
-    "p2-meter-gained": limitArray(source["p2-meter-gained"]),
-    participants: {
-      player1: {
-        char: safeNumber(source["player1-char"]),
-        super: safeNumber(source["player1-super"]),
-        totalMeter: safeNumber(source["p1-total-meter-gained"]),
-      },
-      player2: {
-        char: safeNumber(source["player2-char"]),
-        super: safeNumber(source["player2-super"]),
-        totalMeter: safeNumber(source["p2-total-meter-gained"]),
-      },
-    },
-    meterSamples: {
-      player1: limitArray(source["p1-meter-gained"]),
-      player2: limitArray(source["p2-meter-gained"]),
-    },
-  };
-};
-
 type SendMessageEventDetail = {
   text: string;
   onSuccess?: () => void;
@@ -438,11 +121,6 @@ type SendMessageEventDetail = {
 
 type ChallengeEventDetail = {
   targetUid: string;
-};
-
-type NotificationEntry = {
-  message: TMessage;
-  kind: "challenge" | "mention";
 };
 
 type ChallengeResponseDetail = {
@@ -3442,223 +3120,49 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         bgPosition={layoutBackground.overlay ? "center center, 0 0" : "0 0"}
         animation={`${scrollBackgroundAnimation} 60s linear infinite`}
       >
-        <Stack gap="24px" padding={"12px"} {...navPanelStyles}>
-          <Box height={"64px"} alignSelf={"center"} flex="1">
-            <Image src={hrLogo} height={"64px"} />
-          </Box>
-          {globalLoggedIn ? (
-            <Stack alignItems={"center"} gap="24px" flex="2">
-              <IconButton
-                colorPalette={accentColor}
-                width={"40px"}
-                height={"40px"}
-                onClick={() => changeRoute("/home")}
-                aria-label={t("Layout.aria.home")}
-              >
-                <LucideHome />
-              </IconButton>
-              <IconButton
-                colorPalette={accentColor}
-                width={"40px"}
-                height={"40px"}
-                onClick={() => changeRoute("/lobby")}
-                aria-label={t("Layout.aria.lobby")}
-              >
-                <MessageCircle />
-              </IconButton>
-              <IconButton
-                colorPalette={accentColor}
-                width={"40px"}
-                height={"40px"}
-                onClick={() => changeRoute("/lab")}
-                aria-label={t("Layout.aria.lab")}
-              >
-                <FlaskConical />
-              </IconButton>
-              <IconButton
-                colorPalette={accentColor}
-                width={"40px"}
-                height={"40px"}
-                onClick={() => changeRoute("/profile")}
-                aria-label={t("Layout.aria.profile")}
-              >
-                <UserRound />
-              </IconButton>
-              {isAdmin ? (
-                <IconButton
-                  colorPalette={accentColor}
-                  width={"40px"}
-                  height={"40px"}
-                  onClick={() => changeRoute("/admin")}
-                  aria-label={t("Layout.aria.admin")}
-                >
-                  <ShieldHalf />
-                </IconButton>
-              ) : null}
-            </Stack>
-          ) : null}
-          {globalLoggedIn ? (
-            <Stack
-              alignItems={"center"}
-              flex="1"
-              gap="24px"
-              justifyContent={"flex-end"}
-            >
-              <IconButton
-                colorPalette={accentColor}
-                width={"40px"}
-                height={"40px"}
-                onClick={() => changeRoute("/settings")}
-                aria-label={t("Layout.aria.settings")}
-              >
-                <Settings />
-              </IconButton>
-            </Stack>
-          ) : null}
-        </Stack>
-        <Stack flex="1" height={"100vh"}>
-          <Flex
-            height={"48px"}
-            {...headerStyles}
-            alignItems={"center"}
-            px="4"
-            gap="3"
-            justifyContent="space-between"
-          >
-            {globalLoggedIn ? (
-              <Button
-                size="sm"
-                variant="outline"
-                colorPalette={accentColor}
-                onClick={handleLobbyManagerOpen}
-              >
-                {t("Layout.buttons.lobbyLabel", {
-                  lobby: currentLobbyId || DEFAULT_LOBBY_ID,
-                })}
-              </Button>
-            ) : null}
-            <Flex display="flex" alignItems="center" gap="3">
-              <UserCard />
-              {globalLoggedIn ? (
-                <Box position="relative">
-                <IconButton
-                  colorPalette={accentColor}
-                  width={"40px"}
-                  height={"40px"}
-                  onClick={openNotifications}
-                  aria-label={t("Layout.aria.notifications")}
-                >
-                  <Float placement="bottom-end">
-                    <Circle size="5" bg="accent.default" color="fg.on-accent">
-                      <Text fontSize="xs">
-                        {unreadCount > 99
-                          ? t("Layout.notifications.countOverflow")
-                          : unreadCount}
-                      </Text>
-                    </Circle>
-                  </Float>
-                    {notificationsMuted ? <BellOff /> : <Bell />}
-                  </IconButton>
-                </Box>
-              ) : // <Box>
-
-              //   {unreadCount > 0 ? (
-              //     <Float>
-              //       <Box
-              //       // position="absolute"
-              //       // top="-4px"
-              //       // right="-4px"
-              //       // minWidth="18px"
-              //       // height="18px"
-              //       // borderRadius="full"
-              //       // bg={`${accentColor}.500`}
-              //       // color="white"
-              //       // fontSize="xs"
-              //       // display="flex"
-              //       // alignItems="center"
-              //       // justifyContent="center"
-              //       // px="1"
-              //       >
-              //         {unreadCount > 99 ? "99+" : unreadCount}
-              //       </Box>
-              //     </Float>
-              //   ) : null}
-              // </Box>
-              null}
-
-              {isInMatch ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  colorPalette="red"
-                  onClick={handleForceCloseMatch}
-                >
-                  {t("Layout.buttons.forceCloseMatch")}
-                </Button>
-              ) : null}
-            </Flex>
-          </Flex>
+        <NavigationRail
+          accentColor={accentColor}
+          isAdmin={isAdmin}
+          isAuthenticated={globalLoggedIn}
+          onNavigate={changeRoute}
+          panelStyles={navPanelStyles}
+          t={t}
+        />
+        <Stack flex="1" height="100vh">
+          <HeaderBar
+            accentColor={accentColor}
+            currentLobbyId={currentLobbyId}
+            isAuthenticated={globalLoggedIn}
+            isInMatch={isInMatch}
+            notificationsMuted={notificationsMuted}
+            unreadCount={unreadCount}
+            onForceCloseMatch={handleForceCloseMatch}
+            onOpenLobbyManager={handleLobbyManagerOpen}
+            onOpenNotifications={openNotifications}
+            styles={headerStyles}
+            t={t}
+          />
           <Box
             flex="1"
             display="flex"
             flexDirection="column"
             height="calc(100vh - 120px)"
           >
-            <Box flex="1" overflowY="auto" p="2" scrollbarWidth={"thin"}>
+            <Box flex="1" overflowY="auto" p="2" scrollbarWidth="thin">
               {children}
             </Box>
           </Box>
-          <Box
-            h="24px"
-            display="flex"
-            justifyContent="space-between"
-            alignItems="center"
-            px="4"
-            flexShrink={0}
-            bg={footerStyles.bg}
-            borderTop="1px solid"
-            borderColor={footerStyles.borderColor}
-          >
-            {/* These links no longer work, needs to be resolved */}
-            <Box display="flex" gap="8px">
-              <a
-                href="https://hyper-reflector.com/"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Text textStyle="xs">{t("Layout.footer.linksLabel")}</Text>
-              </a>
-              <a
-                href="https://discord.gg/fsQEVzXwbt"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Text textStyle="xs">{t("Layout.footer.discord")}</Text>
-              </a>
-              <a
-                href="https://github.com/Hyper-Reflector-Team"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <Text textStyle="xs">{t("Layout.footer.github")}</Text>
-              </a>
-            </Box>
-
-            <Flex alignItems="center" gap="3">
-              <Box display="flex" alignItems="center" gap="2">
-                <Box
-                  width="10px"
-                  height="10px"
-                  borderRadius="9999px"
-                  backgroundColor={statusColor}
-                />
-                <Text textStyle="xs" color={mutedLabelColor}>
-                  {statusLabel}
-                </Text>
-              </Box>
-              <Text textStyle="xs">{t("Layout.footer.version")}</Text>
-            </Flex>
-          </Box>
+          <FooterBar
+            mutedLabelColor={mutedLabelColor}
+            statusColor={statusColor}
+            statusLabel={statusLabel}
+            styles={{
+              bg: footerStyles.bg,
+              borderTop: "1px solid",
+              borderColor: footerStyles.borderColor,
+            }}
+            t={t}
+          />
         </Stack>
       </Box>
       <LobbyManagerDialog
@@ -3683,168 +3187,21 @@ export default function Layout({ children }: { children: ReactElement[] }) {
         sideSelectionPending={miniGameSideLoading}
       />
 
-      <Drawer.Root
-        open={notificationsOpen}
-        onOpenChange={({ open }) => {
-          if (!open) {
-            closeNotifications();
-          }
-        }}
-        size="sm"
-      >
-        <Drawer.Backdrop />
-        <Drawer.Positioner>
-          <Drawer.Content {...popoverSurfaceStyles} color="fg.default">
-            <Drawer.CloseTrigger />
-            <Drawer.Header>
-              <Flex justify="space-between" align="center" gap="3">
-                <Drawer.Title>{NOTIFICATIONS_TITLE}</Drawer.Title>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => handleClearNotifications()}
-                  disabled={notificationEntries.length === 0}
-                >
-                  {t("Layout.buttons.clear")}
-                </Button>
-              </Flex>
-              <Switch.Root
-                colorPalette={accentColor}
-                size="md"
-                mt="2"
-                display="flex"
-                alignItems="center"
-                justifyContent="space-between"
-                gap="2"
-                checked={notificationsMuted}
-                onCheckedChange={(event) =>
-                  setNotificationsMuted(event.checked)
-                }
-              >
-                <Switch.HiddenInput />
-                <Switch.Label fontSize="sm" color={mutedLabelColor}>
-                  {t("Layout.notifications.mute")}
-                </Switch.Label>
-                <Switch.Control>
-                  <Switch.Thumb />
-                </Switch.Control>
-              </Switch.Root>
-            </Drawer.Header>
-            <Drawer.Body>
-              <VStack align="stretch">
-                {notificationEntries.length === 0 ? (
-                  <Text fontSize="sm" color={mutedLabelColor}>
-                    {NO_NOTIFICATIONS_MESSAGE}
-                  </Text>
-                ) : (
-                  notificationEntries.map(({ message: msg, kind }) => {
-                    const isSelf = msg.userName === globalUser?.userName;
-                    const isChallenge =
-                      msg.role === "challenge" || kind === "challenge";
-                    const challengeStatus = msg.challengeStatus;
-                    const responderLabel =
-                      msg.challengeResponder && msg.challengeResponder.length
-                        ? msg.challengeResponder
-                        : t("Layout.notifications.unknownPlayer");
-
-                    return (
-                      <Stack
-                        key={msg.id}
-                        borderWidth="1px"
-                        borderRadius="md"
-                        padding="3"
-                        bg="bg.surface"
-                        borderColor="border"
-                      >
-                        <Flex
-                          justifyContent="space-between"
-                          alignItems="center"
-                        >
-                          <Text
-                            fontWeight="semibold"
-                            color={isSelf ? `${accentColor}.500` : undefined}
-                          >
-                            {msg.userName ?? t("Layout.notifications.unknownUser")}
-                          </Text>
-                          <Text fontSize="xs" color={mutedLabelColor}>
-                            {formatTimestamp(msg.timeStamp)}
-                          </Text>
-                        </Flex>
-                        <Box height="1px" bg="border" />
-                        <Flex alignItems="center" gap="2">
-                          {isChallenge ? <Swords size={16} /> : null}
-                          <Text fontSize="sm" whiteSpace="pre-wrap">
-                            {msg.text || t("Layout.notifications.noMessage")}
-                          </Text>
-                        </Flex>
-                        {isChallenge ? (
-                          challengeStatus ? (
-                            <Text
-                              fontSize="xs"
-                              color={
-                                challengeStatus === "accepted"
-                                  ? `${accentColor}.500`
-                                  : "red.300"
-                              }
-                            >
-                              {challengeStatus === "accepted"
-                                ? t("Layout.notifications.challengeAccepted", {
-                                    name: responderLabel,
-                                  })
-                                : t(
-                                    "Layout.notifications.challengeDeclined",
-                                    { name: responderLabel }
-                                  )}
-                            </Text>
-                          ) : (
-                            (() => {
-                              const respondToNotification = (
-                                accepted: boolean
-                              ) => {
-                                if (msg.challengeKind === "rps") {
-                                  handleMiniGameInviteResponse(
-                                    msg.id,
-                                    accepted,
-                                    globalUser?.userName
-                                  );
-                                } else {
-                                  handleChallengeResponse(
-                                    msg.id,
-                                    accepted,
-                                    globalUser?.userName
-                                  );
-                                }
-                              };
-                              return (
-                                <HStack pt="1">
-                                  <Button
-                                    size="sm"
-                                    colorPalette={accentColor}
-                                    onClick={() => respondToNotification(true)}
-                                  >
-                                    {CHALLENGE_ACCEPT_LABEL}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => respondToNotification(false)}
-                                  >
-                                    {CHALLENGE_DECLINE_LABEL}
-                                  </Button>
-                                </HStack>
-                              );
-                            })()
-                          )
-                        ) : null}
-                      </Stack>
-                    );
-                  })
-                )}
-              </VStack>
-            </Drawer.Body>
-          </Drawer.Content>
-        </Drawer.Positioner>
-      </Drawer.Root>
+      <NotificationsDrawer
+        accentColor={accentColor}
+        globalUserName={globalUser?.userName}
+        isOpen={notificationsOpen}
+        mutedLabelColor={mutedLabelColor}
+        notificationEntries={notificationEntries}
+        notificationsMuted={notificationsMuted}
+        onChallengeResponse={handleChallengeResponse}
+        onClearNotifications={handleClearNotifications}
+        onClose={closeNotifications}
+        onMiniGameResponse={handleMiniGameInviteResponse}
+        onToggleNotificationsMuted={setNotificationsMuted}
+        popoverSurfaceStyles={popoverSurfaceStyles}
+        t={t}
+      />
     </>
   );
 }
