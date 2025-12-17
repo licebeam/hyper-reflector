@@ -12,7 +12,6 @@ import { listen } from "@tauri-apps/api/event";
 import keys from "../private/keys";
 import { useNavigate } from "@tanstack/react-router";
 import { Box, Stack, useDisclosure } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
 import {
   DEFAULT_LOBBY_ID,
   useMessageStore,
@@ -24,7 +23,6 @@ import type { MatchSummary } from "../types/match";
 import type { TUser } from "../types/user";
 import { useTranslation } from "react-i18next";
 import { useActiveThemeDefinition } from "../theme/hooks";
-import bgImage from "../assets/bgImage.svg";
 import { LobbyManagerDialog } from "./components/LobbyManagerDialog";
 import { NavigationRail } from "./components/NavigationRail";
 import { HeaderBar } from "./components/HeaderBar";
@@ -47,7 +45,6 @@ import {
   appendMockUsers,
   buildMockForLobby,
   DEBUG_MOCK_MATCH_ID,
-  FALLBACK_USER_TITLE,
   MOCK_ACTION_INTERVAL_MS,
   MOCK_CHALLENGE_LINES,
   MOCK_CHALLENGE_USER,
@@ -101,7 +98,12 @@ import {
   randomMiniGameChoice,
   resolveMockDisplayName,
 } from "./helpers/matchUtils";
-import type { NotificationEntry } from "./types";
+import { useLayoutChromeStyles } from "./hooks/useLayoutChromeStyles";
+import { useSidePreferenceManager } from "./hooks/useSidePreferenceManager";
+import {
+  buildNotificationEntries,
+  extractChallengeTargets,
+} from "./helpers/notifications";
 
 const DEV_MATCH_ID = "dev-matches-and-bugs";
 
@@ -172,85 +174,16 @@ export default function Layout({ children }: { children: ReactElement[] }) {
   const winSoundPath = useSettingsStore((s) => s.winSoundPath);
   const mutedUsers = useSettingsStore((s) => s.mutedUsers);
   const accentColor = theme?.colorPalette ?? "hyperOrange";
-  const withAlpha = useCallback((color: string | undefined, alpha: number) => {
-    if (!color) {
-      return `rgba(0,0,0,${alpha})`;
-    }
-    const hex = color.replace("#", "");
-    if (hex.length === 3) {
-      const [r, g, b] = hex.split("").map((ch) => parseInt(ch + ch, 16));
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-    if (hex.length === 6) {
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-    return color;
-  }, []);
-  const layoutBackground = useMemo(() => {
-    if (!semanticColors) {
-      return { bg: "bg.canvas" as const, overlay: undefined as string | undefined };
-    }
-    const canvas = semanticColors.canvas ?? semanticColors.background;
-    const surface = withAlpha(semanticColors.surface ?? canvas, 0.7);
-    const background = withAlpha(semanticColors.background ?? canvas, 0.95);
-    const overlay = `radial-gradient(circle at top, ${surface} 0%, ${background} 80%)`;
-    return { bg: canvas ?? "bg.canvas", overlay };
-  }, [semanticColors, withAlpha]);
-  const borderColorValue = semanticColors?.border ?? "border";
-  const popoverBgValue = semanticColors?.popover ?? "bg.popover";
-  const mutedBgValue = semanticColors?.muted ?? "bg.muted";
-  const popoverSurfaceStyles = useMemo(
-    () => ({
-      bg: popoverBgValue,
-      borderColor: borderColorValue,
-      borderWidth: "1px",
-      borderRadius: "xl",
-    }),
-    [popoverBgValue, borderColorValue]
-  );
-  const navPanelStyles = useMemo(
-    () => ({
-      bg: popoverBgValue,
-      borderWidth: "1px",
-      borderColor: borderColorValue,
-      borderRadius: "xl",
-      borderRightWidth: "1px",
-    }),
-    [popoverBgValue, borderColorValue]
-  );
-  const headerStyles = useMemo(
-    () => ({
-      bg: mutedBgValue,
-      borderBottom: "1px solid",
-      borderColor: borderColorValue,
-    }),
-    [mutedBgValue, borderColorValue]
-  );
-  const footerStyles = useMemo(
-    () => ({
-      bg: mutedBgValue,
-      borderColor: borderColorValue,
-    }),
-    [mutedBgValue, borderColorValue]
-  );
-  const mutedLabelColor = semanticColors?.textMuted ?? "fg.muted";
-  const scrollBackgroundAnimation = useMemo(
-    () =>
-      keyframes`
-        from { background-position: center center, 0 0; }
-        to { background-position: center center, -800px 800px; }
-      `,
-    []
-  );
-  const backgroundImageValue = useMemo(() => {
-    if (layoutBackground.overlay) {
-      return `${layoutBackground.overlay}, url(${bgImage})`;
-    }
-    return `url(${bgImage})`;
-  }, [layoutBackground.overlay]);
+  const {
+    layoutBackground,
+    navPanelStyles,
+    headerStyles,
+    footerStyles,
+    mutedLabelColor,
+    scrollBackgroundAnimation,
+    backgroundImageValue,
+    popoverSurfaceStyles,
+  } = useLayoutChromeStyles(semanticColors);
   const { t } = useTranslation();
   const {
     open: notificationsOpen,
@@ -341,52 +274,11 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     }
   }, [globalLoggedIn]);
 
-  const applySidePreferenceLocally = useCallback(
-    (
-      entry: {
-        side: "player1" | "player2";
-        ownerUid: string;
-        opponentUid: string;
-        expiresAt: number;
-      } | null,
-      opponentUid: string
-    ) => {
-      const store = useUserStore.getState();
-      const viewer = store.globalUser;
-      if (!viewer) return;
-      const nextPreferences = { ...(viewer.sidePreferences || {}) };
-      if (!entry) {
-        delete nextPreferences[opponentUid];
-      } else {
-        nextPreferences[opponentUid] = entry;
-      }
-      store.setGlobalUser({ ...viewer, sidePreferences: nextPreferences });
-    },
-    []
-  );
-
-  const resolveActiveSidePreference = useCallback(
-    (viewer: TUser | undefined, opponentUid: string) => {
-      if (!viewer?.sidePreferences) return undefined;
-      const entry = viewer.sidePreferences[opponentUid];
-      if (!entry) return undefined;
-      if (entry.expiresAt <= Date.now()) {
-        applySidePreferenceLocally(null, opponentUid);
-        return undefined;
-      }
-      return entry;
-    },
-    [applySidePreferenceLocally]
-  );
-
-  const resolvePreferredSlot = useCallback(
-    (viewer: TUser | undefined, opponentUid: string): 0 | 1 | null => {
-      const entry = resolveActiveSidePreference(viewer, opponentUid);
-      if (!entry) return null;
-      return entry.side === "player2" ? 1 : 0;
-    },
-    [resolveActiveSidePreference]
-  );
+  const {
+    applySidePreferenceLocally,
+    resolveActiveSidePreference,
+    resolvePreferredSlot,
+  } = useSidePreferenceManager();
 
   const resolveUserName = useCallback(
     (uid: string | undefined) => {
@@ -1789,54 +1681,16 @@ export default function Layout({ children }: { children: ReactElement[] }) {
     ]
   );
 
-  const notificationEntries: NotificationEntry[] = useMemo(() => {
-    if (!Array.isArray(chatMessages)) return [];
-
-    const entries: NotificationEntry[] = [];
-    const dismissed = dismissedNotificationIds;
-
-    chatMessages.forEach((msg) => {
-      if (!msg?.id || dismissed.has(msg.id)) {
-        return;
-      }
-
-      const senderId =
-        msg.senderUid ||
-        msg.challengeChallengerId ||
-        (typeof (msg as any).senderId === "string"
-          ? (msg as any).senderId
-          : undefined);
-
-      if (senderId && mutedUsers.includes(senderId)) {
-        return;
-      }
-
-      if (msg.role === "challenge") {
-        entries.push({ message: msg, kind: "challenge" });
-        return;
-      }
-
-      if (!msg.text || !mentionMatchers.length) {
-        return;
-      }
-
-      const text = msg.text ?? "";
-      const hasMention = mentionMatchers.some((matcher) => {
-        matcher.lastIndex = 0;
-        return matcher.test(text);
-      });
-
-      if (hasMention) {
-        entries.push({ message: msg, kind: "mention" });
-      }
-    });
-
-    return entries.sort((a, b) => {
-      const aTime = a.message.timeStamp ?? 0;
-      const bTime = b.message.timeStamp ?? 0;
-      return bTime - aTime;
-    });
-  }, [chatMessages, mentionMatchers, dismissedNotificationIds, mutedUsers]);
+  const notificationEntries = useMemo(
+    () =>
+      buildNotificationEntries({
+        chatMessages,
+        dismissedIds: dismissedNotificationIds,
+        mentionMatchers,
+        mutedUsers,
+      }),
+    [chatMessages, mentionMatchers, dismissedNotificationIds, mutedUsers]
+  );
 
   const handleClearNotifications = useCallback(() => {
     if (!notificationEntries.length) {
@@ -1856,22 +1710,7 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
     const socket = signalSocketRef.current;
     if (socket && globalUser?.uid) {
-      const challengeTargets = notificationEntries
-        .filter((entry) => entry.kind === "challenge")
-        .map((entry) => {
-          const sender = (entry.message as any).sender || {};
-          return (
-            entry.message.challengeChallengerId ||
-            sender.uid ||
-            sender.userUID ||
-            sender.id ||
-            null
-          );
-        })
-        .filter(
-          (uid): uid is string => typeof uid === "string" && uid.length > 0
-        );
-
+      const challengeTargets = extractChallengeTargets(notificationEntries);
       challengeTargets.forEach((uid) => {
         webrtcDeclineCall(socket, uid, globalUser.uid).catch((error) => {
           console.error("Failed to decline challenge for", uid, error);
