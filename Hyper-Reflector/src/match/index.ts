@@ -64,6 +64,7 @@ export async function startProxyMatch({
 
     const resolvedServerHost = serverHost || keys.COTURN_IP
     const parsedServerPort = Number(serverPort ?? keys.PUNCH_PORT ?? 33334)
+    // const romName = 'vsavj'
     const romName =
         typeof gameName === 'string' && gameName.trim().length ? gameName.trim() : 'sfiii3nr1'
     const playerIndex = (playerSlot + 1) as 1 | 2
@@ -83,7 +84,7 @@ export async function startProxyMatch({
     })
 
     try {
-        await invoke('stop_proxy').catch(() => {})
+        await invoke('stop_proxy').catch(() => { })
         await invoke('start_proxy', {
             args: {
                 match_id: matchId,
@@ -107,8 +108,8 @@ export async function startProxyMatch({
             typeof error === 'string'
                 ? error
                 : error && typeof error === 'object' && 'message' in error
-                  ? String((error as any).message)
-                  : 'Unknown error starting proxy'
+                    ? String((error as any).message)
+                    : 'Unknown error starting proxy'
         toaster.error({
             title: 'Failed to start match',
             description: fallbackMessage,
