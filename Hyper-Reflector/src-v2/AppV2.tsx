@@ -1,98 +1,110 @@
 import './styles.css'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { onAuthStateChanged } from 'firebase/auth'
 import { NavRail } from './components/NavRail'
 import { Header } from './components/Header'
 import { LobbyPage } from './pages/LobbyPage'
+import { LoginPage } from './pages/LoginPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { useWebSocket } from './hooks/useWebSocket'
+import { auth } from '../src/utils/firebase'
+import api from '../src/external-api/requests'
 import type { V2User } from './types'
 
 type Page = 'lobby' | 'home' | 'settings'
+type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
 
-const STORAGE_KEY = 'v2_user'
 const DEFAULT_LOBBY = 'Hyper Reflector'
 
-function loadStoredUser(): V2User | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    return JSON.parse(raw) as V2User
-  } catch {
-    return null
-  }
-}
-
-function createGuestUser(userName: string): V2User {
+function mapToV2User(data: any, fallbackEmail?: string | null): V2User {
   return {
-    uid: crypto.randomUUID(),
-    userName: userName.trim(),
-    accountElo: 1200,
-    countryCode: '',
-    lastKnownPings: [],
-    knownAliases: [],
-    userProfilePic: '',
-    gravEmail: '',
-    userEmail: '',
+    uid: data.uid || '',
+    userName: data.userName || 'Player',
+    accountElo: typeof data.accountElo === 'number' ? data.accountElo : 1200,
+    countryCode: data.countryCode || '',
+    userTitle: data.userTitle,
+    lastKnownPings: Array.isArray(data.lastKnownPings) ? data.lastKnownPings : [],
+    knownAliases: Array.isArray(data.knownAliases) ? data.knownAliases : [],
+    userProfilePic: data.userProfilePic || '',
+    gravEmail: data.gravEmail || '',
+    userEmail: data.userEmail || fallbackEmail || '',
   }
-}
-
-function GuestSetup({ onJoin }: { onJoin: (user: V2User) => void }) {
-  const [name, setName] = useState('')
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const trimmed = name.trim()
-    if (!trimmed) return
-    const user = createGuestUser(trimmed)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
-    onJoin(user)
-  }
-
-  return (
-    <div className="h-screen bg-gray-900 flex items-center justify-center">
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-8 w-80 shadow-xl">
-        <h1 className="text-orange-500 text-xl font-bold mb-1">Hyper Reflector</h1>
-        <p className="text-gray-400 text-sm mb-6">V2 — Simple Lobby</p>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <input
-            autoFocus
-            type="text"
-            value={name}
-            maxLength={24}
-            onChange={e => setName(e.target.value)}
-            placeholder="Enter your username..."
-            className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
-          />
-          <button
-            type="submit"
-            disabled={!name.trim()}
-            className="bg-orange-500 text-white rounded py-2 font-medium hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            Join Lobby
-          </button>
-        </form>
-
-        {/* Allow switching back to v1 even from setup screen */}
-        <button
-          className="mt-4 w-full text-xs text-gray-500 hover:text-gray-300 transition-colors"
-          onClick={() => { localStorage.setItem('appVersion', 'v1'); window.location.reload() }}
-        >
-          Switch to V1
-        </button>
-      </div>
-    </div>
-  )
 }
 
 export default function AppV2() {
-  const [user, setUser] = useState<V2User | null>(() => loadStoredUser())
+  const [authState, setAuthState] = useState<AuthState>('loading')
+  const [user, setUser] = useState<V2User | null>(null)
   const [page, setPage] = useState<Page>('lobby')
 
+  // WebSocket — hook is always called; internally skips connection when user is null
   const { status, lobbyUsers, messages, sendMessage } = useWebSocket(user, DEFAULT_LOBBY)
 
-  if (!user) {
-    return <GuestSetup onJoin={setUser} />
+  useEffect(() => {
+    return onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!firebaseUser) {
+        setUser(null)
+        setAuthState('unauthenticated')
+        return
+      }
+
+      try {
+        // Register session with backend, then fetch full profile
+        await api.addLoggedInUser(auth)
+        const userData = await api.getUserByAuth(auth)
+
+        if (userData && userData.uid) {
+          setUser(mapToV2User(userData, firebaseUser.email))
+        } else {
+          throw new Error('Empty user profile from backend')
+        }
+      } catch (err) {
+        // Backend unreachable or no profile — construct minimal user from Firebase data
+        console.warn('[v2] Backend unavailable, using Firebase identity as fallback', err)
+        setUser({
+          uid: firebaseUser.uid,
+          userName:
+            firebaseUser.displayName ||
+            firebaseUser.email?.split('@')[0] ||
+            'Player',
+          accountElo: 1200,
+          countryCode: '',
+          lastKnownPings: [],
+          knownAliases: [],
+          userProfilePic: '',
+          gravEmail: '',
+          userEmail: firebaseUser.email || '',
+        })
+      } finally {
+        setAuthState('authenticated')
+      }
+    })
+  }, [])
+
+  const handleLogout = () => {
+    // Firebase signOut is called by SettingsPage; this clears local state immediately
+    setUser(null)
+    setAuthState('unauthenticated')
+    setPage('lobby')
   }
+
+  // ── Auth states ──────────────────────────────────────────────────────────────
+
+  if (authState === 'loading') {
+    return (
+      <div className="h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center space-y-2">
+          <p className="text-orange-500 font-bold text-lg">Hyper Reflector</p>
+          <p className="text-gray-500 text-sm animate-pulse">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (authState === 'unauthenticated') {
+    return <LoginPage />
+  }
+
+  // ── Authenticated layout ─────────────────────────────────────────────────────
 
   return (
     <div className="flex h-screen bg-gray-900 text-gray-100 overflow-hidden">
@@ -102,7 +114,7 @@ export default function AppV2() {
         <Header
           lobbyId={DEFAULT_LOBBY}
           status={status}
-          userName={user.userName}
+          userName={user?.userName}
         />
 
         <main className="flex-1 overflow-hidden">
@@ -116,13 +128,11 @@ export default function AppV2() {
           )}
           {page === 'home' && (
             <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500">Home — coming soon</p>
+              <p className="text-gray-500 text-sm">Home — coming soon</p>
             </div>
           )}
-          {page === 'settings' && (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500">Settings — coming soon</p>
-            </div>
+          {page === 'settings' && user && (
+            <SettingsPage user={user} onLogout={handleLogout} />
           )}
         </main>
       </div>
