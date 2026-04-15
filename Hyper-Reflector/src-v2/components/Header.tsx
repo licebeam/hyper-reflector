@@ -27,33 +27,45 @@ export function Header({ lobbyId, status, userName }: HeaderProps) {
   }
 
   return (
-    <header className="h-12 flex items-center justify-between px-4 bg-gray-800 border-b border-gray-700 shrink-0">
+    <header
+      className="h-12 flex items-center justify-between px-4 shrink-0 border-b"
+      style={{ background: 'var(--v2-surface)', borderColor: 'var(--v2-border)' }}
+    >
       <div className="flex items-center gap-3">
-        <span className="text-orange-500 font-medium text-sm">
+        <span className="font-medium text-sm" style={{ color: 'var(--v2-accent)' }}>
           Lobby: {lobbyId}
         </span>
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${STATUS_DOT[status]}`} />
-          <span className="text-gray-400 text-xs">{STATUS_LABEL[status]}</span>
+          <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>
+            {STATUS_LABEL[status]}
+          </span>
         </div>
       </div>
 
       <div className="flex items-center gap-3">
         {userName && (
-          <span className="text-gray-300 text-sm">{userName}</span>
+          <span className="text-sm" style={{ color: 'var(--v2-text)' }}>
+            {userName}
+          </span>
         )}
-        <div className="flex rounded overflow-hidden border border-gray-600 text-xs font-medium">
+        <div
+          className="flex rounded overflow-hidden text-xs font-medium border"
+          style={{ borderColor: 'var(--v2-border)' }}
+        >
           <button
-            className="px-2.5 py-1 bg-gray-700 text-gray-400 hover:bg-gray-600 transition-colors"
+            className="px-2.5 py-1 transition-colors"
+            style={{ background: 'var(--v2-hover)', color: 'var(--v2-muted)' }}
             onClick={() => switchTo('v1')}
           >
             V1
           </button>
-          <button
-            className="px-2.5 py-1 bg-orange-500 text-white cursor-default"
+          <span
+            className="px-2.5 py-1"
+            style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
           >
             V2
-          </button>
+          </span>
         </div>
       </div>
     </header>

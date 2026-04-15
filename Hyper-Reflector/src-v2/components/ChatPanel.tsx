@@ -25,8 +25,7 @@ export function ChatPanel({ messages, currentUserUid, onSend }: ChatPanelProps) 
   const handleSend = () => {
     const text = input.trim()
     if (!text) return
-    const sent = onSend(text)
-    if (sent) setInput('')
+    if (onSend(text)) setInput('')
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -41,39 +40,49 @@ export function ChatPanel({ messages, currentUserUid, onSend }: ChatPanelProps) 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-3 space-y-1.5 min-h-0">
         {messages.length === 0 && (
-          <p className="text-gray-500 text-sm text-center pt-8">
+          <p className="text-sm text-center pt-8" style={{ color: 'var(--v2-muted)' }}>
             No messages yet. Say hello!
           </p>
         )}
+
         {messages.map(msg => (
           <div key={msg.id}>
             {msg.role === 'user' && (
               <span>
                 <span
-                  className={`font-semibold text-sm ${
-                    msg.senderUid === currentUserUid
-                      ? 'text-orange-400'
-                      : 'text-blue-400'
-                  }`}
+                  className="font-semibold text-sm"
+                  style={{
+                    color: msg.senderUid === currentUserUid
+                      ? 'var(--v2-name-self)'
+                      : 'var(--v2-name-other)',
+                  }}
                 >
                   {msg.userName}
                 </span>
-                <span className="text-gray-500 text-xs ml-1.5">
+                <span className="text-xs ml-1.5" style={{ color: 'var(--v2-muted)' }}>
                   {formatTime(msg.timeStamp)}
                 </span>
-                <span className="text-gray-100 text-sm ml-2">{msg.text}</span>
+                <span className="text-sm ml-2" style={{ color: 'var(--v2-chat-msg)' }}>
+                  {msg.text}
+                </span>
               </span>
             )}
             {msg.role === 'system' && (
-              <span className="text-gray-500 text-xs italic">{msg.text}</span>
+              <span className="text-xs italic" style={{ color: 'var(--v2-muted)' }}>
+                {msg.text}
+              </span>
             )}
           </div>
         ))}
+
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="border-t border-gray-700 p-3 flex gap-2 shrink-0">
+      {/* Input bar */}
+      <div
+        className="border-t p-3 flex gap-2 shrink-0"
+        style={{ borderColor: 'var(--v2-border)' }}
+      >
         <input
           type="text"
           value={input}
@@ -81,12 +90,22 @@ export function ChatPanel({ messages, currentUserUid, onSend }: ChatPanelProps) 
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
-          className="flex-1 bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
+          className="flex-1 rounded px-3 py-1.5 text-sm border outline-none transition-colors"
+          style={{
+            background: 'var(--v2-hover)',
+            borderColor: 'var(--v2-border)',
+            color: 'var(--v2-text)',
+          }}
+          onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
+          onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
         />
         <button
           onClick={handleSend}
           disabled={!input.trim()}
-          className="px-3 py-1.5 bg-orange-500 text-white rounded text-sm hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+          className="px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-accent-hover)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
         >
           <Send size={14} />
         </button>

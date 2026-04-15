@@ -1,17 +1,18 @@
 import './styles.css'
 import { useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
-import { NavRail } from './components/NavRail'
+import { ThemeProvider, useV2Theme } from './ThemeContext'
+import { NavRail, type Page } from './components/NavRail'
 import { Header } from './components/Header'
 import { LobbyPage } from './pages/LobbyPage'
 import { LoginPage } from './pages/LoginPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { LabPage } from './pages/LabPage'
 import { useWebSocket } from './hooks/useWebSocket'
 import { auth } from '../src/utils/firebase'
 import api from '../src/external-api/requests'
 import type { V2User } from './types'
 
-type Page = 'lobby' | 'home' | 'settings'
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
 
 const DEFAULT_LOBBY = 'Hyper Reflector'
@@ -31,12 +32,16 @@ function mapToV2User(data: any, fallbackEmail?: string | null): V2User {
   }
 }
 
-export default function AppV2() {
+// ── Inner app — has access to ThemeContext ────────────────────────────────────
+
+function AppV2Inner() {
+  const { vars } = useV2Theme()
+
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [user, setUser] = useState<V2User | null>(null)
   const [page, setPage] = useState<Page>('lobby')
 
-  // WebSocket — hook is always called; internally skips connection when user is null
+  // Hook always called — internally skips WS connection when user is null
   const { status, lobbyUsers, messages, sendMessage } = useWebSocket(user, DEFAULT_LOBBY)
 
   useEffect(() => {
@@ -48,24 +53,19 @@ export default function AppV2() {
       }
 
       try {
-        // Register session with backend, then fetch full profile
         await api.addLoggedInUser(auth)
         const userData = await api.getUserByAuth(auth)
 
         if (userData && userData.uid) {
           setUser(mapToV2User(userData, firebaseUser.email))
         } else {
-          throw new Error('Empty user profile from backend')
+          throw new Error('Empty profile from backend')
         }
       } catch (err) {
-        // Backend unreachable or no profile — construct minimal user from Firebase data
-        console.warn('[v2] Backend unavailable, using Firebase identity as fallback', err)
+        console.warn('[v2] Backend unavailable, using Firebase identity', err)
         setUser({
           uid: firebaseUser.uid,
-          userName:
-            firebaseUser.displayName ||
-            firebaseUser.email?.split('@')[0] ||
-            'Player',
+          userName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Player',
           accountElo: 1200,
           countryCode: '',
           lastKnownPings: [],
@@ -81,61 +81,85 @@ export default function AppV2() {
   }, [])
 
   const handleLogout = () => {
-    // Firebase signOut is called by SettingsPage; this clears local state immediately
     setUser(null)
     setAuthState('unauthenticated')
     setPage('lobby')
   }
 
-  // ── Auth states ──────────────────────────────────────────────────────────────
-
-  if (authState === 'loading') {
-    return (
-      <div className="h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center space-y-2">
-          <p className="text-orange-500 font-bold text-lg">Hyper Reflector</p>
-          <p className="text-gray-500 text-sm animate-pulse">Loading...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (authState === 'unauthenticated') {
-    return <LoginPage />
-  }
-
-  // ── Authenticated layout ─────────────────────────────────────────────────────
-
+  // CSS vars applied here cascade to every child via inheritance
   return (
-    <div className="flex h-screen bg-gray-900 text-gray-100 overflow-hidden">
-      <NavRail currentPage={page} onNavigate={setPage} />
+    <div
+      className="h-screen overflow-hidden"
+      style={{
+        ...(vars as unknown as React.CSSProperties),
+        background: 'var(--v2-bg)',
+        color: 'var(--v2-text)',
+      }}
+    >
+      {authState === 'loading' && (
+        <div className="h-full flex items-center justify-center">
+          <div className="text-center space-y-2">
+            <p className="font-bold text-lg" style={{ color: 'var(--v2-accent)' }}>
+              Hyper Reflector
+            </p>
+            <p className="text-sm animate-pulse" style={{ color: 'var(--v2-muted)' }}>
+              Loading...
+            </p>
+          </div>
+        </div>
+      )}
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header
-          lobbyId={DEFAULT_LOBBY}
-          status={status}
-          userName={user?.userName}
-        />
+      {authState === 'unauthenticated' && (
+        <div className="h-full flex items-center justify-center">
+          <LoginPage />
+        </div>
+      )}
 
-        <main className="flex-1 overflow-hidden">
-          {page === 'lobby' && (
-            <LobbyPage
-              messages={messages}
-              lobbyUsers={lobbyUsers}
-              currentUser={user}
-              onSendMessage={sendMessage}
+      {authState === 'authenticated' && (
+        <div className="flex h-full">
+          <NavRail currentPage={page} onNavigate={setPage} />
+
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Header
+              lobbyId={DEFAULT_LOBBY}
+              status={status}
+              userName={user?.userName}
             />
-          )}
-          {page === 'home' && (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-gray-500 text-sm">Home — coming soon</p>
-            </div>
-          )}
-          {page === 'settings' && user && (
-            <SettingsPage user={user} onLogout={handleLogout} />
-          )}
-        </main>
-      </div>
+
+            <main className="flex-1 overflow-hidden">
+              {page === 'lobby' && (
+                <LobbyPage
+                  messages={messages}
+                  lobbyUsers={lobbyUsers}
+                  currentUser={user}
+                  onSendMessage={sendMessage}
+                />
+              )}
+              {page === 'home' && (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-sm" style={{ color: 'var(--v2-muted)' }}>
+                    Home — coming soon
+                  </p>
+                </div>
+              )}
+              {page === 'lab' && <LabPage />}
+              {page === 'settings' && user && (
+                <SettingsPage user={user} onLogout={handleLogout} />
+              )}
+            </main>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+// ── Root export — provides theme context ──────────────────────────────────────
+
+export default function AppV2() {
+  return (
+    <ThemeProvider>
+      <AppV2Inner />
+    </ThemeProvider>
   )
 }
