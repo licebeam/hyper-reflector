@@ -16,30 +16,27 @@ export function LoginPage() {
     setError(null)
     try {
       await loginEmail(email.trim(), password)
-      // onAuthStateChanged in AppV2 handles state transition
     } catch (err) {
       const fe = err as FirebaseError
-      const isCredentialError = [
-        'auth/invalid-credential',
-        'auth/wrong-password',
-        'auth/user-not-found',
-        'auth/invalid-email',
-      ].includes(fe.code)
-      setError(isCredentialError ? 'Incorrect email or password.' : 'Sign in failed. Please try again.')
+      const isBadCred = ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(fe.code)
+      setError(isBadCred ? 'Incorrect email or password.' : 'Sign in failed. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') void handleSubmit(e as any)
-  }
-
   return (
-    <div className="h-screen bg-gray-900 flex items-center justify-center">
-      <div className="bg-gray-800 border border-gray-700 rounded-xl p-8 w-80 shadow-xl">
-        <h1 className="text-orange-500 text-xl font-bold mb-1">Hyper Reflector</h1>
-        <p className="text-gray-400 text-sm mb-6">Sign in to join the lobby</p>
+    <div className="h-full flex items-center justify-center">
+      <div
+        className="rounded-xl p-8 w-80 shadow-xl border"
+        style={{ background: 'var(--v2-surface)', borderColor: 'var(--v2-border)' }}
+      >
+        <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--v2-accent)' }}>
+          Hyper Reflector
+        </h1>
+        <p className="text-sm mb-6" style={{ color: 'var(--v2-muted)' }}>
+          Sign in to join the lobby
+        </p>
 
         {error && (
           <div className="mb-4 px-3 py-2 bg-red-900/40 border border-red-700 rounded text-red-300 text-sm">
@@ -49,38 +46,49 @@ export function LoginPage() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-400 font-medium">Email</label>
+            <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
+              Email
+            </label>
             <input
               autoFocus
               type="email"
               value={email}
               maxLength={100}
               onChange={e => setEmail(e.target.value)}
-              onKeyDown={handleKeyDown}
               placeholder="hyper@reflector.com"
               disabled={loading}
-              className="bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors disabled:opacity-50"
+              className="rounded px-3 py-2 text-sm border outline-none transition-colors disabled:opacity-50"
+              style={{ background: 'var(--v2-hover)', borderColor: 'var(--v2-border)', color: 'var(--v2-text)' }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-400 font-medium">Password</label>
+            <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
+              Password
+            </label>
             <div className="relative">
               <input
                 type={showPass ? 'text' : 'password'}
                 value={password}
                 maxLength={160}
                 onChange={e => setPassword(e.target.value)}
-                onKeyDown={handleKeyDown}
                 placeholder="••••••••"
                 disabled={loading}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 pr-16 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors disabled:opacity-50"
+                className="w-full rounded px-3 py-2 pr-16 text-sm border outline-none transition-colors disabled:opacity-50"
+                style={{ background: 'var(--v2-hover)', borderColor: 'var(--v2-border)', color: 'var(--v2-text)' }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
               />
               <button
                 type="button"
                 tabIndex={-1}
                 onClick={() => setShowPass(p => !p)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-300 transition-colors px-1"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-1 transition-colors"
+                style={{ color: 'var(--v2-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
               >
                 {showPass ? 'hide' : 'show'}
               </button>
@@ -90,15 +98,21 @@ export function LoginPage() {
           <button
             type="submit"
             disabled={loading || !email.trim() || !password}
-            className="mt-1 bg-orange-500 text-white rounded py-2 font-medium text-sm hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="mt-1 rounded py-2 font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
+            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--v2-accent-hover)' }}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
           >
             {loading ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
 
-        <div className="mt-5 pt-4 border-t border-gray-700">
+        <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--v2-border)' }}>
           <button
-            className="w-full text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            className="w-full text-xs transition-colors"
+            style={{ color: 'var(--v2-muted)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
             onClick={() => { localStorage.setItem('appVersion', 'v1'); window.location.reload() }}
           >
             Switch to V1

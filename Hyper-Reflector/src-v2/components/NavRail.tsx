@@ -1,7 +1,7 @@
-import { Home, MessageCircle, Settings } from 'lucide-react'
+import { FlaskConical, Home, MessageCircle, Settings } from 'lucide-react'
 import hrLogo from '../../src/assets/logo.svg'
 
-type Page = 'lobby' | 'home' | 'settings'
+export type Page = 'lobby' | 'home' | 'settings' | 'lab'
 
 type NavRailProps = {
   currentPage: Page
@@ -16,8 +16,8 @@ export function NavRail({ currentPage, onNavigate }: NavRailProps) {
       aria-label={label}
       className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors ${
         currentPage === page
-          ? 'bg-orange-500 text-white'
-          : 'text-gray-400 hover:text-white hover:bg-gray-700'
+          ? 'bg-[var(--v2-accent)] text-[var(--v2-accent-fg)]'
+          : 'text-[var(--v2-muted)] hover:text-[var(--v2-text)] hover:bg-[var(--v2-hover)]'
       }`}
     >
       {icon}
@@ -25,7 +25,10 @@ export function NavRail({ currentPage, onNavigate }: NavRailProps) {
   )
 
   return (
-    <nav className="w-16 flex flex-col items-center py-4 gap-6 bg-gray-800 border-r border-gray-700 shrink-0">
+    <nav
+      className="w-16 flex flex-col items-center py-4 gap-6 border-r shrink-0"
+      style={{ background: 'var(--v2-surface)', borderColor: 'var(--v2-border)' }}
+    >
       <div className="h-10 w-10 flex items-center justify-center">
         <img src={hrLogo} alt="HR" className="h-8 w-8" />
       </div>
@@ -33,6 +36,7 @@ export function NavRail({ currentPage, onNavigate }: NavRailProps) {
       <div className="flex flex-col items-center gap-4 flex-1">
         <NavBtn page="home" icon={<Home size={18} />} label="Home" />
         <NavBtn page="lobby" icon={<MessageCircle size={18} />} label="Lobby" />
+        <NavBtn page="lab" icon={<FlaskConical size={18} />} label="Lab" />
       </div>
 
       <div className="flex flex-col items-center gap-4">

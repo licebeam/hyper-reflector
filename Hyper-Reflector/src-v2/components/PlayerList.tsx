@@ -11,46 +11,75 @@ type PlayerListProps = {
 
 export function PlayerList({ users, currentUserUid }: PlayerListProps) {
   return (
-    <div className="flex flex-col h-full border-l border-gray-700">
-      <div className="px-3 py-2 border-b border-gray-700 shrink-0">
-        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+    <div
+      className="flex flex-col h-full border-l"
+      style={{ borderColor: 'var(--v2-border)' }}
+    >
+      <div
+        className="px-3 py-2 border-b shrink-0"
+        style={{ borderColor: 'var(--v2-border)' }}
+      >
+        <span
+          className="text-xs font-semibold uppercase tracking-wide"
+          style={{ color: 'var(--v2-muted)' }}
+        >
           Players ({users.length})
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {users.length === 0 && (
-          <p className="text-gray-500 text-xs text-center pt-6 px-3">
+          <p className="text-xs text-center pt-6 px-3" style={{ color: 'var(--v2-muted)' }}>
             No players in lobby
           </p>
         )}
         {users.map(user => (
           <div
             key={user.uid}
-            className={`flex items-center gap-2.5 px-3 py-2 hover:bg-gray-700 transition-colors ${
-              user.uid === currentUserUid ? 'bg-gray-700/50' : ''
-            }`}
+            className="flex items-center gap-2.5 px-3 py-2 transition-colors cursor-default"
+            style={{
+              background: user.uid === currentUserUid ? 'var(--v2-hover)' : undefined,
+            }}
+            onMouseEnter={e => {
+              if (user.uid !== currentUserUid)
+                (e.currentTarget as HTMLElement).style.background = 'var(--v2-hover)'
+            }}
+            onMouseLeave={e => {
+              if (user.uid !== currentUserUid)
+                (e.currentTarget as HTMLElement).style.background = ''
+            }}
           >
-            <div className="w-7 h-7 rounded-full bg-orange-500 flex items-center justify-center text-xs font-bold text-white shrink-0">
+            <div
+              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+              style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
+            >
               {getInitials(user.userName)}
             </div>
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1">
                 <span
-                  className={`text-sm truncate ${
-                    user.uid === currentUserUid ? 'text-orange-400' : 'text-gray-100'
-                  }`}
+                  className="text-sm truncate"
+                  style={{
+                    color: user.uid === currentUserUid
+                      ? 'var(--v2-name-self)'
+                      : 'var(--v2-text)',
+                  }}
                 >
                   {user.userName}
                 </span>
                 {user.uid === currentUserUid && (
-                  <span className="text-xs text-gray-500 shrink-0">(you)</span>
+                  <span className="text-xs shrink-0" style={{ color: 'var(--v2-muted)' }}>
+                    (you)
+                  </span>
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400">{user.accountElo} ELO</span>
+                <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>
+                  {user.accountElo} ELO
+                </span>
                 {user.countryCode && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>
                     {user.countryCode.toUpperCase()}
                   </span>
                 )}
