@@ -97,6 +97,39 @@ export function HeaderBar({
             {t("Layout.buttons.forceCloseMatch")}
           </Button>
         ) : null}
+
+        {/* Version toggle */}
+        <Flex
+          border="1px solid"
+          borderColor="border.muted"
+          rounded="md"
+          overflow="hidden"
+          fontSize="xs"
+          fontWeight="medium"
+        >
+          <Box
+            px="2"
+            py="1"
+            bg={`${accentColor}.solid`}
+            color="fg.on-accent"
+          >
+            V1
+          </Box>
+          <Box
+            as="button"
+            px="2"
+            py="1"
+            color="fg.muted"
+            _hover={{ bg: "bg.subtle" }}
+            cursor="pointer"
+            onClick={() => {
+              localStorage.setItem("appVersion", "v2");
+              window.location.reload();
+            }}
+          >
+            V2
+          </Box>
+        </Flex>
       </Flex>
     </Flex>
   );
