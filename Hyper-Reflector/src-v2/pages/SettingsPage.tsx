@@ -2,7 +2,7 @@ import { LogOut } from 'lucide-react'
 import { logout } from '../../src/utils/firebase'
 import { useSettingsStore } from '../../src/state/store'
 import { useV2Theme } from '../ThemeContext'
-import { THEMES, CHAT_MSG_SWATCHES, NAME_SELF_SWATCHES, NAME_OTHER_SWATCHES } from '../theme'
+import { THEMES, CHAT_MSG_SWATCHES, NAME_SELF_SWATCHES, NAME_OTHER_SWATCHES, GRAD_FROM_SWATCHES, GRAD_TO_SWATCHES } from '../theme'
 import type { V2User } from '../types'
 
 type SettingsPageProps = {
@@ -89,9 +89,12 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
     onLogout()
   }
 
-  const currentChatColor = overrides['--v2-chat-msg'] ?? theme.vars['--v2-chat-msg']
-  const currentSelfColor = overrides['--v2-name-self'] ?? theme.vars['--v2-name-self']
+  const currentChatColor  = overrides['--v2-chat-msg']   ?? theme.vars['--v2-chat-msg']
+  const currentSelfColor  = overrides['--v2-name-self']  ?? theme.vars['--v2-name-self']
   const currentOtherColor = overrides['--v2-name-other'] ?? theme.vars['--v2-name-other']
+  const currentGradFrom      = overrides['--v2-grad-from']       ?? theme.vars['--v2-grad-from']
+  const currentGradTo        = overrides['--v2-grad-to']         ?? theme.vars['--v2-grad-to']
+  const currentPatternOpacity = overrides['--v2-pattern-opacity'] ?? theme.vars['--v2-pattern-opacity']
 
   return (
     <div className="h-full overflow-y-auto">
@@ -162,7 +165,7 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
             {/* Fun overrides */}
             <div className="pt-3 border-t space-y-3" style={{ borderColor: 'var(--v2-border)' }}>
               <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--v2-muted)' }}>
-                Customize Colors
+                Chat Colors
               </p>
               <ColorSwatch
                 label="Chat text"
@@ -183,7 +186,7 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
                 onChange={c => setOverride('--v2-name-other', c)}
               />
 
-              {/* Preview line */}
+              {/* Chat preview */}
               <div
                 className="text-xs rounded px-3 py-2 border"
                 style={{ borderColor: 'var(--v2-border)', background: 'var(--v2-hover)' }}
@@ -196,6 +199,42 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
                 <span style={{ color: 'var(--v2-muted)' }}> 12:01 </span>
                 <span style={{ color: currentChatColor }}>GG!</span>
               </div>
+            </div>
+
+            {/* Background gradient overrides */}
+            <div className="pt-3 border-t space-y-3" style={{ borderColor: 'var(--v2-border)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--v2-muted)' }}>
+                Background
+              </p>
+              <ColorSwatch
+                label="Gradient top"
+                current={currentGradFrom}
+                swatches={GRAD_FROM_SWATCHES}
+                onChange={c => setOverride('--v2-grad-from', c)}
+              />
+              <ColorSwatch
+                label="Gradient bottom"
+                current={currentGradTo}
+                swatches={GRAD_TO_SWATCHES}
+                onChange={c => setOverride('--v2-grad-to', c)}
+              />
+              <Row label="Pattern overlay" sub="Tiled texture visibility">
+                <select
+                  value={currentPatternOpacity}
+                  onChange={e => setOverride('--v2-pattern-opacity', e.target.value)}
+                  className="rounded px-3 py-1.5 text-sm border outline-none"
+                  style={{
+                    background: 'var(--v2-hover)',
+                    borderColor: 'var(--v2-border)',
+                    color: 'var(--v2-text)',
+                  }}
+                >
+                  <option value="0">Off</option>
+                  <option value="0.06">Subtle</option>
+                  <option value="0.12">Medium</option>
+                  <option value="0.22">Strong</option>
+                </select>
+              </Row>
             </div>
           </div>
         </Section>
