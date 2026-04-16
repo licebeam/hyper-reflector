@@ -1,7 +1,7 @@
-import { FlaskConical, Home, MessageCircle, Settings } from 'lucide-react'
+import { FlaskConical, Home, MessageCircle, Settings, Users } from 'lucide-react'
 import hrLogo from '../../src/assets/logo.svg'
 
-export type Page = 'lobby' | 'home' | 'settings' | 'lab'
+export type Page = 'lobby' | 'home' | 'profiles' | 'settings' | 'lab'
 
 type NavRailProps = {
   currentPage: Page
@@ -34,9 +34,10 @@ export function NavRail({ currentPage, onNavigate }: NavRailProps) {
       </div>
 
       <div className="flex flex-col items-center gap-4 flex-1">
-        <NavBtn page="home" icon={<Home size={18} />} label="Home" />
-        <NavBtn page="lobby" icon={<MessageCircle size={18} />} label="Lobby" />
-        <NavBtn page="lab" icon={<FlaskConical size={18} />} label="Lab" />
+        <NavBtn page="home"     icon={<Home size={18} />}           label="Home" />
+        <NavBtn page="lobby"    icon={<MessageCircle size={18} />}  label="Lobby" />
+        <NavBtn page="profiles" icon={<Users size={18} />}          label="Profiles" />
+        <NavBtn page="lab"      icon={<FlaskConical size={18} />}   label="Lab" />
       </div>
 
       <div className="flex flex-col items-center gap-4">
