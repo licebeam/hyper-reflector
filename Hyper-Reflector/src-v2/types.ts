@@ -22,9 +22,20 @@ export type V2User = {
 
 export type V2Message = {
   id: string
-  role: 'user' | 'system'
+  role: 'user' | 'system' | 'challenge'
   text: string
   timeStamp: number
   userName?: string
   senderUid?: string
+  // Challenge-specific
+  challengeChallengerId?: string
+  challengeOpponentId?: string
+  challengeStatus?: 'accepted' | 'declined'
+  challengeResponder?: string
+}
+
+export type V2Lobby = {
+  name: string
+  users: number
+  isPrivate?: boolean
 }

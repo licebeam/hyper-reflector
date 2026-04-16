@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react'
 import type { ConnectionStatus } from '../types'
 
 const STATUS_DOT: Record<ConnectionStatus, string> = {
@@ -18,9 +19,10 @@ type HeaderProps = {
   lobbyId: string
   status: ConnectionStatus
   userName?: string
+  onOpenLobbySelector?: () => void
 }
 
-export function Header({ lobbyId, status, userName }: HeaderProps) {
+export function Header({ lobbyId, status, userName, onOpenLobbySelector }: HeaderProps) {
   const switchTo = (version: string) => {
     localStorage.setItem('appVersion', version)
     window.location.reload()
@@ -32,9 +34,17 @@ export function Header({ lobbyId, status, userName }: HeaderProps) {
       style={{ background: 'var(--v2-surface)', borderColor: 'var(--v2-border)' }}
     >
       <div className="flex items-center gap-3">
-        <span className="font-medium text-sm" style={{ color: 'var(--v2-accent)' }}>
-          Lobby: {lobbyId}
-        </span>
+        <button
+          onClick={onOpenLobbySelector}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors"
+          style={{ color: 'var(--v2-accent)' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-hover)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          title="Switch lobby"
+        >
+          <span className="font-medium text-sm">{lobbyId}</span>
+          <ChevronDown size={13} />
+        </button>
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${STATUS_DOT[status]}`} />
           <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>

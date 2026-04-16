@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Swords, User } from 'lucide-react'
 import type { V2User } from '../types'
 import { CountryFlag } from './CountryFlag'
 import { UserTitle } from './UserTitle'
@@ -59,12 +60,12 @@ function UserAvatar({ user }: { user: V2User }) {
 type RowProps = {
   user: V2User
   isSelf: boolean
-  clickable: boolean
   onViewProfile?: (uid: string) => void
+  onChallenge?: (uid: string) => void
   currentUser?: V2User | null
 }
 
-function PlayerRow({ user, isSelf, clickable, onViewProfile, currentUser }: RowProps) {
+function PlayerRow({ user, isSelf, onViewProfile, onChallenge, currentUser }: RowProps) {
   const [hovered, setHovered] = useState(false)
   const expanded = isSelf || hovered
 
@@ -77,11 +78,9 @@ function PlayerRow({ user, isSelf, clickable, onViewProfile, currentUser }: RowP
     <div
       className="flex items-start gap-2.5 px-3 py-1 border-b transition-colors"
       style={{
-        cursor: clickable ? 'pointer' : 'default',
         background: hovered || isSelf ? 'var(--v2-hover)' : 'transparent',
         borderColor: 'var(--v2-border)',
       }}
-      onClick={() => clickable && onViewProfile!(user.uid)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -113,7 +112,7 @@ function PlayerRow({ user, isSelf, clickable, onViewProfile, currentUser }: RowP
           }`}
         >
           <div className="overflow-hidden">
-            <div className="pt-1 pb-0.5 space-y-1">
+            <div className="pt-1 pb-1 space-y-1.5">
               {user.userTitle?.title && (
                 <UserTitle title={user.userTitle} />
               )}
@@ -135,6 +134,34 @@ function PlayerRow({ user, isSelf, clickable, onViewProfile, currentUser }: RowP
                   )
                 )}
               </div>
+
+              {/* Action buttons for other players */}
+              {!isSelf && (
+                <div className="flex gap-1.5 flex-wrap">
+                  {onChallenge && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onChallenge(user.uid) }}
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium transition-colors"
+                      style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-accent-hover)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
+                    >
+                      <Swords size={10} /> Challenge
+                    </button>
+                  )}
+                  {onViewProfile && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onViewProfile(user.uid) }}
+                      className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded transition-colors"
+                      style={{ border: '1px solid var(--v2-border)', color: 'var(--v2-muted)' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-hover)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                    >
+                      <User size={10} /> Profile
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -149,9 +176,10 @@ type PlayerListProps = {
   users: V2User[]
   currentUser?: V2User | null
   onViewProfile?: (uid: string) => void
+  onChallenge?: (uid: string) => void
 }
 
-export function PlayerList({ users, currentUser, onViewProfile }: PlayerListProps) {
+export function PlayerList({ users, currentUser, onViewProfile, onChallenge }: PlayerListProps) {
   return (
     <div className="flex flex-col h-full border-l" style={{ borderColor: 'var(--v2-border)' }}>
       <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: 'var(--v2-border)' }}>
@@ -168,14 +196,13 @@ export function PlayerList({ users, currentUser, onViewProfile }: PlayerListProp
         )}
         {users.map(user => {
           const isSelf = user.uid === currentUser?.uid
-          const clickable = !isSelf && !!onViewProfile
           return (
             <PlayerRow
               key={user.uid}
               user={user}
               isSelf={isSelf}
-              clickable={clickable}
-              onViewProfile={onViewProfile}
+              onViewProfile={!isSelf ? onViewProfile : undefined}
+              onChallenge={!isSelf ? onChallenge : undefined}
               currentUser={currentUser}
             />
           )
