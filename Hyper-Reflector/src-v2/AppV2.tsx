@@ -1,5 +1,6 @@
 import './styles.css'
 import { useEffect, useState } from 'react'
+import bgImage from '../src/assets/bgImage.svg'
 import { onAuthStateChanged } from 'firebase/auth'
 import { ThemeProvider, useV2Theme } from './ThemeContext'
 import { NavRail, type Page } from './components/NavRail'
@@ -89,12 +90,12 @@ function AppV2Inner() {
   // CSS vars applied here cascade to every child via inheritance
   return (
     <div
-      className="h-screen overflow-hidden"
+      className="relative h-screen overflow-hidden v2-animated-bg"
       style={{
         ...(vars as unknown as React.CSSProperties),
-        background: 'var(--v2-bg)',
+        '--v2-bg-image': `url(${bgImage})`,
         color: 'var(--v2-text)',
-      }}
+      } as React.CSSProperties}
     >
       {authState === 'loading' && (
         <div className="h-full flex items-center justify-center">
