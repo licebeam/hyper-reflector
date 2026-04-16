@@ -20,7 +20,7 @@ export type ThemeVars = {
 }
 
 export type ThemeOverrides = Partial<
-  Pick<ThemeVars, '--v2-chat-msg' | '--v2-name-self' | '--v2-name-other' | '--v2-grad-from' | '--v2-grad-to' | '--v2-pattern-opacity'>
+  Pick<ThemeVars, '--v2-chat-msg' | '--v2-name-self' | '--v2-name-other' | '--v2-pattern-opacity'>
 >
 
 export type V2Theme = {
@@ -82,6 +82,50 @@ export const THEMES: V2Theme[] = [
       '--v2-pattern-opacity': '0.1',
     },
   },
+  {
+    id: 'neon-teal',
+    name: 'Neon Teal',
+    emoji: '🌊',
+    vars: {
+      '--v2-bg': '#050f10',
+      '--v2-surface': '#0a1f21',
+      '--v2-hover': '#112d30',
+      '--v2-border': '#1a4045',
+      '--v2-accent': '#14b8a6',
+      '--v2-accent-hover': '#0d9488',
+      '--v2-accent-fg': '#ffffff',
+      '--v2-text': '#e0fdfa',
+      '--v2-muted': '#6ea8a4',
+      '--v2-chat-msg': '#e0fdfa',
+      '--v2-name-self': '#2dd4bf',
+      '--v2-name-other': '#a78bfa',
+      '--v2-grad-from': '#0a1f21',
+      '--v2-grad-to': '#050f10',
+      '--v2-pattern-opacity': '0.1',
+    },
+  },
+  {
+    id: 'crimson-night',
+    name: 'Crimson Night',
+    emoji: '🩸',
+    vars: {
+      '--v2-bg': '#0f0408',
+      '--v2-surface': '#1c060f',
+      '--v2-hover': '#2a0d1a',
+      '--v2-border': '#3d1226',
+      '--v2-accent': '#e11d48',
+      '--v2-accent-hover': '#be123c',
+      '--v2-accent-fg': '#ffffff',
+      '--v2-text': '#fef2f2',
+      '--v2-muted': '#a07080',
+      '--v2-chat-msg': '#fef2f2',
+      '--v2-name-self': '#fb7185',
+      '--v2-name-other': '#60a5fa',
+      '--v2-grad-from': '#1c060f',
+      '--v2-grad-to': '#0f0408',
+      '--v2-pattern-opacity': '0.1',
+    },
+  },
 ]
 
 export const DEFAULT_THEME_ID = 'dark-orange'
@@ -90,9 +134,6 @@ export const DEFAULT_THEME_ID = 'dark-orange'
 export const CHAT_MSG_SWATCHES = ['#f9fafb', '#e2d9f3', '#d1fae5', '#fef3c7', '#ffe4e6', '#a0f0ed']
 export const NAME_SELF_SWATCHES = ['#fb923c', '#c084fc', '#34d399', '#60a5fa', '#f472b6', '#facc15']
 export const NAME_OTHER_SWATCHES = ['#60a5fa', '#34d399', '#fb923c', '#c084fc', '#f472b6', '#facc15']
-// Gradient background swatches — tinted dark surface colors
-export const GRAD_FROM_SWATCHES = ['#1f2937', '#1a1035', '#2d1515', '#0f2020', '#1f1a08', '#2a0f2a']
-export const GRAD_TO_SWATCHES   = ['#0a0f17', '#080510', '#120606', '#040f0f', '#0f0f04', '#110511']
 
 export function getThemeById(id: string): V2Theme {
   return THEMES.find(t => t.id === id) ?? THEMES[0]

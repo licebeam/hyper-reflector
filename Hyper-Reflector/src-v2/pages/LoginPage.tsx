@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { loginEmail } from '../../src/utils/firebase'
 import type { FirebaseError } from 'firebase/app'
 
-export function LoginPage() {
+type LoginPageProps = {
+  onSignup?: () => void
+}
+
+export function LoginPage({ onSignup }: LoginPageProps = {}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -107,9 +111,20 @@ export function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-5 pt-4 border-t" style={{ borderColor: 'var(--v2-border)' }}>
+        <div className="mt-5 pt-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--v2-border)' }}>
+          {onSignup && (
+            <button
+              className="text-xs transition-colors"
+              style={{ color: 'var(--v2-accent)' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.7')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+              onClick={onSignup}
+            >
+              Create account
+            </button>
+          )}
           <button
-            className="w-full text-xs transition-colors"
+            className="text-xs transition-colors ml-auto"
             style={{ color: 'var(--v2-muted)' }}
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
