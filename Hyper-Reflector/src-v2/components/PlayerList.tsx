@@ -1,3 +1,6 @@
+// TODO: ping is working in v1, but v2 it is not working properly, it never shows more than a dash, we should use the same process for gathering ping.
+// Or we can modify the backend / websocket server in order to accommodate a new approach.
+
 import { useState } from "react";
 import { Swords, User } from "lucide-react";
 import type { V2User } from "../types";

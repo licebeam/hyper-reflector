@@ -18,6 +18,7 @@ export type V2User = {
   userProfilePic: string
   gravEmail: string
   userEmail: string
+  isRankQueued: boolean
 }
 
 export type V2Message = {

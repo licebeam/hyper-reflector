@@ -1,3 +1,4 @@
+// TODO: add ranked queue settings, IE: region or ping / elo limits for fine grain control
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";

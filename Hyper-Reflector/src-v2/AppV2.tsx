@@ -37,6 +37,7 @@ function mapToV2User(data: any, fallbackEmail?: string | null): V2User {
     userProfilePic: data.userProfilePic || "",
     gravEmail: data.gravEmail || "",
     userEmail: data.userEmail || fallbackEmail || "",
+    isRankQueued: false,
   };
 }
 
@@ -100,6 +101,7 @@ function AppV2Inner() {
           userProfilePic: "",
           gravEmail: "",
           userEmail: firebaseUser.email || "",
+          isRankQueued: false,
         });
       } finally {
         setAuthState("authenticated");
@@ -134,6 +136,11 @@ function AppV2Inner() {
 
   const handleDeclineChallenge = (messageId: string) => {
     void declineChallenge(messageId);
+  };
+
+  const handleSetIsRankQueued = (isQueue: boolean) => {
+    console.log(isQueue);
+    //TODO: user needs to be able to toggle ranke queue on and off using isQueue
   };
 
   // CSS vars applied here cascade to every child via inheritance
@@ -183,6 +190,7 @@ function AppV2Inner() {
 
           <div className="flex-1 flex flex-col overflow-hidden">
             <Header
+              onToggleRankQueued={handleSetIsRankQueued}
               lobbyId={currentLobbyId}
               status={status}
               currentUser={user}

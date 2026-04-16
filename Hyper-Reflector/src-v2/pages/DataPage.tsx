@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-type DataPage = {
+type DataPageProps = {
   onSignup?: () => void;
 };
 
