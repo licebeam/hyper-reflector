@@ -7,8 +7,10 @@ import { NavRail, type Page } from './components/NavRail'
 import { Header } from './components/Header'
 import { LobbyPage } from './pages/LobbyPage'
 import { LoginPage } from './pages/LoginPage'
+import { SignupPage } from './pages/SignupPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LabPage } from './pages/LabPage'
+import { HomePage } from './pages/HomePage'
 import { useWebSocket } from './hooks/useWebSocket'
 import { auth } from '../src/utils/firebase'
 import api from '../src/external-api/requests'
@@ -39,6 +41,7 @@ function AppV2Inner() {
   const { vars } = useV2Theme()
 
   const [authState, setAuthState] = useState<AuthState>('loading')
+  const [authView, setAuthView] = useState<'login' | 'signup'>('login')
   const [user, setUser] = useState<V2User | null>(null)
   const [page, setPage] = useState<Page>('lobby')
 
@@ -64,9 +67,12 @@ function AppV2Inner() {
         }
       } catch (err) {
         console.warn('[v2] Backend unavailable, using Firebase identity', err)
+        // During signup, onAuthStateChanged fires before api.createAccount completes,
+        // so the backend has no record yet. Read the name stashed in sessionStorage.
+        const pendingName = sessionStorage.getItem('v2_pending_display_name')
         setUser({
           uid: firebaseUser.uid,
-          userName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Player',
+          userName: pendingName || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Player',
           accountElo: 1200,
           countryCode: '',
           lastKnownPings: [],
@@ -111,8 +117,11 @@ function AppV2Inner() {
       )}
 
       {authState === 'unauthenticated' && (
-        <div className="h-full flex items-center justify-center">
-          <LoginPage />
+        <div className="h-full">
+          {authView === 'signup'
+            ? <SignupPage onBack={() => setAuthView('login')} />
+            : <LoginPage onSignup={() => setAuthView('signup')} />
+          }
         </div>
       )}
 
@@ -136,13 +145,7 @@ function AppV2Inner() {
                   onSendMessage={sendMessage}
                 />
               )}
-              {page === 'home' && (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-sm" style={{ color: 'var(--v2-muted)' }}>
-                    Home — coming soon
-                  </p>
-                </div>
-              )}
+              {page === 'home' && <HomePage currentUser={user} />}
               {page === 'lab' && <LabPage />}
               {page === 'settings' && user && (
                 <SettingsPage user={user} onLogout={handleLogout} />
