@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-type TournamentPage = {
+type TournamentPageProps = {
   onSignup?: () => void;
 };
 

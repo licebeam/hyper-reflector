@@ -1,4 +1,11 @@
-import { ChevronDown, User } from "lucide-react";
+// TODO: instead of a lobby modal and drop down, I want to be able to click on buttons that look like folder tabs, that flow to the right, with a + button for a new tab, and an x to leave the lobby.
+// We'll need to add some new code to the web socket server to allow users to exist in multiple lobbies at once.
+
+// TODO: users should be able to Queue for ranked matches, this should prioritize people in the lobby with the lowest ping and same region.
+// We'll need to modify the websocket server to accommodate this and perhaps adjust how the hole punching server works as well.
+
+import { useState } from "react";
+import { ChevronDown, Swords, User } from "lucide-react";
 import type { ConnectionStatus, V2User } from "../types";
 
 const STATUS_DOT: Record<ConnectionStatus, string> = {
@@ -16,6 +23,7 @@ const STATUS_LABEL: Record<ConnectionStatus, string> = {
 };
 
 type HeaderProps = {
+  onToggleRankQueued: (isQueue: boolean) => void;
   lobbyId: string;
   status: ConnectionStatus;
   currentUser: V2User | null;
@@ -24,6 +32,7 @@ type HeaderProps = {
 };
 
 export function Header({
+  onToggleRankQueued,
   lobbyId,
   status,
   currentUser,
@@ -34,6 +43,7 @@ export function Header({
     localStorage.setItem("appVersion", version);
     window.location.reload();
   };
+  const [isQueued, setIsQueued] = useState(false); // TODO: should be set to whatever the current user is on load.
 
   return (
     <header
@@ -66,6 +76,29 @@ export function Header({
           </span>
         </div>
       </div>
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          console.log("rank queue");
+          onToggleRankQueued(true); //TODO: should be the opposite of what exists on currentUser for toggle
+          setIsQueued(!isQueued);
+        }}
+        className="flex items-center gap-1 text-[20px] px-2 py-0.5 rounded font-medium transition-colors"
+        style={{
+          background: "var(--v2-accent)",
+          color: "var(--v2-accent-fg)",
+          cursor: "pointer",
+        }}
+        onMouseEnter={(e) =>
+          (e.currentTarget.style.background = "var(--v2-accent-hover)")
+        }
+        onMouseLeave={(e) =>
+          (e.currentTarget.style.background = "var(--v2-accent)")
+        }
+      >
+        <Swords size={16} /> {isQueued ? "Searching..." : "Ranked Queue"}
+      </button>
 
       <div className="flex items-center gap-3">
         {currentUser && (
