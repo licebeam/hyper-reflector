@@ -1,7 +1,29 @@
 @import "tailwindcss";
 
-body {
+/* ── Scrollbars: thin + themed ───────────────────────────────────────────────── */
+/* Firefox */
+* {
   scrollbar-width: thin;
+  scrollbar-color: var(--v2-border, #333) transparent;
+}
+
+/* Chromium / WebKit */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--v2-border, #333);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--v2-muted, #555);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ── Animated pattern overlay ────────────────────────────────────────────────── */

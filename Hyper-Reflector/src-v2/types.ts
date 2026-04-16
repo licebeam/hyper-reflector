@@ -1,11 +1,18 @@
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
 
+export type UserTitleData = {
+  bgColor: string
+  border: string
+  color: string
+  title: string
+}
+
 export type V2User = {
   uid: string
   userName: string
   accountElo: number
   countryCode: string
-  userTitle?: { title: string; color: string; textColor: string }
+  userTitle?: UserTitleData
   lastKnownPings: Array<{ id: string; ping: number | string }>
   knownAliases: string[]
   userProfilePic: string

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { V2User } from '../types'
+import { CountryFlag } from './CountryFlag'
+import { UserTitle } from './UserTitle'
 
 // ── Ping helpers ───────────────────────────────────────────────────────────────
 
@@ -28,14 +30,6 @@ function pingColor(ping: number | null, isUnstable?: boolean): string {
   return '#f87171'
 }
 
-// ── Country flag emoji ─────────────────────────────────────────────────────────
-
-function toFlagEmoji(code?: string): string {
-  if (!code || code.length < 2) return ''
-  const base = 0x1F1E6 - 65
-  return code.toUpperCase().split('').map(c => String.fromCodePoint(base + c.charCodeAt(0))).join('')
-}
-
 // ── Avatar ─────────────────────────────────────────────────────────────────────
 
 function UserAvatar({ user }: { user: V2User }) {
@@ -60,7 +54,96 @@ function UserAvatar({ user }: { user: V2User }) {
   )
 }
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// ── Player row ─────────────────────────────────────────────────────────────────
+
+type RowProps = {
+  user: V2User
+  isSelf: boolean
+  clickable: boolean
+  onViewProfile?: (uid: string) => void
+  currentUser?: V2User | null
+}
+
+function PlayerRow({ user, isSelf, clickable, onViewProfile, currentUser }: RowProps) {
+  const [hovered, setHovered] = useState(false)
+  const expanded = isSelf || hovered
+
+  const { ping, isUnstable } = resolvePing(user, currentUser)
+  const pingMs = ping !== null ? Math.round(ping) : null
+  const pingLabel = ping === 0 ? '< 1 ms' : pingMs !== null ? `${pingMs} ms` : null
+  const pColor = pingColor(ping, isUnstable)
+
+  return (
+    <div
+      className="flex items-start gap-2.5 px-3 py-1 border-b transition-colors"
+      style={{
+        cursor: clickable ? 'pointer' : 'default',
+        background: hovered || isSelf ? 'var(--v2-hover)' : 'transparent',
+        borderColor: 'var(--v2-border)',
+      }}
+      onClick={() => clickable && onViewProfile!(user.uid)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <UserAvatar user={user} />
+
+      <div className="flex-1 min-w-0">
+        {/* Always visible: name + (you) + flag */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span
+            className="text-sm font-medium truncate"
+            style={{ color: isSelf ? 'var(--v2-name-self)' : 'var(--v2-text)' }}
+          >
+            {user.userName}
+          </span>
+          {isSelf && (
+            <span className="text-[10px] shrink-0" style={{ color: 'var(--v2-muted)' }}>(you)</span>
+          )}
+          <CountryFlag code={user.countryCode} className="shrink-0" />
+        </div>
+
+        {/*
+          Expandable section.
+          transition-[grid-template-rows] is the Tailwind v4 arbitrary-property syntax.
+          Both row values appear as complete literals here so the scanner picks them up.
+        */}
+        <div
+          className={`grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out ${
+            expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="pt-1 pb-0.5 space-y-1">
+              {user.userTitle?.title && (
+                <UserTitle title={user.userTitle} />
+              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px]" style={{ color: 'var(--v2-muted)' }}>
+                  {user.accountElo} ELO
+                </span>
+                {!isSelf && (
+                  pingLabel !== null ? (
+                    <span
+                      className="text-[10px]"
+                      style={{ color: pColor }}
+                      title={isUnstable ? 'Unstable connection' : undefined}
+                    >
+                      {isUnstable ? `~${pingLabel}` : pingLabel}
+                    </span>
+                  ) : (
+                    <span className="text-[10px]" style={{ color: 'var(--v2-muted)' }}>ping —</span>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── List ───────────────────────────────────────────────────────────────────────
 
 type PlayerListProps = {
   users: V2User[]
@@ -83,66 +166,18 @@ export function PlayerList({ users, currentUser, onViewProfile }: PlayerListProp
             No players in lobby
           </p>
         )}
-
         {users.map(user => {
           const isSelf = user.uid === currentUser?.uid
-          const { ping, isUnstable } = resolvePing(user, currentUser)
-          const pingMs = ping !== null ? Math.round(ping) : null
-          const pingLabel = ping === 0 ? '< 1 ms' : pingMs !== null ? `${pingMs} ms` : null
-          const pColor = pingColor(ping, isUnstable)
-          const flag = toFlagEmoji(user.countryCode)
           const clickable = !isSelf && !!onViewProfile
-
           return (
-            <div
+            <PlayerRow
               key={user.uid}
-              className="flex items-center gap-2.5 px-3 py-2 transition-colors"
-              style={{
-                cursor: clickable ? 'pointer' : 'default',
-                background: isSelf ? 'var(--v2-hover)' : undefined,
-              }}
-              onClick={() => clickable && onViewProfile!(user.uid)}
-              onMouseEnter={e => { if (clickable) (e.currentTarget as HTMLElement).style.background = 'var(--v2-hover)' }}
-              onMouseLeave={e => { if (clickable && !isSelf) (e.currentTarget as HTMLElement).style.background = '' }}
-            >
-              <UserAvatar user={user} />
-
-              <div className="flex-1 min-w-0">
-                {/* Name row */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span
-                    className="text-sm font-medium truncate"
-                    style={{ color: isSelf ? 'var(--v2-name-self)' : 'var(--v2-text)' }}
-                  >
-                    {user.userName}
-                  </span>
-                  {isSelf && (
-                    <span className="text-xs shrink-0" style={{ color: 'var(--v2-muted)' }}>(you)</span>
-                  )}
-                  {flag && <span className="text-xs shrink-0">{flag}</span>}
-                </div>
-
-                {/* Stats row */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>
-                    {user.accountElo} ELO
-                  </span>
-                  {!isSelf && (
-                    pingLabel !== null ? (
-                      <span
-                        className="text-xs"
-                        style={{ color: pColor }}
-                        title={isUnstable ? 'Unstable connection' : undefined}
-                      >
-                        {isUnstable ? `~${pingLabel}` : pingLabel}
-                      </span>
-                    ) : (
-                      <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>ping —</span>
-                    )
-                  )}
-                </div>
-              </div>
-            </div>
+              user={user}
+              isSelf={isSelf}
+              clickable={clickable}
+              onViewProfile={onViewProfile}
+              currentUser={currentUser}
+            />
           )
         })}
       </div>

@@ -43,9 +43,9 @@ export function ChatPanel({
   };
 
   return (
-    <div className="flex flex-col h-full overflow-y-scroll">
+    <div className="flex flex-col h-full ">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-1.5 min-h-0">
+      <div className="flex-1 p-3 space-y-1.5 min-h-0 overflow-y-scroll">
         {messages.length === 0 && (
           <p
             className="text-sm text-center pt-8"

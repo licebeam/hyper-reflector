@@ -10,6 +10,8 @@ import {
 import api from "../../src/external-api/requests";
 import { auth } from "../../src/utils/firebase";
 import type { V2User } from "../types";
+import { CountryFlag } from "../components/CountryFlag";
+import { UserTitle } from "../components/UserTitle";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -43,18 +45,6 @@ const INIT_BOARD: LeaderboardState = {
   loading: false,
   initialized: false,
 };
-
-// ── Flag emoji ─────────────────────────────────────────────────────────────────
-
-function toFlagEmoji(code?: string): string {
-  if (!code || code.length < 2) return "";
-  const base = 0x1f1e6 - 65;
-  return code
-    .toUpperCase()
-    .split("")
-    .map((c) => String.fromCodePoint(base + c.charCodeAt(0)))
-    .join("");
-}
 
 // ── Avatar chip ────────────────────────────────────────────────────────────────
 
@@ -93,7 +83,6 @@ function UserCard({
   statLine?: string;
   onView?: (uid: string) => void;
 }) {
-  const flag = toFlagEmoji(user.countryCode);
   const clickable = !!user.uid && !!onView;
 
   return (
@@ -121,19 +110,8 @@ function UserCard({
           >
             {user.userName || "Unknown player"}
           </span>
-          {flag && <span className="text-xs">{flag}</span>}
-          {user.userTitle?.title && (
-            <span
-              className="text-xs px-1.5 py-0.5 rounded"
-              style={{
-                background: user.userTitle.bgColor || "var(--v2-hover)",
-                color: user.userTitle.color || "var(--v2-text)",
-                border: `1px solid ${user.userTitle.border}`,
-              }}
-            >
-              {user.userTitle.title}
-            </span>
-          )}
+          <CountryFlag code={user.countryCode} />
+          <UserTitle title={user.userTitle} />
         </div>
         {statLine && (
           <p className="text-xs mt-0.5" style={{ color: "var(--v2-muted)" }}>
