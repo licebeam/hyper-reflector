@@ -13,14 +13,13 @@ import { LabPage } from './pages/LabPage'
 import { HomePage } from './pages/HomePage'
 import { ProfilesPage } from './pages/ProfilesPage'
 import { PlayerProfilePage } from './pages/PlayerProfilePage'
+import { LobbySelector } from './components/LobbySelector'
 import { useWebSocket } from './hooks/useWebSocket'
 import { auth } from '../src/utils/firebase'
 import api from '../src/external-api/requests'
 import type { V2User } from './types'
 
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
-
-const DEFAULT_LOBBY = 'Hyper Reflector'
 
 function mapToV2User(data: any, fallbackEmail?: string | null): V2User {
   return {
@@ -47,9 +46,21 @@ function AppV2Inner() {
   const [user, setUser] = useState<V2User | null>(null)
   const [page, setPage] = useState<Page>('lobby')
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null)
+  const [lobbySelectorOpen, setLobbySelectorOpen] = useState(false)
 
-  // Hook always called — internally skips WS connection when user is null
-  const { status, lobbyUsers, messages, sendMessage } = useWebSocket(user, DEFAULT_LOBBY)
+  const {
+    status,
+    lobbyUsers,
+    messages,
+    currentLobbyId,
+    lobbyList,
+    sendMessage,
+    joinLobby,
+    createLobby,
+    sendChallenge,
+    acceptChallenge,
+    declineChallenge,
+  } = useWebSocket(user)
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (firebaseUser) => {
@@ -70,8 +81,6 @@ function AppV2Inner() {
         }
       } catch (err) {
         console.warn('[v2] Backend unavailable, using Firebase identity', err)
-        // During signup, onAuthStateChanged fires before api.createAccount completes,
-        // so the backend has no record yet. Read the name stashed in sessionStorage.
         const pendingName = sessionStorage.getItem('v2_pending_display_name')
         setUser({
           uid: firebaseUser.uid,
@@ -105,6 +114,18 @@ function AppV2Inner() {
   const handleNavigate = (p: Page) => {
     if (p !== 'profiles') setViewingProfileId(null)
     setPage(p)
+  }
+
+  const handleChallenge = (uid: string) => {
+    void sendChallenge(uid)
+  }
+
+  const handleAcceptChallenge = (messageId: string) => {
+    void acceptChallenge(messageId)
+  }
+
+  const handleDeclineChallenge = (messageId: string) => {
+    void declineChallenge(messageId)
   }
 
   // CSS vars applied here cascade to every child via inheritance
@@ -145,9 +166,10 @@ function AppV2Inner() {
 
           <div className="flex-1 flex flex-col overflow-hidden">
             <Header
-              lobbyId={DEFAULT_LOBBY}
+              lobbyId={currentLobbyId}
               status={status}
               userName={user?.userName}
+              onOpenLobbySelector={() => setLobbySelectorOpen(true)}
             />
 
             <main className="flex-1 overflow-hidden">
@@ -158,6 +180,9 @@ function AppV2Inner() {
                   currentUser={user}
                   onSendMessage={sendMessage}
                   onViewProfile={handleViewProfile}
+                  onChallenge={handleChallenge}
+                  onAcceptChallenge={handleAcceptChallenge}
+                  onDeclineChallenge={handleDeclineChallenge}
                 />
               )}
               {page === 'home' && <HomePage currentUser={user} />}
@@ -181,6 +206,17 @@ function AppV2Inner() {
             </main>
           </div>
         </div>
+      )}
+
+      {/* Lobby selector modal */}
+      {lobbySelectorOpen && (
+        <LobbySelector
+          lobbies={lobbyList}
+          currentLobbyId={currentLobbyId}
+          onJoin={joinLobby}
+          onCreate={createLobby}
+          onClose={() => setLobbySelectorOpen(false)}
+        />
       )}
     </div>
   )
