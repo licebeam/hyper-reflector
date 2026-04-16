@@ -1,10 +1,3 @@
-// TODO: instead of a lobby modal and drop down, I want to be able to click on buttons that look like folder tabs, that flow to the right, with a + button for a new tab, and an x to leave the lobby.
-// We'll need to add some new code to the web socket server to allow users to exist in multiple lobbies at once.
-
-// TODO: users should be able to Queue for ranked matches, this should prioritize people in the lobby with the lowest ping and same region.
-// We'll need to modify the websocket server to accommodate this and perhaps adjust how the hole punching server works as well.
-
-import { useState } from "react";
 import { ChevronDown, Swords, User } from "lucide-react";
 import type { ConnectionStatus, V2User } from "../types";
 
@@ -43,7 +36,7 @@ export function Header({
     localStorage.setItem("appVersion", version);
     window.location.reload();
   };
-  const [isQueued, setIsQueued] = useState(false); // TODO: should be set to whatever the current user is on load.
+  const isQueued = currentUser?.isRankQueued ?? false;
 
   return (
     <header
@@ -80,9 +73,7 @@ export function Header({
       <button
         onClick={(e) => {
           e.stopPropagation();
-          console.log("rank queue");
-          onToggleRankQueued(true); //TODO: should be the opposite of what exists on currentUser for toggle
-          setIsQueued(!isQueued);
+          onToggleRankQueued(!isQueued);
         }}
         className="flex items-center gap-1 text-[20px] px-2 py-0.5 rounded font-medium transition-colors"
         style={{

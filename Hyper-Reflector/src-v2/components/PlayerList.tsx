@@ -1,6 +1,3 @@
-// TODO: ping is working in v1, but v2 it is not working properly, it never shows more than a dash, we should use the same process for gathering ping.
-// Or we can modify the backend / websocket server in order to accommodate a new approach.
-
 import { useState } from "react";
 import { Swords, User } from "lucide-react";
 import type { V2User } from "../types";
@@ -35,6 +32,50 @@ function pingColor(ping: number | null, isUnstable?: boolean): string {
   if (ping <= 80) return "#fbbf24";
   if (ping <= 150) return "#fb923c";
   return "#f87171";
+}
+
+// ── Ping tooltip ───────────────────────────────────────────────────────────────
+
+type PingBadgeProps = {
+  pingLabel: string;
+  isUnstable?: boolean;
+  color: string;
+};
+
+function PingBadge({ pingLabel, isUnstable, color }: PingBadgeProps) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const label = isUnstable ? `~${pingLabel}` : pingLabel;
+  const tooltipText = isUnstable
+    ? `Unstable connection · ${pingLabel}`
+    : pingLabel;
+
+  return (
+    <span
+      className="relative inline-flex items-center"
+      onMouseEnter={(e) => setRect(e.currentTarget.getBoundingClientRect())}
+      onMouseLeave={() => setRect(null)}
+    >
+      <span className="text-[10px]" style={{ color }}>
+        {label}
+      </span>
+      {rect && (
+        <span
+          className="fixed px-2 py-1 rounded text-[10px] whitespace-nowrap pointer-events-none z-9999"
+          style={{
+            top: rect.top - 4,
+            left: rect.left + rect.width / 2,
+            transform: "translate(-50%, -100%)",
+            background: "var(--v2-surface)",
+            color: isUnstable ? "#fb923c" : "var(--v2-text)",
+            border: "1px solid var(--v2-border)",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+          }}
+        >
+          {tooltipText}
+        </span>
+      )}
+    </span>
+  );
 }
 
 // ── Avatar ─────────────────────────────────────────────────────────────────────
@@ -123,13 +164,11 @@ function PlayerRow({
           >
             {!isSelf &&
               (pingLabel !== null ? (
-                <span
-                  className="text-[10px]"
-                  style={{ color: pColor }}
-                  title={isUnstable ? "Unstable connection" : undefined}
-                >
-                  {isUnstable ? `~${pingLabel}` : pingLabel}
-                </span>
+                <PingBadge
+                  pingLabel={pingLabel}
+                  isUnstable={isUnstable}
+                  color={pColor}
+                />
               ) : (
                 <span
                   className="text-[10px]"

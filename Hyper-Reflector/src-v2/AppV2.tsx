@@ -59,12 +59,14 @@ function AppV2Inner() {
     messages,
     currentLobbyId,
     lobbyList,
+    selfPings,
     sendMessage,
     joinLobby,
     createLobby,
     sendChallenge,
     acceptChallenge,
     declineChallenge,
+    toggleRankQueue,
   } = useWebSocket(user);
 
   useEffect(() => {
@@ -139,9 +141,17 @@ function AppV2Inner() {
   };
 
   const handleSetIsRankQueued = (isQueue: boolean) => {
-    console.log(isQueue);
-    //TODO: user needs to be able to toggle ranke queue on and off using isQueue
+    toggleRankQueue(isQueue);
+    setUser((prev) => (prev ? { ...prev, isRankQueued: isQueue } : prev));
   };
+
+
+  // Merge live ping data from the websocket into the current user so PlayerList
+  // can resolve viewer→target ping via resolvePing().
+  const effectiveUser: V2User | null =
+    user && selfPings.length > 0
+      ? { ...user, lastKnownPings: selfPings }
+      : user;
 
   // CSS vars applied here cascade to every child via inheritance
   return (
@@ -193,7 +203,7 @@ function AppV2Inner() {
               onToggleRankQueued={handleSetIsRankQueued}
               lobbyId={currentLobbyId}
               status={status}
-              currentUser={user}
+              currentUser={effectiveUser}
               onViewProfile={handleViewProfile}
               onOpenLobbySelector={() => setLobbySelectorOpen(true)}
             />
@@ -203,7 +213,7 @@ function AppV2Inner() {
                 <LobbyPage
                   messages={messages}
                   lobbyUsers={lobbyUsers}
-                  currentUser={user}
+                  currentUser={effectiveUser}
                   onSendMessage={sendMessage}
                   onViewProfile={handleViewProfile}
                   onChallenge={handleChallenge}

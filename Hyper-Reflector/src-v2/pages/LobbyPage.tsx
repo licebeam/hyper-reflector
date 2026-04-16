@@ -1,4 +1,3 @@
-// TODO: chat messages and challenges arent being recieved, we need to match the websocket schema that src v1 uses.
 import { ChatPanel } from "../components/ChatPanel";
 import { PlayerList } from "../components/PlayerList";
 import type { V2User, V2Message } from "../types";

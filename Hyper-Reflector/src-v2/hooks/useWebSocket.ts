@@ -27,6 +27,7 @@ const MOCK_USER_1: V2User = {
   userProfilePic: '',
   gravEmail: '',
   userEmail: 'mock@hyper-reflector.test',
+  isRankQueued: false,
 }
 
 const MOCK_USER_2: V2User = {
@@ -40,6 +41,7 @@ const MOCK_USER_2: V2User = {
   userProfilePic: '',
   gravEmail: '',
   userEmail: 'mock2@hyper-reflector.test',
+  isRankQueued: false,
 }
 
 function getMockUser(uid: string): V2User | null {
@@ -86,6 +88,7 @@ function normalizeUser(data: any): V2User | null {
     userProfilePic: data.userProfilePic || '',
     gravEmail: data.gravEmail || '',
     userEmail: data.userEmail || '',
+    isRankQueued: data.isRankQueued === true,
   }
 }
 
@@ -102,6 +105,7 @@ export function useWebSocket(user: V2User | null) {
   const [currentLobbyId, setCurrentLobbyId] = useState(DEFAULT_LOBBY_ID)
   const [lobbyList, setLobbyList] = useState<V2Lobby[]>([])
   const [isInMatch, setIsInMatch] = useState(false)
+  const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean }>>([])
 
   // Stable refs for async/socket callbacks
   const currentLobbyIdRef = useRef(DEFAULT_LOBBY_ID)
@@ -237,9 +241,10 @@ export function useWebSocket(user: V2User | null) {
           }
 
           case 'lobby-user-counts': {
-            if (!Array.isArray(payload.lobbies)) break
+            const rawLobbies = payload.updates ?? payload.lobbies
+            if (!Array.isArray(rawLobbies)) break
             const lobbyMap = new Map<string, V2Lobby>()
-            for (const entry of payload.lobbies) {
+            for (const entry of rawLobbies) {
               if (typeof entry?.name === 'string' && entry.name.trim()) {
                 const name = entry.name.trim()
                 lobbyMap.set(name, {
@@ -286,14 +291,31 @@ export function useWebSocket(user: V2User | null) {
           }
 
           case 'update-user-pinged': {
-            if (payload.user?.uid) {
-              updateLobbyUsers(
-                lobbyUsersRef.current.map((u: V2User) =>
-                  u.uid === payload.user.uid
-                    ? { ...u, lastKnownPings: payload.user.lastKnownPings ?? u.lastKnownPings }
-                    : u
+            const data = payload.data
+            if (!data || typeof data !== 'object') break
+
+            if (data.isNewPing) {
+              // A peer resolved their ping to the current user — update our own lastKnownPings
+              if (typeof data.id === 'string' || typeof data.id === 'number') {
+                const peerId = String(data.id)
+                setSelfPings(prev => {
+                  const filtered = prev.filter(p => p.id !== peerId)
+                  return [...filtered, { id: peerId, ping: data.ping ?? 0, isUnstable: Boolean(data.isUnstable) }]
+                })
+              }
+            } else if (Array.isArray(data.lastKnownPings)) {
+              // Server is sending our own full ping update (after geo resolution)
+              setSelfPings(data.lastKnownPings)
+              const myUid = userRef.current?.uid
+              if (myUid) {
+                updateLobbyUsers(
+                  lobbyUsersRef.current.map((u: V2User) =>
+                    u.uid === myUid
+                      ? { ...u, lastKnownPings: data.lastKnownPings }
+                      : u
+                  )
                 )
-              )
+              }
             }
             break
           }
@@ -672,6 +694,22 @@ export function useWebSocket(user: V2User | null) {
     closePeerConnection()
   }, [setIsInMatchBoth, closePeerConnection])
 
+  const toggleRankQueue = useCallback((isQueue: boolean): void => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return
+    try {
+      socket.send(JSON.stringify({
+        type: 'updateSocketState',
+        data: {
+          uid: currentUser.uid,
+          lobbyId: currentLobbyIdRef.current,
+          stateToUpdate: { key: 'isRankQueued', value: isQueue },
+        },
+      }))
+    } catch {}
+  }, [])
+
   return {
     status,
     lobbyUsers,
@@ -679,6 +717,7 @@ export function useWebSocket(user: V2User | null) {
     currentLobbyId,
     lobbyList,
     isInMatch,
+    selfPings,
     sendMessage,
     joinLobby,
     createLobby,
@@ -686,5 +725,6 @@ export function useWebSocket(user: V2User | null) {
     acceptChallenge,
     declineChallenge,
     markMatchEnded,
+    toggleRankQueue,
   }
 }
