@@ -7,9 +7,10 @@ type LobbyPageProps = {
   lobbyUsers: V2User[]
   currentUser: V2User | null
   onSendMessage: (text: string) => boolean
+  onViewProfile?: (uid: string) => void
 }
 
-export function LobbyPage({ messages, lobbyUsers, currentUser, onSendMessage }: LobbyPageProps) {
+export function LobbyPage({ messages, lobbyUsers, currentUser, onSendMessage, onViewProfile }: LobbyPageProps) {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Chat panel — takes remaining width */}
@@ -25,7 +26,8 @@ export function LobbyPage({ messages, lobbyUsers, currentUser, onSendMessage }: 
       <div className="w-56 shrink-0">
         <PlayerList
           users={lobbyUsers}
-          currentUserUid={currentUser?.uid}
+          currentUser={currentUser}
+          onViewProfile={onViewProfile}
         />
       </div>
     </div>

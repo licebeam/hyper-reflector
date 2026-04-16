@@ -11,6 +11,8 @@ import { SignupPage } from './pages/SignupPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LabPage } from './pages/LabPage'
 import { HomePage } from './pages/HomePage'
+import { ProfilesPage } from './pages/ProfilesPage'
+import { PlayerProfilePage } from './pages/PlayerProfilePage'
 import { useWebSocket } from './hooks/useWebSocket'
 import { auth } from '../src/utils/firebase'
 import api from '../src/external-api/requests'
@@ -44,6 +46,7 @@ function AppV2Inner() {
   const [authView, setAuthView] = useState<'login' | 'signup'>('login')
   const [user, setUser] = useState<V2User | null>(null)
   const [page, setPage] = useState<Page>('lobby')
+  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null)
 
   // Hook always called — internally skips WS connection when user is null
   const { status, lobbyUsers, messages, sendMessage } = useWebSocket(user, DEFAULT_LOBBY)
@@ -91,6 +94,17 @@ function AppV2Inner() {
     setUser(null)
     setAuthState('unauthenticated')
     setPage('lobby')
+    setViewingProfileId(null)
+  }
+
+  const handleViewProfile = (uid: string) => {
+    setViewingProfileId(uid)
+    setPage('profiles')
+  }
+
+  const handleNavigate = (p: Page) => {
+    if (p !== 'profiles') setViewingProfileId(null)
+    setPage(p)
   }
 
   // CSS vars applied here cascade to every child via inheritance
@@ -127,7 +141,7 @@ function AppV2Inner() {
 
       {authState === 'authenticated' && (
         <div className="flex h-full">
-          <NavRail currentPage={page} onNavigate={setPage} />
+          <NavRail currentPage={page} onNavigate={handleNavigate} />
 
           <div className="flex-1 flex flex-col overflow-hidden">
             <Header
@@ -143,12 +157,26 @@ function AppV2Inner() {
                   lobbyUsers={lobbyUsers}
                   currentUser={user}
                   onSendMessage={sendMessage}
+                  onViewProfile={handleViewProfile}
                 />
               )}
               {page === 'home' && <HomePage currentUser={user} />}
               {page === 'lab' && <LabPage />}
               {page === 'settings' && user && (
                 <SettingsPage user={user} onLogout={handleLogout} />
+              )}
+              {page === 'profiles' && (
+                viewingProfileId
+                  ? <PlayerProfilePage
+                      profileUid={viewingProfileId}
+                      currentUser={user}
+                      onBack={() => setViewingProfileId(null)}
+                      onUserUpdated={updated => setUser(prev => prev ? { ...prev, ...updated } : prev)}
+                    />
+                  : <ProfilesPage
+                      currentUser={user}
+                      onViewProfile={handleViewProfile}
+                    />
               )}
             </main>
           </div>
