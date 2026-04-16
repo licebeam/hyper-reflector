@@ -23,7 +23,7 @@ export function LobbyPage({ messages, lobbyUsers, currentUser, onSendMessage, on
       </div>
 
       {/* Player list sidebar */}
-      <div className="w-56 shrink-0">
+      <div className="w-64 shrink-0">
         <PlayerList
           users={lobbyUsers}
           currentUser={currentUser}

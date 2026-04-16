@@ -15,6 +15,8 @@ import {
 import api from "../../src/external-api/requests";
 import { auth } from "../../src/utils/firebase";
 import type { V2User } from "../types";
+import { CountryFlag } from "../components/CountryFlag";
+import { UserTitle } from "../components/UserTitle";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -84,15 +86,6 @@ function normalizeSuperChoices(
   return Object.values(choice);
 }
 
-function toFlagEmoji(code?: string): string {
-  if (!code || code.length < 2) return "";
-  const base = 0x1f1e6 - 65;
-  return code
-    .toUpperCase()
-    .split("")
-    .map((c) => String.fromCodePoint(base + c.charCodeAt(0)))
-    .join("");
-}
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
@@ -396,7 +389,6 @@ export function PlayerProfilePage({
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
-  const flag = toFlagEmoji(profile?.countryCode);
 
   return (
     <div className="h-full overflow-y-scroll">
@@ -465,7 +457,7 @@ export function PlayerProfilePage({
                     >
                       {profile.userName}
                     </h1>
-                    {flag && <span>{flag}</span>}
+                    <CountryFlag code={profile.countryCode} />
                     {isSelf && (
                       <span
                         className="text-xs"
@@ -475,18 +467,7 @@ export function PlayerProfilePage({
                       </span>
                     )}
                   </div>
-                  {profile.userTitle?.title && (
-                    <span
-                      className="inline-block text-xs px-2 py-0.5 rounded"
-                      style={{
-                        background: profile.userTitle.bgColor,
-                        color: profile.userTitle.color,
-                        border: `1px solid ${profile.userTitle.border}`,
-                      }}
-                    >
-                      {profile.userTitle.title}
-                    </span>
-                  )}
+                  <UserTitle title={profile.userTitle} size="sm" />
                   <div
                     className="flex items-center gap-3 text-xs"
                     style={{ color: "var(--v2-muted)" }}
@@ -561,16 +542,7 @@ export function PlayerProfilePage({
                         </label>
                         <div className="flex items-center gap-2">
                           {pendingTitle?.title ? (
-                            <span
-                              className="inline-block text-xs px-2 py-0.5 rounded"
-                              style={{
-                                background: pendingTitle.bgColor,
-                                color: pendingTitle.color,
-                                border: `1px solid ${pendingTitle.border}`,
-                              }}
-                            >
-                              {pendingTitle.title}
-                            </span>
+                            <UserTitle title={pendingTitle} size="sm" />
                           ) : (
                             <span
                               className="text-xs"
@@ -641,16 +613,7 @@ export function PlayerProfilePage({
                                     ).style.background = "transparent";
                                 }}
                               >
-                                <span
-                                  className="px-1.5 py-0.5 rounded"
-                                  style={{
-                                    background: t.bgColor,
-                                    color: t.color,
-                                    border: `1px solid ${t.border}`,
-                                  }}
-                                >
-                                  {t.title}
-                                </span>
+                                <UserTitle title={t} size="sm" />
                               </button>
                             ))}
                           </div>
