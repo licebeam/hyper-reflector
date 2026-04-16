@@ -26,7 +26,6 @@ export type ThemeOverrides = Partial<
 export type V2Theme = {
   id: string
   name: string
-  emoji: string
   vars: ThemeVars
 }
 
@@ -41,7 +40,6 @@ export const THEMES: V2Theme[] = [
   {
     id: 'dark-orange',
     name: 'Dark Orange',
-    emoji: '🔥',
     vars: {
       '--v2-bg': '#111827',
       '--v2-surface': '#1f2937',
@@ -63,7 +61,6 @@ export const THEMES: V2Theme[] = [
   {
     id: 'midnight-purple',
     name: 'Midnight Purple',
-    emoji: '🌙',
     vars: {
       '--v2-bg': '#0d0a1e',
       '--v2-surface': '#1a1035',
@@ -85,7 +82,6 @@ export const THEMES: V2Theme[] = [
   {
     id: 'neon-teal',
     name: 'Neon Teal',
-    emoji: '🌊',
     vars: {
       '--v2-bg': '#050f10',
       '--v2-surface': '#0a1f21',
@@ -107,7 +103,6 @@ export const THEMES: V2Theme[] = [
   {
     id: 'crimson-night',
     name: 'Crimson Night',
-    emoji: '🩸',
     vars: {
       '--v2-bg': '#0f0408',
       '--v2-surface': '#1c060f',

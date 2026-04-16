@@ -1,52 +1,56 @@
-import './styles.css'
-import { useEffect, useState } from 'react'
-import bgImage from '../src/assets/bgImage.svg'
-import { onAuthStateChanged } from 'firebase/auth'
-import { ThemeProvider, useV2Theme } from './ThemeContext'
-import { NavRail, type Page } from './components/NavRail'
-import { Header } from './components/Header'
-import { LobbyPage } from './pages/LobbyPage'
-import { LoginPage } from './pages/LoginPage'
-import { SignupPage } from './pages/SignupPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { LabPage } from './pages/LabPage'
-import { HomePage } from './pages/HomePage'
-import { ProfilesPage } from './pages/ProfilesPage'
-import { PlayerProfilePage } from './pages/PlayerProfilePage'
-import { LobbySelector } from './components/LobbySelector'
-import { useWebSocket } from './hooks/useWebSocket'
-import { auth } from '../src/utils/firebase'
-import api from '../src/external-api/requests'
-import type { V2User } from './types'
+import "./styles.css";
+import { useEffect, useState } from "react";
+import bgImage from "../src/assets/bgImage.svg";
+import { onAuthStateChanged } from "firebase/auth";
+import { ThemeProvider, useV2Theme } from "./ThemeContext";
+import { NavRail, type Page } from "./components/NavRail";
+import { Header } from "./components/Header";
+import { LobbyPage } from "./pages/LobbyPage";
+import { LoginPage } from "./pages/LoginPage";
+import { SignupPage } from "./pages/SignupPage";
+import { SettingsPage } from "./pages/SettingsPage";
+import { LabPage } from "./pages/LabPage";
+import { DataPage } from "./pages/DataPage";
+import { TournamentPage } from "./pages/TournamentPage";
+import { HomePage } from "./pages/HomePage";
+import { ProfilesPage } from "./pages/ProfilesPage";
+import { PlayerProfilePage } from "./pages/PlayerProfilePage";
+import { LobbySelector } from "./components/LobbySelector";
+import { useWebSocket } from "./hooks/useWebSocket";
+import { auth } from "../src/utils/firebase";
+import api from "../src/external-api/requests";
+import type { V2User } from "./types";
 
-type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
+type AuthState = "loading" | "unauthenticated" | "authenticated";
 
 function mapToV2User(data: any, fallbackEmail?: string | null): V2User {
   return {
-    uid: data.uid || '',
-    userName: data.userName || 'Player',
-    accountElo: typeof data.accountElo === 'number' ? data.accountElo : 1200,
-    countryCode: data.countryCode || '',
+    uid: data.uid || "",
+    userName: data.userName || "Player",
+    accountElo: typeof data.accountElo === "number" ? data.accountElo : 1200,
+    countryCode: data.countryCode || "",
     userTitle: data.userTitle,
-    lastKnownPings: Array.isArray(data.lastKnownPings) ? data.lastKnownPings : [],
+    lastKnownPings: Array.isArray(data.lastKnownPings)
+      ? data.lastKnownPings
+      : [],
     knownAliases: Array.isArray(data.knownAliases) ? data.knownAliases : [],
-    userProfilePic: data.userProfilePic || '',
-    gravEmail: data.gravEmail || '',
-    userEmail: data.userEmail || fallbackEmail || '',
-  }
+    userProfilePic: data.userProfilePic || "",
+    gravEmail: data.gravEmail || "",
+    userEmail: data.userEmail || fallbackEmail || "",
+  };
 }
 
 // ── Inner app — has access to ThemeContext ────────────────────────────────────
 
 function AppV2Inner() {
-  const { vars } = useV2Theme()
+  const { vars } = useV2Theme();
 
-  const [authState, setAuthState] = useState<AuthState>('loading')
-  const [authView, setAuthView] = useState<'login' | 'signup'>('login')
-  const [user, setUser] = useState<V2User | null>(null)
-  const [page, setPage] = useState<Page>('lobby')
-  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null)
-  const [lobbySelectorOpen, setLobbySelectorOpen] = useState(false)
+  const [authState, setAuthState] = useState<AuthState>("loading");
+  const [authView, setAuthView] = useState<"login" | "signup">("login");
+  const [user, setUser] = useState<V2User | null>(null);
+  const [page, setPage] = useState<Page>("lobby");
+  const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
+  const [lobbySelectorOpen, setLobbySelectorOpen] = useState(false);
 
   const {
     status,
@@ -60,107 +64,120 @@ function AppV2Inner() {
     sendChallenge,
     acceptChallenge,
     declineChallenge,
-  } = useWebSocket(user)
+  } = useWebSocket(user);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (firebaseUser) => {
       if (!firebaseUser) {
-        setUser(null)
-        setAuthState('unauthenticated')
-        return
+        setUser(null);
+        setAuthState("unauthenticated");
+        return;
       }
 
       try {
-        await api.addLoggedInUser(auth)
-        const userData = await api.getUserByAuth(auth)
+        await api.addLoggedInUser(auth);
+        const userData = await api.getUserByAuth(auth);
 
         if (userData && userData.uid) {
-          setUser(mapToV2User(userData, firebaseUser.email))
+          setUser(mapToV2User(userData, firebaseUser.email));
         } else {
-          throw new Error('Empty profile from backend')
+          throw new Error("Empty profile from backend");
         }
       } catch (err) {
-        console.warn('[v2] Backend unavailable, using Firebase identity', err)
-        const pendingName = sessionStorage.getItem('v2_pending_display_name')
+        console.warn("[v2] Backend unavailable, using Firebase identity", err);
+        const pendingName = sessionStorage.getItem("v2_pending_display_name");
         setUser({
           uid: firebaseUser.uid,
-          userName: pendingName || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Player',
+          userName:
+            pendingName ||
+            firebaseUser.displayName ||
+            firebaseUser.email?.split("@")[0] ||
+            "Player",
           accountElo: 1200,
-          countryCode: '',
+          countryCode: "",
           lastKnownPings: [],
           knownAliases: [],
-          userProfilePic: '',
-          gravEmail: '',
-          userEmail: firebaseUser.email || '',
-        })
+          userProfilePic: "",
+          gravEmail: "",
+          userEmail: firebaseUser.email || "",
+        });
       } finally {
-        setAuthState('authenticated')
+        setAuthState("authenticated");
       }
-    })
-  }, [])
+    });
+  }, []);
 
   const handleLogout = () => {
-    setUser(null)
-    setAuthState('unauthenticated')
-    setPage('lobby')
-    setViewingProfileId(null)
-  }
+    setUser(null);
+    setAuthState("unauthenticated");
+    setPage("lobby");
+    setViewingProfileId(null);
+  };
 
   const handleViewProfile = (uid: string) => {
-    setViewingProfileId(uid)
-    setPage('profiles')
-  }
+    setViewingProfileId(uid);
+    setPage("profiles");
+  };
 
   const handleNavigate = (p: Page) => {
-    if (p !== 'profiles') setViewingProfileId(null)
-    setPage(p)
-  }
+    if (p !== "profiles") setViewingProfileId(null);
+    setPage(p);
+  };
 
   const handleChallenge = (uid: string) => {
-    void sendChallenge(uid)
-  }
+    void sendChallenge(uid);
+  };
 
   const handleAcceptChallenge = (messageId: string) => {
-    void acceptChallenge(messageId)
-  }
+    void acceptChallenge(messageId);
+  };
 
   const handleDeclineChallenge = (messageId: string) => {
-    void declineChallenge(messageId)
-  }
+    void declineChallenge(messageId);
+  };
 
   // CSS vars applied here cascade to every child via inheritance
   return (
     <div
       className="relative h-screen overflow-hidden v2-animated-bg"
-      style={{
-        ...(vars as unknown as React.CSSProperties),
-        '--v2-bg-image': `url(${bgImage})`,
-        color: 'var(--v2-text)',
-      } as React.CSSProperties}
+      style={
+        {
+          ...(vars as unknown as React.CSSProperties),
+          "--v2-bg-image": `url(${bgImage})`,
+          color: "var(--v2-text)",
+        } as React.CSSProperties
+      }
     >
-      {authState === 'loading' && (
+      {authState === "loading" && (
         <div className="h-full flex items-center justify-center">
           <div className="text-center space-y-2">
-            <p className="font-bold text-lg" style={{ color: 'var(--v2-accent)' }}>
+            <p
+              className="font-bold text-lg"
+              style={{ color: "var(--v2-accent)" }}
+            >
               Hyper Reflector
             </p>
-            <p className="text-sm animate-pulse" style={{ color: 'var(--v2-muted)' }}>
+            <p
+              className="text-sm animate-pulse"
+              style={{ color: "var(--v2-muted)" }}
+            >
               Loading...
             </p>
           </div>
         </div>
       )}
 
-      {authState === 'unauthenticated' && (
+      {authState === "unauthenticated" && (
         <div className="h-full">
-          {authView === 'signup'
-            ? <SignupPage onBack={() => setAuthView('login')} />
-            : <LoginPage onSignup={() => setAuthView('signup')} />
-          }
+          {authView === "signup" ? (
+            <SignupPage onBack={() => setAuthView("login")} />
+          ) : (
+            <LoginPage onSignup={() => setAuthView("signup")} />
+          )}
         </div>
       )}
 
-      {authState === 'authenticated' && (
+      {authState === "authenticated" && (
         <div className="flex h-full">
           <NavRail currentPage={page} onNavigate={handleNavigate} />
 
@@ -168,12 +185,13 @@ function AppV2Inner() {
             <Header
               lobbyId={currentLobbyId}
               status={status}
-              userName={user?.userName}
+              currentUser={user}
+              onViewProfile={handleViewProfile}
               onOpenLobbySelector={() => setLobbySelectorOpen(true)}
             />
 
             <main className="flex-1 overflow-hidden">
-              {page === 'lobby' && (
+              {page === "lobby" && (
                 <LobbyPage
                   messages={messages}
                   lobbyUsers={lobbyUsers}
@@ -185,24 +203,29 @@ function AppV2Inner() {
                   onDeclineChallenge={handleDeclineChallenge}
                 />
               )}
-              {page === 'home' && <HomePage currentUser={user} />}
-              {page === 'lab' && <LabPage />}
-              {page === 'settings' && user && (
+              {page === "home" && <HomePage currentUser={user} />}
+              {page === "lab" && <LabPage />}
+              {page === "data" && <DataPage />}
+              {page === "settings" && user && (
                 <SettingsPage user={user} onLogout={handleLogout} />
               )}
-              {page === 'profiles' && (
-                viewingProfileId
-                  ? <PlayerProfilePage
-                      profileUid={viewingProfileId}
-                      currentUser={user}
-                      onBack={() => setViewingProfileId(null)}
-                      onUserUpdated={updated => setUser(prev => prev ? { ...prev, ...updated } : prev)}
-                    />
-                  : <ProfilesPage
-                      currentUser={user}
-                      onViewProfile={handleViewProfile}
-                    />
-              )}
+              {page === "profiles" &&
+                (viewingProfileId ? (
+                  <PlayerProfilePage
+                    profileUid={viewingProfileId}
+                    currentUser={user}
+                    onBack={() => setViewingProfileId(null)}
+                    onUserUpdated={(updated) =>
+                      setUser((prev) => (prev ? { ...prev, ...updated } : prev))
+                    }
+                  />
+                ) : (
+                  <ProfilesPage
+                    currentUser={user}
+                    onViewProfile={handleViewProfile}
+                  />
+                ))}
+              {page === "pools" && <TournamentPage />}
             </main>
           </div>
         </div>
@@ -219,7 +242,7 @@ function AppV2Inner() {
         />
       )}
     </div>
-  )
+  );
 }
 
 // ── Root export — provides theme context ──────────────────────────────────────
@@ -229,5 +252,5 @@ export default function AppV2() {
     <ThemeProvider>
       <AppV2Inner />
     </ThemeProvider>
-  )
+  );
 }
