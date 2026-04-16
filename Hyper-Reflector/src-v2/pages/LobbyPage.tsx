@@ -1,17 +1,17 @@
-import { ChatPanel } from '../components/ChatPanel'
-import { PlayerList } from '../components/PlayerList'
-import type { V2User, V2Message } from '../types'
+import { ChatPanel } from "../components/ChatPanel";
+import { PlayerList } from "../components/PlayerList";
+import type { V2User, V2Message } from "../types";
 
 type LobbyPageProps = {
-  messages: V2Message[]
-  lobbyUsers: V2User[]
-  currentUser: V2User | null
-  onSendMessage: (text: string) => boolean
-  onViewProfile?: (uid: string) => void
-  onChallenge?: (uid: string) => void
-  onAcceptChallenge?: (messageId: string) => void
-  onDeclineChallenge?: (messageId: string) => void
-}
+  messages: V2Message[];
+  lobbyUsers: V2User[];
+  currentUser: V2User | null;
+  onSendMessage: (text: string) => boolean;
+  onViewProfile?: (uid: string) => void;
+  onChallenge?: (uid: string) => void;
+  onAcceptChallenge?: (messageId: string) => void;
+  onDeclineChallenge?: (messageId: string) => void;
+};
 
 export function LobbyPage({
   messages,
@@ -37,7 +37,7 @@ export function LobbyPage({
       </div>
 
       {/* Player list sidebar */}
-      <div className="w-64 shrink-0">
+      <div className="w-80 shrink-0">
         <PlayerList
           users={lobbyUsers}
           currentUser={currentUser}
@@ -46,5 +46,5 @@ export function LobbyPage({
         />
       </div>
     </div>
-  )
+  );
 }

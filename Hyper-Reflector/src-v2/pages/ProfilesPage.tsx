@@ -373,7 +373,8 @@ export function ProfilesPage({
               Search players, browse leaderboards, or view your own profile.
             </p>
           </div>
-          {currentUser.uid && (
+          {/* TEMP DISABLE */}
+          {/* {currentUser.uid && (
             <button
               onClick={() => onViewProfile(currentUser.uid)}
               className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded transition-colors"
@@ -390,7 +391,7 @@ export function ProfilesPage({
             >
               <User size={14} /> My profile
             </button>
-          )}
+          )} */}
         </div>
 
         {/* Search */}
