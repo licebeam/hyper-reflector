@@ -100,7 +100,7 @@ function WinSpreadDonut({
 
   return (
     <div className="w-64 h-64 mx-auto">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="110%">
         <PieChart>
           <Tooltip
             contentStyle={{
@@ -281,7 +281,7 @@ export function HomePage({ currentUser }: HomePageProps) {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-scroll">
       <div className="max-w-5xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-2">
@@ -351,7 +351,7 @@ export function HomePage({ currentUser }: HomePageProps) {
                   colors={[accent, nameOther]}
                 />
                 {/* Legend */}
-                <div className="flex justify-center gap-6 mt-3">
+                <div className="flex justify-center gap-6 mt-6">
                   {[
                     ["Player 1", accent],
                     ["Player 2", nameOther],

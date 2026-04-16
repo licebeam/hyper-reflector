@@ -1,28 +1,39 @@
 @import "tailwindcss";
 
-/* ── Animated pattern overlay ────────────────────────────────────────────────── */
+body {
+  scrollbar-width: thin;
+}
 
+/* ── Animated pattern overlay ────────────────────────────────────────────────── */
 @keyframes v2-bg-scroll {
-  from { background-position: 0 0; }
-  to   { background-position: -800px 800px; }
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -800px 800px;
+  }
 }
 
 .v2-animated-bg {
   position: relative;
   /* Multi-layer gradient: accent spotlight at top + directional depth fill */
   background:
-    radial-gradient(ellipse 80% 55% at 50% -5%,
+    radial-gradient(
+      ellipse 80% 55% at 50% -5%,
       color-mix(in srgb, var(--v2-accent) 22%, transparent) 0%,
-      transparent 100%),
-    radial-gradient(ellipse 50% 40% at -5% 105%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at -5% 105%,
       color-mix(in srgb, var(--v2-accent) 9%, transparent) 0%,
-      transparent 70%),
+      transparent 70%
+    ),
     linear-gradient(160deg, var(--v2-grad-from) 0%, var(--v2-grad-to) 100%);
 }
 
 /* Pattern tiled on top of the gradient — opacity independently controllable */
 .v2-animated-bg::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background-image: var(--v2-bg-image);
