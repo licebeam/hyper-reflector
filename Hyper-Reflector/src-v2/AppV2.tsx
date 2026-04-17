@@ -19,6 +19,7 @@ import { LobbySelector } from "./components/LobbySelector";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { auth } from "../src/utils/firebase";
 import api from "../src/external-api/requests";
+import { useUserStore } from "../src/state/store";
 import type { V2User } from "./types";
 
 type AuthState = "loading" | "unauthenticated" | "authenticated";
@@ -87,15 +88,35 @@ function AppV2Inner() {
         await api.addLoggedInUser(auth);
         const userData = await api.getUserByAuth(auth);
 
+        const FALLBACK_TITLE = { bgColor: '#1f1f24', border: '#37373f', color: '#f2f2f7', title: 'Contender' };
+
         if (userData && userData.uid) {
-          setUser(mapToV2User(userData, firebaseUser.email));
+          const v2User = mapToV2User(userData, firebaseUser.email);
+          setUser(v2User);
+          useUserStore.getState().setGlobalUser({
+            uid: v2User.uid,
+            userName: v2User.userName,
+            accountElo: v2User.accountElo,
+            countryCode: v2User.countryCode,
+            gravEmail: v2User.gravEmail,
+            knownAliases: v2User.knownAliases,
+            userEmail: v2User.userEmail,
+            userProfilePic: v2User.userProfilePic,
+            userTitle: v2User.userTitle ?? FALLBACK_TITLE,
+            lastKnownPings: v2User.lastKnownPings,
+            role: "user",
+            winStreak: 0,
+            rpsElo: 1200,
+            sidePreferences: {},
+          });
         } else {
           throw new Error("Empty profile from backend");
         }
       } catch (err) {
         console.warn("[v2] Backend unavailable, using Firebase identity", err);
+        const FALLBACK_TITLE = { bgColor: '#1f1f24', border: '#37373f', color: '#f2f2f7', title: 'Contender' };
         const pendingName = sessionStorage.getItem("v2_pending_display_name");
-        setUser({
+        const fallbackUser: V2User = {
           uid: firebaseUser.uid,
           userName:
             pendingName ||
@@ -110,6 +131,23 @@ function AppV2Inner() {
           gravEmail: "",
           userEmail: firebaseUser.email || "",
           isRankQueued: false,
+        };
+        setUser(fallbackUser);
+        useUserStore.getState().setGlobalUser({
+          uid: fallbackUser.uid,
+          userName: fallbackUser.userName,
+          accountElo: fallbackUser.accountElo,
+          countryCode: fallbackUser.countryCode,
+          gravEmail: fallbackUser.gravEmail,
+          knownAliases: fallbackUser.knownAliases,
+          userEmail: fallbackUser.userEmail,
+          userProfilePic: fallbackUser.userProfilePic,
+          userTitle: FALLBACK_TITLE,
+          lastKnownPings: [],
+          role: "user",
+          winStreak: 0,
+          rpsElo: 1200,
+          sidePreferences: {},
         });
       } finally {
         setAuthState("authenticated");
@@ -243,6 +281,7 @@ function AppV2Inner() {
                   messages={messages}
                   lobbyUsers={lobbyUsers}
                   currentUser={effectiveUser}
+                  lobbyGame={lobbyList.find(l => l.name === activeLobbyId)?.gameName}
                   onSendMessage={sendMessage}
                   onViewProfile={handleViewProfile}
                   onChallenge={handleChallenge}
