@@ -1,4 +1,5 @@
 import { Plus, Swords, User, X } from "lucide-react";
+import { GAMES, getGameName } from "../games";
 import {
   DndContext,
   PointerSensor,
@@ -121,6 +122,9 @@ type HeaderProps = {
   status: ConnectionStatus;
   currentUser: V2User | null;
   onViewProfile?: (uid: string) => void;
+  activeLobbyGame?: string;
+  activeLobbyOwnerUid?: string;
+  onUpdateLobbyGame: (lobbyId: string, gameName: string) => void;
 };
 
 export function Header({
@@ -134,6 +138,9 @@ export function Header({
   status,
   currentUser,
   onViewProfile,
+  activeLobbyGame,
+  activeLobbyOwnerUid,
+  onUpdateLobbyGame,
 }: HeaderProps) {
   const switchTo = (version: string) => {
     localStorage.setItem("appVersion", version);
@@ -212,8 +219,42 @@ export function Header({
         )}
       </div>
 
-      {/* ── Center: Ranked Queue ── */}
-      <div className="flex items-center px-4 shrink-0">
+      {/* ── Center: Game selector + Ranked Queue ── */}
+      <div className="flex items-center gap-2 px-4 shrink-0">
+        {/* Game selector — only visible to the lobby owner */}
+        {currentUser?.uid && currentUser.uid === activeLobbyOwnerUid ? (
+          <select
+            value={activeLobbyGame ?? GAMES[0].rom}
+            onChange={(e) => onUpdateLobbyGame(activeLobbyId, e.target.value)}
+            className="text-xs px-2 py-1.5 rounded border outline-none transition-colors"
+            style={{
+              background: "var(--v2-hover)",
+              borderColor: "var(--v2-border)",
+              color: "var(--v2-text)",
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--v2-accent)")}
+            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--v2-border)")}
+            title="Set game for this lobby"
+          >
+            {GAMES.map((g) => (
+              <option key={g.rom} value={g.rom} style={{ background: "var(--v2-surface)" }}>
+                {g.name}
+              </option>
+            ))}
+          </select>
+        ) : activeLobbyGame ? (
+          <span
+            className="text-xs px-2 py-1 rounded"
+            style={{
+              background: "color-mix(in srgb, var(--v2-accent) 12%, transparent)",
+              color: "var(--v2-accent)",
+              border: "1px solid color-mix(in srgb, var(--v2-accent) 25%, transparent)",
+            }}
+          >
+            {getGameName(activeLobbyGame)}
+          </span>
+        ) : null}
+
         <button
           onClick={(e) => {
             e.stopPropagation();

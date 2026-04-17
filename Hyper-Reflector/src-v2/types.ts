@@ -33,10 +33,13 @@ export type V2Message = {
   challengeOpponentId?: string
   challengeStatus?: 'accepted' | 'declined'
   challengeResponder?: string
+  challengeGameName?: string   // ROM key, e.g. 'sfiii3nr1'
 }
 
 export type V2Lobby = {
   name: string
   users: number
   isPrivate?: boolean
+  gameName?: string   // ROM key stored in lobbyMeta
+  ownerUid?: string   // UID of the user who created this lobby
 }

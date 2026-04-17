@@ -468,7 +468,22 @@ async fn start_training_mode(
         app.shell().command(resolved)
     };
     resolve_lua_args(&app, &mut args)?;
-    let cmd = cmd_builder.args(args);
+
+    // If a --lua script is provided, set the working directory to its parent
+    // folder so relative require/dofile calls inside the script resolve correctly.
+    let lua_cwd: Option<std::path::PathBuf> = args
+        .windows(2)
+        .find(|w| w[0].eq_ignore_ascii_case("--lua"))
+        .and_then(|w| std::path::Path::new(&w[1]).parent().map(|p| p.to_path_buf()));
+
+    let cmd = {
+        let c = cmd_builder.args(args);
+        if let Some(cwd) = lua_cwd {
+            c.current_dir(cwd)
+        } else {
+            c
+        }
+    };
     let (mut rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
     {
         let mut guard = proc.lock().unwrap();

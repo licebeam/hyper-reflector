@@ -7,15 +7,40 @@ import {
   ensureDefaultEmulatorPath,
   ensureDefaultTrainingPath,
 } from '../../src/utils/pathSettings'
+import { GAMES } from '../games'
+
+const SFIII_ROM = 'sfiii3nr1'
 
 export function LabPage() {
   const emulatorPath = useSettingsStore(s => s.emulatorPath)
   const setEmulatorPath = useSettingsStore(s => s.setEmulatorPath)
+
+  // Legacy sfiii3nr1 auto-resolved path (still used as the default fallback)
   const trainingPath = useSettingsStore(s => s.trainingPath)
-  const setTrainingPath = useSettingsStore(s => s.setTrainingPath)
+
+  // Per-game custom Lua paths
+  const luaScripts = useSettingsStore(s => s.luaScripts)
+  const luaScriptSources = useSettingsStore(s => s.luaScriptSources)
+  const setLuaScriptForGame = useSettingsStore(s => s.setLuaScriptForGame)
+
+  // Selected game — persisted across sessions
+  const labSelectedGame = useSettingsStore(s => s.labSelectedGame)
+  const setLabSelectedGame = useSettingsStore(s => s.setLabSelectedGame)
+
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [launched, setLaunched] = useState(false)
+
+  const isSfiii = labSelectedGame === SFIII_ROM
+  const customLuaPath = luaScripts[labSelectedGame] ?? ''
+  const luaSource = luaScriptSources[labSelectedGame] ?? 'auto'
+  // Displayed path: custom if set; for sfiii fall back to auto-resolved default
+  const displayedLuaPath = luaSource === 'custom' && customLuaPath
+    ? customLuaPath
+    : isSfiii
+    ? trainingPath
+    : ''
+  const hasCustomLua = luaSource === 'custom' && !!customLuaPath
 
   const handleLaunch = async () => {
     setLaunching(true)
@@ -30,13 +55,20 @@ export function LabPage() {
         return
       }
 
-      await ensureDefaultTrainingPath(resolved)
-      const { trainingPath: resolvedTraining } = useSettingsStore.getState()
+      const args = ['--rom', labSelectedGame]
 
-      const args = ['--rom', 'sfiii3nr1']
-      if (resolvedTraining?.trim()) {
-        args.push('--lua', resolvedTraining)
+      if (hasCustomLua) {
+        // Any game: user picked a custom Lua script
+        args.push('--lua', customLuaPath)
+      } else if (isSfiii) {
+        // sfiii3nr1 with no custom: fall back to auto-resolved default training script
+        await ensureDefaultTrainingPath(resolved)
+        const { trainingPath: resolvedTraining } = useSettingsStore.getState()
+        if (resolvedTraining?.trim()) {
+          args.push('--lua', resolvedTraining)
+        }
       }
+      // Other games with no custom script: no --lua argument
 
       await invoke('start_training_mode', {
         useSidecar: false,
@@ -71,9 +103,11 @@ export function LabPage() {
         title: 'Select Lua training script',
         filters: [{ name: 'Lua scripts', extensions: ['lua', 'luac'] }],
       })
-      if (typeof res === 'string') setTrainingPath(res, 'custom')
+      if (typeof res === 'string') setLuaScriptForGame(labSelectedGame, res, 'custom')
     } catch { /* dialog dismissed */ }
   }
+
+  const resetLua = () => setLuaScriptForGame(labSelectedGame, '', 'auto')
 
   const sectionCls = 'rounded-lg overflow-hidden border'
   const sectionStyle = { borderColor: 'var(--v2-border)' }
@@ -89,6 +123,37 @@ export function LabPage() {
         <div className="flex items-center gap-2 mb-2">
           <FlaskConical size={18} style={{ color: 'var(--v2-accent)' }} />
           <h1 className="text-lg font-semibold" style={{ color: 'var(--v2-text)' }}>Lab</h1>
+        </div>
+
+        {/* Game selector */}
+        <div className={sectionCls} style={sectionStyle}>
+          <div className={headerCls} style={headerStyle}>
+            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Game</span>
+          </div>
+          <div className="px-4 py-4" style={bodyStyle}>
+            <select
+              value={labSelectedGame}
+              onChange={e => {
+                setLabSelectedGame(e.target.value)
+                setError(null)
+                setLaunched(false)
+              }}
+              className="text-sm px-3 py-1.5 rounded border outline-none w-full max-w-xs"
+              style={{
+                background: 'var(--v2-hover)',
+                borderColor: 'var(--v2-border)',
+                color: 'var(--v2-text)',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
+            >
+              {GAMES.map(g => (
+                <option key={g.rom} value={g.rom} style={{ background: 'var(--v2-surface)' }}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Launch */}
@@ -140,14 +205,14 @@ export function LabPage() {
           </div>
         </div>
 
-        {/* Lua script */}
+        {/* Lua script — available for all games */}
         <div className={sectionCls} style={sectionStyle}>
           <div className={headerCls} style={headerStyle}>
             <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Lua Script</span>
           </div>
           <div className="px-4 py-4 space-y-2" style={bodyStyle}>
             <p className="text-xs font-mono break-all" style={{ color: 'var(--v2-muted)' }}>
-              {trainingPath || 'Default'}
+              {displayedLuaPath || (isSfiii ? 'Default' : 'None selected')}
             </p>
             <div className="flex items-center gap-4">
               <button
@@ -160,13 +225,13 @@ export function LabPage() {
                 <FolderOpen size={13} />
                 Browse for script...
               </button>
-              {trainingPath && (
+              {hasCustomLua && (
                 <button
-                  onClick={() => setTrainingPath('', 'auto')}
+                  onClick={resetLua}
                   className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors"
                 >
                   <Trash2 size={13} />
-                  Reset to default
+                  {isSfiii ? 'Reset to default' : 'Remove script'}
                 </button>
               )}
             </div>

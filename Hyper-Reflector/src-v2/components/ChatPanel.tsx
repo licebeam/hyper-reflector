@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Swords, Check, X } from "lucide-react";
 import type { V2Message } from "../types";
+import { getGameName } from "../games";
 
 const MAX_LENGTH = 120;
 
@@ -42,6 +43,17 @@ function ChallengeMessage({
         <span className="text-xs font-medium" style={{ color: "var(--v2-text)" }}>
           {msg.text}
         </span>
+        {msg.challengeGameName && (
+          <span
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded ml-2"
+            style={{
+              background: "color-mix(in srgb, var(--v2-accent) 15%, transparent)",
+              color: "var(--v2-accent)",
+            }}
+          >
+            {getGameName(msg.challengeGameName)}
+          </span>
+        )}
         <span className="text-xs ml-2" style={{ color: "var(--v2-muted)" }}>
           {formatTime(msg.timeStamp)}
         </span>

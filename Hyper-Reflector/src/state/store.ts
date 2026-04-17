@@ -44,6 +44,13 @@ type SettingsState = {
     trainingPath: string
     trainingPathSource: TrainingPathSource
     setTrainingPath: (path: string, source?: TrainingPathSource) => void
+    // Per-game Lua script paths for the Lab page
+    luaScripts: Record<string, string>
+    luaScriptSources: Record<string, TrainingPathSource>
+    setLuaScriptForGame: (rom: string, path: string, source?: TrainingPathSource) => void
+    // Last selected game in Lab page
+    labSelectedGame: string
+    setLabSelectedGame: (rom: string) => void
     appLanguage: string
     setAppLanguage: (code: string) => void
     mutedUsers: string[]
@@ -176,6 +183,15 @@ export const useSettingsStore = create<SettingsState>()(
             trainingPath: '',
             trainingPathSource: 'auto',
             setTrainingPath: (path, source = 'auto') => set({ trainingPath: path, trainingPathSource: source }),
+            luaScripts: {},
+            luaScriptSources: {},
+            setLuaScriptForGame: (rom, path, source = 'auto') =>
+                set((s) => ({
+                    luaScripts: { ...s.luaScripts, [rom]: path },
+                    luaScriptSources: { ...s.luaScriptSources, [rom]: source },
+                })),
+            labSelectedGame: 'sfiii3nr1',
+            setLabSelectedGame: (rom) => set({ labSelectedGame: rom }),
             appLanguage: 'en',
             setAppLanguage: (code) => set({ appLanguage: code }),
             mutedUsers: [],
