@@ -158,6 +158,17 @@ function PlayerRow({
             </span>
           )}
           {user.userTitle?.title && <UserTitle title={user.userTitle} />}
+          {/* Searching indicator */}
+          {user.isRankQueued && (
+            <span
+              className="flex items-center gap-0.5 text-[10px] px-1 rounded"
+              style={{ color: "#fbbf24", background: "#78350f44" }}
+              title="Searching for ranked match"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse inline-block" />
+              Searching
+            </span>
+          )}
           <div
             className="flex items-center gap-1.5"
             style={{ flexDirection: "row", alignItems: "flex-end" }}
@@ -260,6 +271,49 @@ function PlayerRow({
   );
 }
 
+// ── In-match pair row ──────────────────────────────────────────────────────────
+
+function MatchPairRow({ players }: { players: V2User[] }) {
+  const [p1, p2] = players;
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-2.5 border-b"
+      style={{ borderColor: "var(--v2-border)" }}
+    >
+      <Swords size={11} className="shrink-0" style={{ color: "var(--v2-muted)" }} />
+      <div className="flex items-center gap-1 min-w-0 flex-1">
+        {/* Player 1 */}
+        <div className="flex items-center gap-1 min-w-0" style={{ maxWidth: "calc(50% - 12px)" }}>
+          <CountryFlag code={p1?.countryCode ?? ""} className="h-2.5 shrink-0" />
+          <span
+            className="text-xs truncate"
+            style={{ color: "var(--v2-text)" }}
+            title={p1?.userName}
+          >
+            {p1?.userName ?? "?"}
+          </span>
+        </div>
+        <span className="text-[10px] shrink-0 px-0.5" style={{ color: "var(--v2-muted)" }}>vs</span>
+        {/* Player 2 */}
+        {p2 ? (
+          <div className="flex items-center gap-1 min-w-0" style={{ maxWidth: "calc(50% - 12px)" }}>
+            <CountryFlag code={p2.countryCode ?? ""} className="h-2.5 shrink-0" />
+            <span
+              className="text-xs truncate"
+              style={{ color: "var(--v2-text)" }}
+              title={p2.userName}
+            >
+              {p2.userName}
+            </span>
+          </div>
+        ) : (
+          <span className="text-[10px]" style={{ color: "var(--v2-muted)" }}>???</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── List ───────────────────────────────────────────────────────────────────────
 
 type PlayerListProps = {
@@ -275,6 +329,19 @@ export function PlayerList({
   onViewProfile,
   onChallenge,
 }: PlayerListProps) {
+  const available = users.filter(u => !u.currentMatchId);
+  const inMatch = users.filter(u => !!u.currentMatchId);
+
+  // Group in-match users into pairs by their currentMatchId
+  const matchGroups = new Map<string, V2User[]>();
+  for (const u of inMatch) {
+    const key = u.currentMatchId!;
+    if (!matchGroups.has(key)) matchGroups.set(key, []);
+    matchGroups.get(key)!.push(u);
+  }
+  // For any group with only 1 player, add a placeholder so the row still renders
+  const matchPairs = Array.from(matchGroups.values());
+
   return (
     <div
       className="flex flex-col h-full border-l"
@@ -288,12 +355,12 @@ export function PlayerList({
           className="text-xs font-semibold uppercase tracking-wide"
           style={{ color: "var(--v2-muted)" }}
         >
-          Players ({users.length})
+          Players ({available.length})
         </span>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {users.length === 0 && (
+        {available.length === 0 && matchPairs.length === 0 && (
           <p
             className="text-xs text-center pt-6 px-3"
             style={{ color: "var(--v2-muted)" }}
@@ -301,7 +368,7 @@ export function PlayerList({
             No players in lobby
           </p>
         )}
-        {users.map((user) => {
+        {available.map((user) => {
           const isSelf = user.uid === currentUser?.uid;
           return (
             <PlayerRow
@@ -314,6 +381,23 @@ export function PlayerList({
             />
           );
         })}
+
+        {matchPairs.length > 0 && (
+          <>
+            <div
+              className="px-3 pt-3 pb-1 flex items-center gap-1.5"
+              style={{ borderTop: available.length > 0 ? '1px solid var(--v2-border)' : undefined }}
+            >
+              <Swords size={11} style={{ color: 'var(--v2-muted)' }} />
+              <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--v2-muted)' }}>
+                In Match ({inMatch.length})
+              </span>
+            </div>
+            {matchPairs.map((players, i) => (
+              <MatchPairRow key={players[0]?.uid ?? i} players={players} />
+            ))}
+          </>
+        )}
       </div>
     </div>
   );

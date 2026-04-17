@@ -1,5 +1,6 @@
-import { Plus, Swords, User, X } from "lucide-react";
-import { GAMES, getGameName } from "../games";
+import { Bell, BellOff, Check, Plus, Swords, User, X } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import type { V2Message } from "../types";
 import {
   DndContext,
   PointerSensor,
@@ -119,6 +120,188 @@ function SortableTab({
   );
 }
 
+// ── Notifications panel ───────────────────────────────────────────────────────
+
+function formatTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+type NotificationsPanelProps = {
+  notifications: V2Message[];
+  allNotifications: V2Message[];
+  muted: boolean;
+  currentUserUid?: string;
+  onAccept: (id: string) => void;
+  onDecline: (id: string) => void;
+  onClear: () => void;
+  onToggleMute: () => void;
+  onClose: () => void;
+};
+
+function NotificationsPanel({
+  notifications,
+  allNotifications,
+  muted,
+  onAccept,
+  onDecline,
+  onClear,
+  onToggleMute,
+  onClose,
+}: NotificationsPanelProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={panelRef}
+      className="fixed w-80 rounded-lg shadow-xl border overflow-hidden z-50"
+      style={{
+        background: "var(--v2-surface)",
+        borderColor: "var(--v2-border)",
+        top: "3.25rem",
+        right: "0.75rem",
+      }}
+    >
+      {/* Header row */}
+      <div
+        className="flex items-center justify-between px-3 py-2 border-b"
+        style={{ borderColor: "var(--v2-border)" }}
+      >
+        <span
+          className="text-xs font-semibold"
+          style={{ color: "var(--v2-text)" }}
+        >
+          Notifications
+        </span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleMute}
+            className="text-[10px] px-1.5 py-0.5 rounded transition-colors"
+            style={{ color: "var(--v2-muted)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--v2-text)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "var(--v2-muted)")
+            }
+            title={muted ? "Unmute notifications" : "Mute notifications"}
+          >
+            {muted ? <BellOff size={13} /> : <Bell size={13} />}
+          </button>
+          <button
+            onClick={onClear}
+            disabled={allNotifications.length === 0}
+            className="text-[10px] transition-colors disabled:opacity-40"
+            style={{ color: "var(--v2-muted)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--v2-text)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "var(--v2-muted)")
+            }
+          >
+            Clear all
+          </button>
+        </div>
+      </div>
+
+      {/* Notification list */}
+      <div className="max-h-80 overflow-y-auto">
+        {notifications.length === 0 ? (
+          <p
+            className="text-xs text-center py-6"
+            style={{ color: "var(--v2-muted)" }}
+          >
+            No notifications
+          </p>
+        ) : (
+          notifications.map((msg) => (
+            <div
+              key={msg.id}
+              className="px-3 py-2.5 border-b"
+              style={{ borderColor: "var(--v2-border)" }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center gap-1.5">
+                  <Swords size={11} style={{ color: "var(--v2-accent)" }} />
+                  <span
+                    className="text-xs font-medium"
+                    style={{ color: "var(--v2-text)" }}
+                  >
+                    {msg.userName ?? "Unknown"}
+                  </span>
+                </div>
+                <span
+                  className="text-[10px]"
+                  style={{ color: "var(--v2-muted)" }}
+                >
+                  {formatTime(msg.timeStamp)}
+                </span>
+              </div>
+              <p className="text-xs mb-2" style={{ color: "var(--v2-muted)" }}>
+                {msg.text}
+              </p>
+              {msg.challengeStatus ? (
+                <span
+                  className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                  style={{
+                    background:
+                      msg.challengeStatus === "accepted"
+                        ? "#34d39922"
+                        : "#f8717122",
+                    color:
+                      msg.challengeStatus === "accepted"
+                        ? "#34d399"
+                        : "#f87171",
+                  }}
+                >
+                  {msg.challengeStatus === "accepted" ? "Accepted" : "Declined"}
+                  {msg.challengeResponder
+                    ? ` by ${msg.challengeResponder}`
+                    : ""}
+                </span>
+              ) : (
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => onAccept(msg.id)}
+                    className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium"
+                    style={{ background: "#34d399", color: "#000" }}
+                  >
+                    <Check size={10} /> Accept
+                  </button>
+                  <button
+                    onClick={() => onDecline(msg.id)}
+                    className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium border"
+                    style={{
+                      background: "var(--v2-hover)",
+                      color: "var(--v2-muted)",
+                      borderColor: "var(--v2-border)",
+                    }}
+                  >
+                    <X size={10} /> Decline
+                  </button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Header ────────────────────────────────────────────────────────────────────
 
 type HeaderProps = {
@@ -132,9 +315,12 @@ type HeaderProps = {
   status: ConnectionStatus;
   currentUser: V2User | null;
   onViewProfile?: (uid: string) => void;
-  activeLobbyGame?: string;
-  activeLobbyOwnerUid?: string;
-  onUpdateLobbyGame: (lobbyId: string, gameName: string) => void;
+  notifications: V2Message[];
+  onAcceptNotification: (id: string) => void;
+  onDeclineNotification: (id: string) => void;
+  notifMuted: boolean;
+  onToggleNotifMuted: () => void;
+  rankQueueGame: string;
 };
 
 export function Header({
@@ -148,15 +334,25 @@ export function Header({
   status,
   currentUser,
   onViewProfile,
-  activeLobbyGame,
-  activeLobbyOwnerUid,
-  onUpdateLobbyGame,
+  notifications,
+  onAcceptNotification,
+  onDeclineNotification,
+  notifMuted,
+  onToggleNotifMuted,
+  rankQueueGame,
 }: HeaderProps) {
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [clearedIds, setClearedIds] = useState<Set<string>>(new Set());
+  const bellRef = useRef<HTMLDivElement>(null);
+
   const switchTo = (version: string) => {
     localStorage.setItem("appVersion", version);
     window.location.reload();
   };
   const isQueued = currentUser?.isRankQueued ?? false;
+
+  const visibleNotifs = notifications.filter((n) => !clearedIds.has(n.id));
+  const unreadCount = visibleNotifs.filter((n) => !n.challengeStatus).length;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -229,7 +425,7 @@ export function Header({
         )}
       </div>
 
-      {/* ── Center: Game selector + Ranked Queue ── */}
+      {/* ── Center: Ranked Queue ── */}
       <div className="flex items-center gap-2 px-4 shrink-0">
         {/* Game selector — only visible to the lobby owner */}
         {/* {currentUser?.uid && currentUser.uid === activeLobbyOwnerUid ? (
@@ -264,30 +460,37 @@ export function Header({
             {getGameName(activeLobbyGame)}
           </span>
         ) : null} */}
-
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleRankQueued(!isQueued);
-          }}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded font-medium transition-colors whitespace-nowrap"
-          style={{
-            background: "var(--v2-accent)",
-            color: "var(--v2-accent-fg)",
-          }}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.background = "var(--v2-accent-hover)")
-          }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.background = "var(--v2-accent)")
-          }
+        <span
+          className="text-[10px] leading-none"
+          style={{ color: "var(--v2-muted)" }}
         >
-          <Swords size={13} />
-          {isQueued ? "Searching..." : "Ranked Queue"}
-        </button>
+          {rankQueueGame}
+        </span>
+        <div className="flex flex-col items-center gap-0.5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleRankQueued(!isQueued);
+            }}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded font-medium transition-colors whitespace-nowrap"
+            style={{
+              background: "var(--v2-accent)",
+              color: "var(--v2-accent-fg)",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "var(--v2-accent-hover)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "var(--v2-accent)")
+            }
+          >
+            <Swords size={13} />
+            {isQueued ? "Searching..." : "Ranked Queue"}
+          </button>
+        </div>
       </div>
 
-      {/* ── Right: Status + Profile + Version ── */}
+      {/* ── Right: Status + Notifications + Profile + Version ── */}
       <div className="flex items-center gap-3 px-4 shrink-0">
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${STATUS_DOT[status]}`} />
@@ -295,6 +498,67 @@ export function Header({
             {STATUS_LABEL[status]}
           </span>
         </div>
+
+        {/* Notification bell */}
+        {currentUser?.uid && (
+          <div ref={bellRef} className="relative">
+            <button
+              onClick={() => setNotifOpen((o) => !o)}
+              className="relative flex items-center justify-center w-7 h-7 rounded transition-colors"
+              style={{
+                color: notifMuted
+                  ? "var(--v2-muted)"
+                  : unreadCount > 0
+                    ? "var(--v2-accent)"
+                    : "var(--v2-muted)",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.color = "var(--v2-text)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = notifMuted
+                  ? "var(--v2-muted)"
+                  : unreadCount > 0
+                    ? "var(--v2-accent)"
+                    : "var(--v2-muted)")
+              }
+              title="Notifications"
+            >
+              {notifMuted ? <BellOff size={15} /> : <Bell size={15} />}
+              {!notifMuted && unreadCount > 0 && (
+                <span
+                  className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
+                  style={{
+                    background: "var(--v2-accent)",
+                    color: "var(--v2-accent-fg)",
+                  }}
+                >
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {notifOpen && (
+              <NotificationsPanel
+                notifications={visibleNotifs}
+                allNotifications={notifications}
+                muted={notifMuted}
+                currentUserUid={currentUser.uid}
+                onAccept={(id) => {
+                  onAcceptNotification(id);
+                }}
+                onDecline={(id) => {
+                  onDeclineNotification(id);
+                }}
+                onClear={() =>
+                  setClearedIds(new Set(notifications.map((n) => n.id)))
+                }
+                onToggleMute={onToggleNotifMuted}
+                onClose={() => setNotifOpen(false)}
+              />
+            )}
+          </div>
+        )}
 
         {currentUser?.uid && (
           <button

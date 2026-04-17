@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
+import { useSettingsStore } from '../../src/state/store'
 // @ts-ignore
 import keys from '../../src/private/keys'
 import type { V2User, V2Message, V2Lobby, ConnectionStatus } from '../types'
@@ -92,6 +94,7 @@ function normalizeUser(data: any): V2User | null {
     gravEmail: data.gravEmail || '',
     userEmail: data.userEmail || '',
     isRankQueued: data.isRankQueued === true,
+    currentMatchId: typeof data.currentMatchId === 'string' && data.currentMatchId ? data.currentMatchId : undefined,
   }
 }
 
@@ -109,11 +112,38 @@ function loadSavedLobbies(): string[] {
   }
 }
 
+// ── Sound helpers ─────────────────────────────────────────────────────────────
+
+function playChallengeSound(muted: boolean) {
+  if (muted) return
+  const { notifChallengeSound, notifChallengeSoundPath } = useSettingsStore.getState()
+  if (!notifChallengeSound || !notifChallengeSoundPath) return
+  invoke('play_sound', { path: notifChallengeSoundPath }).catch(() => {})
+}
+
+function playMentionSound(muted: boolean) {
+  if (muted) return
+  const { notifiAtSound, notifAtSoundPath } = useSettingsStore.getState()
+  if (!notifiAtSound || !notifAtSoundPath) return
+  invoke('play_sound', { path: notifAtSoundPath }).catch(() => {})
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type RankQueuePendingData = {
+  matchId: string
+  playerA: { uid: string; userName: string; countryCode: string; accountElo: number; ping: number | null }
+  playerB: { uid: string; userName: string; countryCode: string; accountElo: number; ping: number | null }
+  expiresAt: number
+  isMock?: boolean
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useWebSocket(user: V2User | null) {
+export function useWebSocket(user: V2User | null, notifMuted = false) {
   const socketRef = useRef<WebSocket | null>(null)
   const userRef = useRef(user)
+  const notifMutedRef = useRef(notifMuted)
 
   // Per-lobby message/user state (plain objects for easy spread-clone)
   const allLobbyMessagesRef = useRef<Record<string, V2Message[]>>({})
@@ -128,7 +158,10 @@ export function useWebSocket(user: V2User | null) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const [lobbyList, setLobbyList] = useState<V2Lobby[]>([])
   const [isInMatch, setIsInMatch] = useState(false)
+  const [isRankQueued, setIsRankQueued] = useState(false)
+  const isRankQueuedRef = useRef(false)
   const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean }>>([])
+  const [rankQueuePending, setRankQueuePending] = useState<RankQueuePendingData | null>(null)
 
   // Reconnect state
   const [reconnectTick, setReconnectTick] = useState(0)
@@ -149,9 +182,11 @@ export function useWebSocket(user: V2User | null) {
   const pendingByUserRef = useRef(new Map<string, string>())
   const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>())
   const sentMatchRequestRef = useRef(new Set<string>())
+  const rankQueuePendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Keep user ref in sync
+  // Keep refs in sync
   useEffect(() => { userRef.current = user }, [user])
+  useEffect(() => { notifMutedRef.current = notifMuted }, [notifMuted])
 
   // Persist subscribed lobbies to localStorage whenever they change
   useEffect(() => {
@@ -177,9 +212,63 @@ export function useWebSocket(user: V2User | null) {
     setActiveLobbyId(id)
   }, [])
 
-  const setIsInMatchBoth = useCallback((val: boolean) => {
+  const setIsInMatchBoth = useCallback((val: boolean, opponentUid?: string) => {
     isInMatchRef.current = val
     setIsInMatch(val)
+
+    // If a match ends while the user was rank-queued, clear queue state so the
+    // button resets to "Ranked Queue" and the server knows they left the queue.
+    if (!val && isRankQueuedRef.current) {
+      isRankQueuedRef.current = false
+      setIsRankQueued(false)
+      const socket = socketRef.current
+      const currentUser = userRef.current
+      if (socket?.readyState === WebSocket.OPEN && currentUser?.uid) {
+        try {
+          socket.send(JSON.stringify({
+            type: 'updateSocketState',
+            data: {
+              uid: currentUser.uid,
+              lobbyId: activeLobbyIdRef.current,
+              stateToUpdate: { key: 'isRankQueued', value: false },
+            },
+          }))
+        } catch {}
+      }
+    }
+
+    // Both the current user AND the opponent get stamped with the same matchId so they
+    // form a pair in the PlayerList "In Match" section.
+    const matchId = val && opponentUid ? `local-match-${opponentUid}` : undefined
+    const myUid = userRef.current?.uid
+
+    if (opponentUid) {
+      setAllLobbyUsers(prev => {
+        const next: Record<string, V2User[]> = {}
+        for (const [lid, users] of Object.entries(prev)) {
+          next[lid] = users.map(u => {
+            if (u.uid === opponentUid || (myUid && u.uid === myUid)) {
+              return { ...u, currentMatchId: matchId }
+            }
+            return u
+          })
+        }
+        allLobbyUsersRef.current = next
+        return next
+      })
+    } else if (!val) {
+      // Match ended — clear all local match IDs (opponent + self)
+      setAllLobbyUsers(prev => {
+        const next: Record<string, V2User[]> = {}
+        for (const [lid, users] of Object.entries(prev)) {
+          next[lid] = users.map(u =>
+            u.currentMatchId?.startsWith('local-match-') ? { ...u, currentMatchId: undefined } : u
+          )
+        }
+        allLobbyUsersRef.current = next
+        return next
+      })
+    }
   }, [])
 
   const closePeerConnection = useCallback(() => {
@@ -217,6 +306,15 @@ export function useWebSocket(user: V2User | null) {
     })
   }, [])
 
+  // Clear the rank queue pending state and its timer
+  const clearRankQueuePending = useCallback(() => {
+    if (rankQueuePendingTimerRef.current) {
+      clearTimeout(rankQueuePendingTimerRef.current)
+      rankQueuePendingTimerRef.current = null
+    }
+    setRankQueuePending(null)
+  }, [])
+
   // ── Socket lifecycle ─────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -229,6 +327,10 @@ export function useWebSocket(user: V2User | null) {
       return
     }
 
+    // Reset the intentional-close flag at the start of every new connection attempt.
+    // Without this, the cleanup from a prior attempt leaves the flag set to true,
+    // and the new socket's onclose bails out without scheduling another reconnect.
+    intentionalCloseRef.current = false
     setStatus('connecting')
     const url = `ws://${keys.COTURN_IP}:${keys.SIGNAL_PORT ?? '3004'}`
     const socket = new WebSocket(url)
@@ -436,8 +538,31 @@ export function useWebSocket(user: V2User | null) {
             break
           }
 
-          case 'rank-queue-matched':
-            // Server found a ranked match — match-start will follow
+          case 'rank-queue-pending': {
+            const { matchId, playerA, playerB } = payload
+            if (!matchId || !playerA || !playerB) break
+            isRankQueuedRef.current = false
+            setIsRankQueued(false)
+            clearRankQueuePending()
+            setRankQueuePending({ matchId, playerA, playerB, expiresAt: Date.now() + 30_000 })
+            rankQueuePendingTimerRef.current = setTimeout(() => {
+              setRankQueuePending(null)
+              // Auto-decline on timeout
+              if (socketRef.current?.readyState === WebSocket.OPEN && userRef.current?.uid) {
+                try { socketRef.current.send(JSON.stringify({ type: 'rank-queue-decline', matchId, uid: userRef.current.uid })) } catch {}
+              }
+            }, 30_000)
+            break
+          }
+
+          case 'rank-queue-timeout':
+          case 'rank-queue-cancelled':
+            clearRankQueuePending()
+            addSystemMessage(
+              payload.type === 'rank-queue-cancelled' && payload.reason === 'opponent-declined'
+                ? 'Your opponent declined the ranked match.'
+                : 'Ranked match expired.'
+            )
             break
 
           case 'webrtc-ping-offer': {
@@ -470,6 +595,7 @@ export function useWebSocket(user: V2User | null) {
                 challengeGameName: activeLobbyGame,
               })
             } else {
+              playChallengeSound(notifMutedRef.current)
               addMessageToLobby(activeLobbyIdRef.current, {
                 id: messageId,
                 role: 'challenge',
@@ -568,7 +694,9 @@ export function useWebSocket(user: V2User | null) {
             const serverHost = typeof payload.serverHost === 'string' && payload.serverHost ? payload.serverHost : undefined
             const serverPort = payload.serverPort !== undefined ? Number(payload.serverPort) : undefined
             const gameName = typeof payload.gameName === 'string' && payload.gameName ? payload.gameName : undefined
-            setIsInMatchBoth(true)
+            // Clear any pending ranked match popup now that the match is starting
+            clearRankQueuePending()
+            setIsInMatchBoth(true, opponentUid)
             try {
               await startProxyMatch({ matchId, opponentUid, playerSlot, serverHost, serverPort, gameName })
             } catch (err) {
@@ -611,7 +739,7 @@ export function useWebSocket(user: V2User | null) {
       socket.close()
       if (socketRef.current === socket) socketRef.current = null
     }
-  }, [user?.uid, reconnectTick, setLobbyUsersForId, addMessageToLobby, setActiveLobbyIdBoth, setIsInMatchBoth, closePeerConnection, addSystemMessage, updateChallengeMessage])
+  }, [user?.uid, reconnectTick, setLobbyUsersForId, addMessageToLobby, setActiveLobbyIdBoth, setIsInMatchBoth, closePeerConnection, addSystemMessage, updateChallengeMessage, clearRankQueuePending])
 
   // ── Mock challenge interval (debug lobby only) ────────────────────────────
 
@@ -624,47 +752,71 @@ export function useWebSocket(user: V2User | null) {
       'is sending over a challenge request right now.',
       'thinks you owe them a rematch.',
     ]
+    const MOCK_MENTION_LINES = [
+      'Hey @{player}, ready for a quick set?',
+      'I have a new combo to test on you, @{player}.',
+      'Your defense is looking sharp @{player}, mind if I poke at it?',
+      'Anyone else here? Guess it is just you and me @{player}.',
+    ]
 
     const tick = () => {
       const lobbyId = activeLobbyIdRef.current
       if (lobbyId.trim().toLowerCase() !== 'debug') return
       if (isInMatchRef.current) return
-      if (Math.random() >= 0.4) return
+      if (Math.random() >= 0.5) return
 
       const mockUser = Math.random() < 0.5 ? MOCK_USER_1 : MOCK_USER_2
-      const line = MOCK_CHALLENGE_LINES[Math.floor(Math.random() * MOCK_CHALLENGE_LINES.length)]
       const now = Date.now()
-      const messageId = `mock-challenge-${mockUser.uid}-${now}`
       const myUid = userRef.current?.uid
+      const myName = userRef.current?.userName ?? 'Player'
       if (!myUid) return
 
-      // Already has an unresolved challenge from this mock user? Skip.
-      const existing = allLobbyMessagesRef.current[lobbyId] ?? []
-      const hasPending = existing.some(
-        m => m.role === 'challenge' && m.senderUid === mockUser.uid && !m.challengeStatus
-      )
-      if (hasPending) return
+      // 50/50 between a challenge and an @mention
+      if (Math.random() < 0.5) {
+        // — Challenge —
+        const existing = allLobbyMessagesRef.current[lobbyId] ?? []
+        const hasPending = existing.some(
+          m => m.role === 'challenge' && m.senderUid === mockUser.uid && !m.challengeStatus
+        )
+        if (hasPending) return
 
-      const activeLobbyGame = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName
+        const activeLobbyGame = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName
+        const line = MOCK_CHALLENGE_LINES[Math.floor(Math.random() * MOCK_CHALLENGE_LINES.length)]
+        const messageId = `mock-challenge-${mockUser.uid}-${now}`
 
-      // Register a fake pending offer so acceptChallenge can route to startMockMatch
-      pendingOffersRef.current.set(messageId, {
-        from: mockUser.uid,
-        offer: {} as RTCSessionDescriptionInit,
-      })
-      pendingByUserRef.current.set(mockUser.uid, messageId)
+        pendingOffersRef.current.set(messageId, {
+          from: mockUser.uid,
+          offer: {} as RTCSessionDescriptionInit,
+        })
+        pendingByUserRef.current.set(mockUser.uid, messageId)
 
-      addMessageToLobby(lobbyId, {
-        id: messageId,
-        role: 'challenge',
-        text: `${mockUser.userName} ${line}`,
-        timeStamp: now,
-        userName: mockUser.userName,
-        senderUid: mockUser.uid,
-        challengeChallengerId: mockUser.uid,
-        challengeOpponentId: myUid,
-        challengeGameName: activeLobbyGame,
-      })
+        playChallengeSound(notifMutedRef.current)
+        addMessageToLobby(lobbyId, {
+          id: messageId,
+          role: 'challenge',
+          text: `${mockUser.userName} ${line}`,
+          timeStamp: now,
+          userName: mockUser.userName,
+          senderUid: mockUser.uid,
+          challengeChallengerId: mockUser.uid,
+          challengeOpponentId: myUid,
+          challengeGameName: activeLobbyGame,
+        })
+      } else {
+        // — @mention —
+        const line = MOCK_MENTION_LINES[Math.floor(Math.random() * MOCK_MENTION_LINES.length)]
+        const text = line.replace('{player}', myName)
+
+        playMentionSound(notifMutedRef.current)
+        addMessageToLobby(lobbyId, {
+          id: `mock-mention-${mockUser.uid}-${now}`,
+          role: 'user',
+          text,
+          timeStamp: now,
+          userName: mockUser.userName,
+          senderUid: mockUser.uid,
+        })
+      }
     }
 
     const id = window.setInterval(tick, MOCK_INTERVAL_MS)
@@ -772,7 +924,7 @@ export function useWebSocket(user: V2User | null) {
       const lobbyId = activeLobbyIdRef.current
       const gameName = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName ?? null
       const mockUser = getMockUser(targetUid)
-      setIsInMatchBoth(true)
+      setIsInMatchBoth(true, targetUid)
       try {
         await startMockMatch({ matchId: `mock-${Date.now()}`, opponentName: mockUser?.userName ?? 'Bot', gameName, playerSlot: 0 })
       } catch (err) {
@@ -814,7 +966,7 @@ export function useWebSocket(user: V2User | null) {
       pendingCandidatesRef.current.delete(from)
       const mockUser = getMockUser(from)
       const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
-      setIsInMatchBoth(true)
+      setIsInMatchBoth(true, from)
       try {
         await startMockMatch({ matchId: messageId, opponentName: mockUser?.userName ?? 'Bot', gameName, playerSlot: 1 })
       } catch (err) {
@@ -885,10 +1037,16 @@ export function useWebSocket(user: V2User | null) {
     closePeerConnection()
   }, [setIsInMatchBoth, closePeerConnection])
 
-  const toggleRankQueue = useCallback((isQueue: boolean): void => {
+  const mockRankTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleRankQueue = useCallback((isQueue: boolean, gameName?: string): void => {
     const socket = socketRef.current
     const currentUser = userRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return
+
+    isRankQueuedRef.current = isQueue
+    setIsRankQueued(isQueue)
+
     try {
       socket.send(JSON.stringify({
         type: 'updateSocketState',
@@ -896,10 +1054,78 @@ export function useWebSocket(user: V2User | null) {
           uid: currentUser.uid,
           lobbyId: activeLobbyIdRef.current,
           stateToUpdate: { key: 'isRankQueued', value: isQueue },
+          rankQueueGameName: isQueue ? (gameName ?? 'sfiii3nr1') : undefined,
         },
       }))
     } catch {}
-  }, [])
+
+    // Clear any existing mock rank timer
+    if (mockRankTimerRef.current) {
+      clearTimeout(mockRankTimerRef.current)
+      mockRankTimerRef.current = null
+    }
+
+    if (!isQueue) {
+      // If cancelling the queue, also dismiss any pending popup
+      clearRankQueuePending()
+      return
+    }
+
+    // In the debug lobby, simulate a match-found popup after ~3s
+    if (activeLobbyIdRef.current.trim().toLowerCase() === 'debug') {
+      mockRankTimerRef.current = setTimeout(() => {
+        if (isInMatchRef.current || !userRef.current) return
+        const myUser = userRef.current
+        const mockUser = MOCK_USER_1
+        const mockMatchId = `mock-rank-${Date.now()}`
+        clearRankQueuePending()
+        setRankQueuePending({
+          matchId: mockMatchId,
+          playerA: { uid: myUser.uid, userName: myUser.userName, countryCode: myUser.countryCode, accountElo: myUser.accountElo, ping: 46 },
+          playerB: { uid: mockUser.uid, userName: mockUser.userName, countryCode: mockUser.countryCode, accountElo: mockUser.accountElo, ping: 46 },
+          expiresAt: Date.now() + 30_000,
+          isMock: true,
+        })
+        rankQueuePendingTimerRef.current = setTimeout(() => {
+          setRankQueuePending(null)
+        }, 30_000)
+      }, 3000)
+    }
+  }, [clearRankQueuePending])
+
+  const rankQueueAccept = useCallback(async (matchId: string, isMock?: boolean): Promise<void> => {
+    clearRankQueuePending()
+
+    if (isMock) {
+      if (isInMatchRef.current || !userRef.current) return
+      const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
+      setIsInMatchBoth(true, MOCK_USER_1.uid)
+      try {
+        await startMockMatch({ matchId, opponentName: MOCK_USER_1.userName, gameName, playerSlot: 0 })
+      } catch (err) {
+        console.error('[v2] Failed to start mock ranked match:', err)
+        setIsInMatchBoth(false)
+      }
+      return
+    }
+
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !userRef.current) return
+    try {
+      socket.send(JSON.stringify({ type: 'rank-queue-accept', matchId, uid: userRef.current.uid }))
+    } catch {}
+  }, [clearRankQueuePending, setIsInMatchBoth])
+
+  const rankQueueDecline = useCallback((matchId: string, isMock?: boolean): void => {
+    clearRankQueuePending()
+    if (isMock) return
+
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !userRef.current) return
+    try {
+      socket.send(JSON.stringify({ type: 'rank-queue-decline', matchId, uid: userRef.current.uid }))
+    } catch {}
+  }, [clearRankQueuePending])
 
   const reorderLobbies = useCallback((newOrder: string[]) => {
     subscribedLobbyIdsRef.current = newOrder
@@ -932,7 +1158,9 @@ export function useWebSocket(user: V2User | null) {
     allLobbyUsers,
     lobbyList,
     isInMatch,
+    isRankQueued,
     selfPings,
+    rankQueuePending,
     sendMessage,
     subscribeLobby,
     unsubscribeLobby,
@@ -944,5 +1172,7 @@ export function useWebSocket(user: V2User | null) {
     declineChallenge,
     markMatchEnded,
     toggleRankQueue,
+    rankQueueAccept,
+    rankQueueDecline,
   }
 }
