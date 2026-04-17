@@ -105,6 +105,7 @@ function ChallengeMessage({
 type ChatPanelProps = {
   messages: V2Message[];
   currentUserUid?: string;
+  lobbyGame?: string;
   onSend: (text: string) => boolean;
   onAcceptChallenge?: (messageId: string) => void;
   onDeclineChallenge?: (messageId: string) => void;
@@ -113,6 +114,7 @@ type ChatPanelProps = {
 export function ChatPanel({
   messages,
   currentUserUid,
+  lobbyGame,
   onSend,
   onAcceptChallenge,
   onDeclineChallenge,
@@ -141,6 +143,9 @@ export function ChatPanel({
     <div className="flex flex-col h-full">
       {/* Messages */}
       <div className="flex-1 p-3 space-y-1.5 min-h-0 overflow-y-scroll">
+        <p className="text-[10px] font-medium uppercase tracking-wide pb-1" style={{ color: 'var(--v2-muted)' }}>
+          {getGameName(lobbyGame)}
+        </p>
         {messages.length === 0 && (
           <p className="text-sm text-center pt-8" style={{ color: "var(--v2-muted)" }}>
             No messages yet. Say hello!

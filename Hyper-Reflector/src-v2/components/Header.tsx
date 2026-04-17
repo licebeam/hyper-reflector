@@ -8,7 +8,10 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { restrictToHorizontalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
+import {
+  restrictToHorizontalAxis,
+  restrictToParentElement,
+} from "@dnd-kit/modifiers";
 import {
   SortableContext,
   horizontalListSortingStrategy,
@@ -44,7 +47,12 @@ type SortableTabProps = {
   onClose: () => void;
 };
 
-function SortableTab({ lobbyId, isActive, onSelect, onClose }: SortableTabProps) {
+function SortableTab({
+  lobbyId,
+  isActive,
+  onSelect,
+  onClose,
+}: SortableTabProps) {
   const isDefault = lobbyId === DEFAULT_LOBBY_ID;
 
   const {
@@ -62,8 +70,8 @@ function SortableTab({ lobbyId, isActive, onSelect, onClose }: SortableTabProps)
     background: isDragging
       ? "var(--v2-hover)"
       : isActive
-      ? "var(--v2-hover)"
-      : "color-mix(in srgb, var(--v2-surface) 60%, transparent)",
+        ? "var(--v2-hover)"
+        : "color-mix(in srgb, var(--v2-surface) 60%, transparent)",
     color: isActive || isDragging ? "var(--v2-text)" : "var(--v2-muted)",
     borderTop: isActive
       ? "2px solid var(--v2-accent)"
@@ -99,7 +107,9 @@ function SortableTab({ lobbyId, isActive, onSelect, onClose }: SortableTabProps)
           className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 -mr-0.5"
           style={{ color: "var(--v2-muted)" }}
           onMouseEnter={(e) => (e.currentTarget.style.color = "#f87171")}
-          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--v2-muted)")}
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.color = "var(--v2-muted)")
+          }
           title={`Leave ${lobbyId}`}
         >
           <X size={10} />
@@ -152,7 +162,7 @@ export function Header({
     useSensor(PointerSensor, {
       // Require a 5px move before a drag starts so normal clicks still work
       activationConstraint: { distance: 5 },
-    })
+    }),
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -222,7 +232,7 @@ export function Header({
       {/* ── Center: Game selector + Ranked Queue ── */}
       <div className="flex items-center gap-2 px-4 shrink-0">
         {/* Game selector — only visible to the lobby owner */}
-        {currentUser?.uid && currentUser.uid === activeLobbyOwnerUid ? (
+        {/* {currentUser?.uid && currentUser.uid === activeLobbyOwnerUid ? (
           <select
             value={activeLobbyGame ?? GAMES[0].rom}
             onChange={(e) => onUpdateLobbyGame(activeLobbyId, e.target.value)}
@@ -253,7 +263,7 @@ export function Header({
           >
             {getGameName(activeLobbyGame)}
           </span>
-        ) : null}
+        ) : null} */}
 
         <button
           onClick={(e) => {

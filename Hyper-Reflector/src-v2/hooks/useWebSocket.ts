@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { listen } from '@tauri-apps/api/event'
 // @ts-ignore
 import keys from '../../src/private/keys'
 import type { V2User, V2Message, V2Lobby, ConnectionStatus } from '../types'
@@ -611,6 +612,85 @@ export function useWebSocket(user: V2User | null) {
       if (socketRef.current === socket) socketRef.current = null
     }
   }, [user?.uid, reconnectTick, setLobbyUsersForId, addMessageToLobby, setActiveLobbyIdBoth, setIsInMatchBoth, closePeerConnection, addSystemMessage, updateChallengeMessage])
+
+  // ── Mock challenge interval (debug lobby only) ────────────────────────────
+
+  useEffect(() => {
+    if (!user?.uid) return
+
+    const MOCK_INTERVAL_MS = 8000
+    const MOCK_CHALLENGE_LINES = [
+      'wants to run a FT3 if you are up for it.',
+      'is sending over a challenge request right now.',
+      'thinks you owe them a rematch.',
+    ]
+
+    const tick = () => {
+      const lobbyId = activeLobbyIdRef.current
+      if (lobbyId.trim().toLowerCase() !== 'debug') return
+      if (isInMatchRef.current) return
+      if (Math.random() >= 0.4) return
+
+      const mockUser = Math.random() < 0.5 ? MOCK_USER_1 : MOCK_USER_2
+      const line = MOCK_CHALLENGE_LINES[Math.floor(Math.random() * MOCK_CHALLENGE_LINES.length)]
+      const now = Date.now()
+      const messageId = `mock-challenge-${mockUser.uid}-${now}`
+      const myUid = userRef.current?.uid
+      if (!myUid) return
+
+      // Already has an unresolved challenge from this mock user? Skip.
+      const existing = allLobbyMessagesRef.current[lobbyId] ?? []
+      const hasPending = existing.some(
+        m => m.role === 'challenge' && m.senderUid === mockUser.uid && !m.challengeStatus
+      )
+      if (hasPending) return
+
+      const activeLobbyGame = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName
+
+      // Register a fake pending offer so acceptChallenge can route to startMockMatch
+      pendingOffersRef.current.set(messageId, {
+        from: mockUser.uid,
+        offer: {} as RTCSessionDescriptionInit,
+      })
+      pendingByUserRef.current.set(mockUser.uid, messageId)
+
+      addMessageToLobby(lobbyId, {
+        id: messageId,
+        role: 'challenge',
+        text: `${mockUser.userName} ${line}`,
+        timeStamp: now,
+        userName: mockUser.userName,
+        senderUid: mockUser.uid,
+        challengeChallengerId: mockUser.uid,
+        challengeOpponentId: myUid,
+        challengeGameName: activeLobbyGame,
+      })
+    }
+
+    const id = window.setInterval(tick, MOCK_INTERVAL_MS)
+    return () => window.clearInterval(id)
+  }, [user?.uid, addMessageToLobby])
+
+  // ── Tauri emulator-exit listener ─────────────────────────────────────────
+
+  useEffect(() => {
+    if (typeof (window as any).__TAURI_INTERNALS__ === 'undefined') return
+    let unlistenEnd: (() => void) | null = null
+    let unlistenEndUi: (() => void) | null = null
+
+    const handleEnd = () => {
+      setIsInMatchBoth(false)
+      closePeerConnection()
+    }
+
+    listen('endMatch', handleEnd).then(fn => { unlistenEnd = fn }).catch(() => {})
+    listen('endMatchUI', handleEnd).then(fn => { unlistenEndUi = fn }).catch(() => {})
+
+    return () => {
+      unlistenEnd?.()
+      unlistenEndUi?.()
+    }
+  }, [setIsInMatchBoth, closePeerConnection])
 
   // ── Public API ────────────────────────────────────────────────────────────────
 

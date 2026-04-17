@@ -6,6 +6,7 @@ type LobbyPageProps = {
   messages: V2Message[];
   lobbyUsers: V2User[];
   currentUser: V2User | null;
+  lobbyGame?: string;
   onSendMessage: (text: string) => boolean;
   onViewProfile?: (uid: string) => void;
   onChallenge?: (uid: string) => void;
@@ -17,6 +18,7 @@ export function LobbyPage({
   messages,
   lobbyUsers,
   currentUser,
+  lobbyGame,
   onSendMessage,
   onViewProfile,
   onChallenge,
@@ -30,6 +32,7 @@ export function LobbyPage({
         <ChatPanel
           messages={messages}
           currentUserUid={currentUser?.uid}
+          lobbyGame={lobbyGame}
           onSend={onSendMessage}
           onAcceptChallenge={onAcceptChallenge}
           onDeclineChallenge={onDeclineChallenge}
