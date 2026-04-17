@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { X, Users, Lock, Plus, Check } from 'lucide-react'
 import type { V2Lobby } from '../types'
+import { GAMES, DEFAULT_GAME_ROM } from '../games'
 
 type LobbySelectorProps = {
   lobbies: V2Lobby[]
   currentLobbyId: string
   subscribedLobbyIds: string[]
   onJoin: (lobbyId: string, pass?: string) => boolean
-  onCreate: (lobbyId: string, pass: string, isPrivate: boolean) => boolean
+  onCreate: (lobbyId: string, pass: string, isPrivate: boolean, gameName?: string) => boolean
   onClose: () => void
 }
 
@@ -24,6 +25,7 @@ export function LobbySelector({
   const [newName, setNewName] = useState('')
   const [newPass, setNewPass] = useState('')
   const [newPrivate, setNewPrivate] = useState(false)
+  const [newGame, setNewGame] = useState(DEFAULT_GAME_ROM)
   const [error, setError] = useState<string | null>(null)
 
   const handleJoin = (lobby: V2Lobby) => {
@@ -39,7 +41,7 @@ export function LobbySelector({
       setError('Lobby name must be at least 2 characters.')
       return
     }
-    const ok = onCreate(name, newPass.trim(), newPrivate)
+    const ok = onCreate(name, newPass.trim(), newPrivate, newGame)
     if (ok) onClose()
     else setError('Could not create lobby. Make sure you are connected.')
   }
@@ -258,6 +260,31 @@ export function LobbySelector({
                   onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
                   onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
                 />
+              </div>
+
+              {/* Game selector */}
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--v2-muted)' }}>
+                  Game
+                </label>
+                <select
+                  value={newGame}
+                  onChange={e => setNewGame(e.target.value)}
+                  className="w-full text-xs px-2.5 py-1.5 rounded border outline-none"
+                  style={{
+                    background: 'var(--v2-hover)',
+                    borderColor: 'var(--v2-border)',
+                    color: 'var(--v2-text)',
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
+                >
+                  {GAMES.map(g => (
+                    <option key={g.rom} value={g.rom} style={{ background: 'var(--v2-surface)' }}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex items-center justify-between gap-4">

@@ -55,6 +55,7 @@ function AppV2Inner() {
 
   const {
     status,
+    isReconnecting,
     lobbyUsers,
     messages,
     subscribedLobbyIds,
@@ -66,6 +67,7 @@ function AppV2Inner() {
     subscribeLobby,
     unsubscribeLobby,
     reorderLobbies,
+    updateLobbyGame,
     createLobby,
     sendChallenge,
     acceptChallenge,
@@ -202,6 +204,22 @@ function AppV2Inner() {
         <div className="flex h-full">
           <NavRail currentPage={page} onNavigate={handleNavigate} />
 
+          {/* Disconnection warning banner */}
+          {(status === "disconnected" || status === "error") && (
+            <div
+              className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 py-1.5 text-xs font-medium"
+              style={{ background: isReconnecting ? "#78350f" : "#7f1d1d", color: "#fef3c7" }}
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full"
+                style={{ background: isReconnecting ? "#fbbf24" : "#f87171", animation: isReconnecting ? "pulse 1.5s infinite" : "none" }}
+              />
+              {isReconnecting
+                ? "Disconnected — reconnecting…"
+                : "Disconnected from server"}
+            </div>
+          )}
+
           <div className="flex-1 flex flex-col overflow-hidden">
             <Header
               onToggleRankQueued={handleSetIsRankQueued}
@@ -214,6 +232,9 @@ function AppV2Inner() {
               status={status}
               currentUser={effectiveUser}
               onViewProfile={handleViewProfile}
+              activeLobbyGame={lobbyList.find(l => l.name === activeLobbyId)?.gameName}
+              activeLobbyOwnerUid={lobbyList.find(l => l.name === activeLobbyId)?.ownerUid}
+              onUpdateLobbyGame={updateLobbyGame}
             />
 
             <main className="flex-1 overflow-hidden">

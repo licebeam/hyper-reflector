@@ -122,15 +122,25 @@ export function useWebSocket(user: V2User | null) {
 
   const initialLobbies = useRef(loadSavedLobbies())
   const [subscribedLobbyIds, setSubscribedLobbyIds] = useState<string[]>(initialLobbies.current)
-  const [activeLobbyId, setActiveLobbyId] = useState(initialLobbies.current[0] ?? DEFAULT_LOBBY_ID)
+  // Always start on the default lobby tab regardless of saved tab order
+  const [activeLobbyId, setActiveLobbyId] = useState(DEFAULT_LOBBY_ID)
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
   const [lobbyList, setLobbyList] = useState<V2Lobby[]>([])
   const [isInMatch, setIsInMatch] = useState(false)
   const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean }>>([])
 
+  // Reconnect state
+  const [reconnectTick, setReconnectTick] = useState(0)
+  const reconnectAttemptRef = useRef(0)
+  const reconnectStartRef = useRef<number | null>(null)
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const intentionalCloseRef = useRef(false)
+  const MAX_RECONNECT_MS = 5 * 60 * 1000
+
   // Stable refs for use inside async/socket callbacks
+  const lobbyListRef = useRef<V2Lobby[]>([])
   const subscribedLobbyIdsRef = useRef(initialLobbies.current)
-  const activeLobbyIdRef = useRef(initialLobbies.current[0] ?? DEFAULT_LOBBY_ID)
+  const activeLobbyIdRef = useRef(DEFAULT_LOBBY_ID)
   const isInMatchRef = useRef(false)
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const opponentUidRef = useRef<string | null>(null)
@@ -224,6 +234,13 @@ export function useWebSocket(user: V2User | null) {
     socketRef.current = socket
 
     socket.onopen = () => {
+      // Successful connection — clear reconnect state
+      reconnectAttemptRef.current = 0
+      reconnectStartRef.current = null
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
       setStatus('connected')
       const primaryLobby = subscribedLobbyIdsRef.current[0] ?? DEFAULT_LOBBY_ID
       socket.send(JSON.stringify({
@@ -247,6 +264,27 @@ export function useWebSocket(user: V2User | null) {
     socket.onclose = () => {
       if (socketRef.current === socket) socketRef.current = null
       setStatus('disconnected')
+
+      // Don't reconnect if the close was intentional (user logout / effect cleanup)
+      if (intentionalCloseRef.current || !userRef.current) {
+        intentionalCloseRef.current = false
+        return
+      }
+
+      // Start the 5-minute reconnect window on first failure
+      const now = Date.now()
+      if (reconnectStartRef.current === null) reconnectStartRef.current = now
+      const elapsed = now - reconnectStartRef.current
+
+      if (elapsed < MAX_RECONNECT_MS) {
+        const delay = Math.min(2000 * Math.pow(2, reconnectAttemptRef.current), 30_000)
+        reconnectAttemptRef.current++
+        reconnectTimerRef.current = setTimeout(() => setReconnectTick(t => t + 1), delay)
+      } else {
+        // 5 minutes elapsed — give up and reset so a future login starts fresh
+        reconnectStartRef.current = null
+        reconnectAttemptRef.current = 0
+      }
     }
 
     socket.onmessage = async (event: MessageEvent) => {
@@ -299,13 +337,17 @@ export function useWebSocket(user: V2User | null) {
                   name,
                   users: typeof entry.users === 'number' ? entry.users : 0,
                   isPrivate: entry.isPrivate === true,
+                  gameName: typeof entry.gameName === 'string' && entry.gameName ? entry.gameName : undefined,
+                  ownerUid: typeof entry.ownerUid === 'string' && entry.ownerUid ? entry.ownerUid : undefined,
                 })
               }
             }
             if (!lobbyMap.has(DEFAULT_LOBBY_ID)) {
               lobbyMap.set(DEFAULT_LOBBY_ID, { name: DEFAULT_LOBBY_ID, users: 0 })
             }
-            setLobbyList(Array.from(lobbyMap.values()))
+            const nextList = Array.from(lobbyMap.values())
+            lobbyListRef.current = nextList
+            setLobbyList(nextList)
             break
           }
 
@@ -417,11 +459,14 @@ export function useWebSocket(user: V2User | null) {
               if (found) { challengerName = found.userName; break }
             }
 
+            const activeLobbyGame = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName
+
             if (existingMsgId) {
               updateChallengeMessage(existingMsgId, {
                 timeStamp: Date.now(),
                 challengeStatus: undefined,
                 challengeResponder: undefined,
+                challengeGameName: activeLobbyGame,
               })
             } else {
               addMessageToLobby(activeLobbyIdRef.current, {
@@ -433,6 +478,7 @@ export function useWebSocket(user: V2User | null) {
                 senderUid: payload.from as string,
                 challengeChallengerId: payload.from as string,
                 challengeOpponentId: myUid,
+                challengeGameName: activeLobbyGame,
               })
             }
             break
@@ -459,7 +505,7 @@ export function useWebSocket(user: V2User | null) {
             }
 
             const lobbyForMatch = activeLobbyIdRef.current || DEFAULT_LOBBY_ID
-            const inferredGameName = lobbyForMatch.trim().toLowerCase() === 'vampire' ? 'vsavj' : undefined
+            const inferredGameName = lobbyListRef.current.find(l => l.name === lobbyForMatch)?.gameName
             const requesterUid = userRef.current?.uid
 
             if (
@@ -556,10 +602,15 @@ export function useWebSocket(user: V2User | null) {
     }
 
     return () => {
+      intentionalCloseRef.current = true
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
       socket.close()
       if (socketRef.current === socket) socketRef.current = null
     }
-  }, [user?.uid, setLobbyUsersForId, addMessageToLobby, setActiveLobbyIdBoth, setIsInMatchBoth, closePeerConnection, addSystemMessage, updateChallengeMessage])
+  }, [user?.uid, reconnectTick, setLobbyUsersForId, addMessageToLobby, setActiveLobbyIdBoth, setIsInMatchBoth, closePeerConnection, addSystemMessage, updateChallengeMessage])
 
   // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -616,7 +667,7 @@ export function useWebSocket(user: V2User | null) {
     setAllLobbyUsers(prev => { const n = { ...prev }; delete n[lobbyId]; allLobbyUsersRef.current = n; return n })
   }, [setActiveLobbyIdBoth])
 
-  const createLobby = useCallback((lobbyId: string, pass: string, isPrivate: boolean): boolean => {
+  const createLobby = useCallback((lobbyId: string, pass: string, isPrivate: boolean, gameName?: string): boolean => {
     const socket = socketRef.current
     const currentUser = userRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return false
@@ -626,6 +677,7 @@ export function useWebSocket(user: V2User | null) {
         lobbyId,
         pass,
         isPrivate,
+        gameName: gameName || undefined,
         user: { ...currentUser, lobbyId },
       }))
       return true
@@ -638,7 +690,7 @@ export function useWebSocket(user: V2User | null) {
 
     if (isMockUserId(targetUid)) {
       const lobbyId = activeLobbyIdRef.current
-      const gameName = lobbyId.trim().toLowerCase() === 'vampire' ? 'vsavj' : null
+      const gameName = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName ?? null
       const mockUser = getMockUser(targetUid)
       setIsInMatchBoth(true)
       try {
@@ -681,7 +733,7 @@ export function useWebSocket(user: V2User | null) {
       pendingByUserRef.current.delete(from)
       pendingCandidatesRef.current.delete(from)
       const mockUser = getMockUser(from)
-      const gameName = activeLobbyIdRef.current.trim().toLowerCase() === 'vampire' ? 'vsavj' : null
+      const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
       setIsInMatchBoth(true)
       try {
         await startMockMatch({ matchId: messageId, opponentName: mockUser?.userName ?? 'Bot', gameName, playerSlot: 1 })
@@ -774,12 +826,23 @@ export function useWebSocket(user: V2User | null) {
     setSubscribedLobbyIds(newOrder)
   }, [])
 
+  const updateLobbyGame = useCallback((lobbyId: string, gameName: string): void => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) return
+    try {
+      socket.send(JSON.stringify({ type: 'updateLobbyGame', lobbyId, gameName }))
+    } catch {}
+  }, [])
+
   // Derived: active-tab slice
   const lobbyUsers = allLobbyUsers[activeLobbyId] ?? []
   const messages = allLobbyMessages[activeLobbyId] ?? []
 
+  const isReconnecting = status === 'disconnected' && reconnectAttemptRef.current > 0
+
   return {
     status,
+    isReconnecting,
     subscribedLobbyIds,
     activeLobbyId,
     setActiveLobbyId: setActiveLobbyIdBoth,
@@ -794,6 +857,7 @@ export function useWebSocket(user: V2User | null) {
     subscribeLobby,
     unsubscribeLobby,
     reorderLobbies,
+    updateLobbyGame,
     createLobby,
     sendChallenge,
     acceptChallenge,
