@@ -57,11 +57,15 @@ function AppV2Inner() {
     status,
     lobbyUsers,
     messages,
-    currentLobbyId,
+    subscribedLobbyIds,
+    activeLobbyId,
+    setActiveLobbyId,
     lobbyList,
     selfPings,
     sendMessage,
-    joinLobby,
+    subscribeLobby,
+    unsubscribeLobby,
+    reorderLobbies,
     createLobby,
     sendChallenge,
     acceptChallenge,
@@ -201,11 +205,15 @@ function AppV2Inner() {
           <div className="flex-1 flex flex-col overflow-hidden">
             <Header
               onToggleRankQueued={handleSetIsRankQueued}
-              lobbyId={currentLobbyId}
+              subscribedLobbyIds={subscribedLobbyIds}
+              activeLobbyId={activeLobbyId}
+              onSelectLobby={setActiveLobbyId}
+              onCloseLobby={unsubscribeLobby}
+              onAddLobby={() => setLobbySelectorOpen(true)}
+              onReorderLobbies={reorderLobbies}
               status={status}
               currentUser={effectiveUser}
               onViewProfile={handleViewProfile}
-              onOpenLobbySelector={() => setLobbySelectorOpen(true)}
             />
 
             <main className="flex-1 overflow-hidden">
@@ -253,8 +261,9 @@ function AppV2Inner() {
       {lobbySelectorOpen && (
         <LobbySelector
           lobbies={lobbyList}
-          currentLobbyId={currentLobbyId}
-          onJoin={joinLobby}
+          currentLobbyId={activeLobbyId}
+          subscribedLobbyIds={subscribedLobbyIds}
+          onJoin={(id, pass) => subscribeLobby(id, pass)}
           onCreate={createLobby}
           onClose={() => setLobbySelectorOpen(false)}
         />
