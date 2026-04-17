@@ -19,6 +19,7 @@ export type V2User = {
   gravEmail: string
   userEmail: string
   isRankQueued: boolean
+  currentMatchId?: string
 }
 
 export type V2Message = {

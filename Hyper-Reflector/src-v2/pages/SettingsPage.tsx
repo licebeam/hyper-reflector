@@ -20,6 +20,7 @@ import {
   NAME_OTHER_SWATCHES,
 } from "../theme";
 import type { V2User } from "../types";
+import { GAMES } from "../games";
 
 type SettingsPageProps = {
   user: V2User;
@@ -286,6 +287,8 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
   const setWinSound = useSettingsStore((s) => s.setWinSound);
   const winSoundPath = useSettingsStore((s) => s.winSoundPath);
   const setWinSoundPath = useSettingsStore((s) => s.setWinSoundPath);
+  const rankQueueGame = useSettingsStore((s) => s.rankQueueGame);
+  const setRankQueueGame = useSettingsStore((s) => s.setRankQueueGame);
 
   const { theme, overrides, setThemeId, setOverride } = useV2Theme();
 
@@ -386,6 +389,24 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
               {DELAYS.map((d) => (
                 <option key={d} value={d}>
                   {d}
+                </option>
+              ))}
+            </select>
+          </Row>
+        </Section>
+
+        {/* ── Ranked Queue ── */}
+        <Section title="Ranked Queue">
+          <Row label="Game" sub="The game you queue for in ranked search">
+            <select
+              value={rankQueueGame}
+              onChange={(e) => setRankQueueGame(e.target.value)}
+              className="rounded px-3 py-1.5 text-sm border outline-none"
+              style={selectStyle}
+            >
+              {GAMES.map((g) => (
+                <option key={g.rom} value={g.rom}>
+                  {g.name}
                 </option>
               ))}
             </select>

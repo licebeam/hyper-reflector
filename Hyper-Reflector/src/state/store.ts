@@ -58,6 +58,8 @@ type SettingsState = {
     isUserMuted: (uid: string) => boolean
     romPath: string
     setRomPath: (path: string) => void
+    rankQueueGame: string
+    setRankQueueGame: (rom: string) => void
 }
 
 type SignalStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -211,6 +213,8 @@ export const useSettingsStore = create<SettingsState>()(
             },
             romPath: '',
             setRomPath: (path) => set({ romPath: path }),
+            rankQueueGame: 'sfiii3nr1',
+            setRankQueueGame: (rom) => set({ rankQueueGame: rom }),
         }),
         {
             name: 'settings',
