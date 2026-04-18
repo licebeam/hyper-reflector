@@ -298,7 +298,14 @@ export function HomePage({ currentUser }: HomePageProps) {
         </div>
 
         {error && (
-          <div className="px-4 py-3 rounded-lg border border-yellow-700/50 bg-yellow-900/20 text-yellow-300 text-sm">
+          <div
+            className="px-4 py-3 rounded-lg border text-sm"
+            style={{
+              borderColor: 'var(--v2-border)',
+              background: 'color-mix(in srgb, var(--v2-accent) 8%, var(--v2-surface))',
+              color: 'var(--v2-muted)',
+            }}
+          >
             {error}
           </div>
         )}

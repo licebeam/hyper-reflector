@@ -94,6 +94,7 @@ function normalizeUser(data: any): V2User | null {
     gravEmail: data.gravEmail || '',
     userEmail: data.userEmail || '',
     isRankQueued: data.isRankQueued === true,
+    isAfk: data.isAfk === true,
     currentMatchId: typeof data.currentMatchId === 'string' && data.currentMatchId ? data.currentMatchId : undefined,
   }
 }
@@ -162,6 +163,9 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const isRankQueuedRef = useRef(false)
   const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean }>>([])
   const [rankQueuePending, setRankQueuePending] = useState<RankQueuePendingData | null>(null)
+  const [lobbyPasswords, setLobbyPasswords] = useState<Record<string, string>>({})
+  const lobbyPasswordsRef = useRef<Record<string, string>>({})
+  const [lobbyJoinError, setLobbyJoinError] = useState<string | null>(null)
 
   // Reconnect state
   const [reconnectTick, setReconnectTick] = useState(0)
@@ -306,6 +310,22 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     })
   }, [])
 
+  // Decline every pending challenge except the one being accepted
+  const declineAllPendingExcept = useCallback((exceptMessageId?: string) => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    for (const [msgId, { from }] of pendingOffersRef.current.entries()) {
+      if (msgId === exceptMessageId) continue
+      if (socket?.readyState === WebSocket.OPEN && currentUser?.uid) {
+        try { webrtcDeclineCall(socket, from, currentUser.uid) } catch {}
+      }
+      updateChallengeMessage(msgId, { challengeStatus: 'declined', challengeResponder: currentUser?.userName })
+      pendingByUserRef.current.delete(from)
+      pendingCandidatesRef.current.delete(from)
+      pendingOffersRef.current.delete(msgId)
+    }
+  }, [updateChallengeMessage])
+
   // Clear the rank queue pending state and its timer
   const clearRankQueuePending = useCallback(() => {
     if (rankQueuePendingTimerRef.current) {
@@ -344,6 +364,16 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
         clearTimeout(reconnectTimerRef.current)
         reconnectTimerRef.current = null
       }
+      // Clear stale WebRTC state from any previous session so a reconnected
+      // socket doesn't try to use dead offers/candidates from before the drop.
+      sentMatchRequestRef.current.clear()
+      pendingOffersRef.current.clear()
+      pendingByUserRef.current.clear()
+      pendingCandidatesRef.current.clear()
+      if (peerConnectionRef.current) {
+        try { peerConnectionRef.current.close() } catch {}
+        peerConnectionRef.current = null
+      }
       setStatus('connected')
       const primaryLobby = subscribedLobbyIdsRef.current[0] ?? DEFAULT_LOBBY_ID
       socket.send(JSON.stringify({
@@ -356,7 +386,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
           socket.send(JSON.stringify({
             type: 'subscribeLobby',
             lobbyId,
-            pass: '',
+            pass: lobbyPasswordsRef.current[lobbyId] ?? '',
             user: { ...userRef.current, lobbyId },
           }))
         } catch {}
@@ -454,19 +484,27 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
             break
           }
 
+          case 'error': {
+            const errMsg = typeof payload.message === 'string' ? payload.message : 'An error occurred'
+            setLobbyJoinError(errMsg)
+            break
+          }
+
           case 'lobby-joined': {
             const newId = typeof payload.lobbyId === 'string' ? payload.lobbyId.trim() : ''
             if (!newId) break
+            setLobbyJoinError(null)
 
             if (payload.isSubscription) {
-              // Multi-lobby: add a new tab without clearing existing data
+              // Only switch active tab for genuinely new subscriptions, not reconnect restores
+              const isNew = !subscribedLobbyIdsRef.current.includes(newId)
               setSubscribedLobbyIds(prev => {
                 if (prev.includes(newId)) return prev
                 const next = [...prev, newId].slice(0, MAX_SUBSCRIPTIONS)
                 subscribedLobbyIdsRef.current = next
                 return next
               })
-              setActiveLobbyIdBoth(newId)
+              if (isNew) setActiveLobbyIdBoth(newId)
               if (!allLobbyMessagesRef.current[newId]) {
                 allLobbyMessagesRef.current = { ...allLobbyMessagesRef.current, [newId]: [] }
                 setAllLobbyMessages(prev => ({ ...prev, [newId]: [] }))
@@ -636,6 +674,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
             const requesterUid = userRef.current?.uid
 
             if (
+              !isInMatchRef.current &&
               requesterUid &&
               payload.from &&
               !isMockUserId(payload.from as string) &&
@@ -686,6 +725,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
           }
 
           case 'match-start': {
+            if (isInMatchRef.current) break
             const matchId = typeof payload.matchId === 'string' ? payload.matchId : undefined
             const opponentUid = typeof payload.opponentUid === 'string' ? payload.opponentUid : undefined
             const rawSlot = payload.playerSlot !== undefined ? Number(payload.playerSlot) : undefined
@@ -877,6 +917,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
         pass: pass ?? '',
         user: { ...currentUser, lobbyId },
       }))
+      if (pass) { lobbyPasswordsRef.current = { ...lobbyPasswordsRef.current, [lobbyId]: pass }; setLobbyPasswords(lobbyPasswordsRef.current) }
       return true
     } catch { return false }
   }, [setActiveLobbyIdBoth])
@@ -912,6 +953,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
         gameName: gameName || undefined,
         user: { ...currentUser, lobbyId },
       }))
+      if (pass) { lobbyPasswordsRef.current = { ...lobbyPasswordsRef.current, [lobbyId]: pass }; setLobbyPasswords(lobbyPasswordsRef.current) }
       return true
     } catch { return false }
   }, [])
@@ -952,7 +994,9 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
   const acceptChallenge = useCallback(async (messageId: string): Promise<void> => {
     const currentUser = userRef.current
-    if (!currentUser?.uid) return
+    if (!currentUser?.uid || isInMatchRef.current) return
+
+    declineAllPendingExcept(messageId)
 
     const pendingOffer = pendingOffersRef.current.get(messageId)
     updateChallengeMessage(messageId, { challengeStatus: 'accepted', challengeResponder: currentUser.userName })
@@ -1010,7 +1054,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       pendingOffersRef.current.delete(messageId)
       pendingByUserRef.current.delete(from)
     }
-  }, [setIsInMatchBoth, closePeerConnection, updateChallengeMessage])
+  }, [setIsInMatchBoth, closePeerConnection, updateChallengeMessage, declineAllPendingExcept])
 
   const declineChallenge = useCallback(async (messageId: string): Promise<void> => {
     const currentUser = userRef.current
@@ -1095,6 +1139,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
   const rankQueueAccept = useCallback(async (matchId: string, isMock?: boolean): Promise<void> => {
     clearRankQueuePending()
+    declineAllPendingExcept()
 
     if (isMock) {
       if (isInMatchRef.current || !userRef.current) return
@@ -1114,7 +1159,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     try {
       socket.send(JSON.stringify({ type: 'rank-queue-accept', matchId, uid: userRef.current.uid }))
     } catch {}
-  }, [clearRankQueuePending, setIsInMatchBoth])
+  }, [clearRankQueuePending, setIsInMatchBoth, declineAllPendingExcept])
 
   const rankQueueDecline = useCallback((matchId: string, isMock?: boolean): void => {
     clearRankQueuePending()
@@ -1126,6 +1171,35 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       socket.send(JSON.stringify({ type: 'rank-queue-decline', matchId, uid: userRef.current.uid }))
     } catch {}
   }, [clearRankQueuePending])
+
+  const setAfk = useCallback((val: boolean): void => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return
+
+    // Optimistic update — immediately reflect in every lobby so the UI doesn't
+    // wait for the server roundtrip before moving the user to the AFK section.
+    const myUid = currentUser.uid
+    setAllLobbyUsers(prev => {
+      const next: Record<string, V2User[]> = {}
+      for (const [lid, users] of Object.entries(prev)) {
+        next[lid] = users.map(u => u.uid === myUid ? { ...u, isAfk: val } : u)
+      }
+      allLobbyUsersRef.current = next
+      return next
+    })
+
+    try {
+      socket.send(JSON.stringify({
+        type: 'updateSocketState',
+        data: {
+          uid: currentUser.uid,
+          lobbyId: activeLobbyIdRef.current,
+          stateToUpdate: { key: 'isAfk', value: val },
+        },
+      }))
+    } catch {}
+  }, [])
 
   const reorderLobbies = useCallback((newOrder: string[]) => {
     subscribedLobbyIdsRef.current = newOrder
@@ -1174,5 +1248,9 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     toggleRankQueue,
     rankQueueAccept,
     rankQueueDecline,
+    setAfk,
+    lobbyPasswords,
+    lobbyJoinError,
+    clearLobbyJoinError: () => setLobbyJoinError(null),
   }
 }

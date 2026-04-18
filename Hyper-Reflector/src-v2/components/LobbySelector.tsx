@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Users, Lock, Plus, Check } from 'lucide-react'
 import type { V2Lobby } from '../types'
 import { GAMES, DEFAULT_GAME_ROM } from '../games'
@@ -10,6 +10,8 @@ type LobbySelectorProps = {
   onJoin: (lobbyId: string, pass?: string) => boolean
   onCreate: (lobbyId: string, pass: string, isPrivate: boolean, gameName?: string) => boolean
   onClose: () => void
+  joinError?: string | null
+  onClearJoinError?: () => void
 }
 
 export function LobbySelector({
@@ -19,20 +21,33 @@ export function LobbySelector({
   onJoin,
   onCreate,
   onClose,
+  joinError,
+  onClearJoinError,
 }: LobbySelectorProps) {
   const [joinPassInputs, setJoinPassInputs] = useState<Record<string, string>>({})
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newPass, setNewPass] = useState('')
-  const [newPrivate, setNewPrivate] = useState(false)
   const [newGame, setNewGame] = useState(DEFAULT_GAME_ROM)
   const [error, setError] = useState<string | null>(null)
+  const [pendingPrivateLobbyId, setPendingPrivateLobbyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (pendingPrivateLobbyId && subscribedLobbyIds.includes(pendingPrivateLobbyId)) {
+      onClose()
+    }
+  }, [subscribedLobbyIds, pendingPrivateLobbyId, onClose])
 
   const handleJoin = (lobby: V2Lobby) => {
     if (subscribedLobbyIds.includes(lobby.name)) return
     const pass = joinPassInputs[lobby.name] || ''
     const ok = onJoin(lobby.name, pass)
-    if (ok) onClose()
+    if (!ok) return
+    if (lobby.isPrivate) {
+      setPendingPrivateLobbyId(lobby.name)
+    } else {
+      onClose()
+    }
   }
 
   const handleCreate = () => {
@@ -41,7 +56,7 @@ export function LobbySelector({
       setError('Lobby name must be at least 2 characters.')
       return
     }
-    const ok = onCreate(name, newPass.trim(), newPrivate, newGame)
+    const ok = onCreate(name, newPass.trim(), newPass.trim() !== '', newGame)
     if (ok) onClose()
     else setError('Could not create lobby. Make sure you are connected.')
   }
@@ -171,34 +186,40 @@ export function LobbySelector({
 
                 {/* Password input — only for non-subscribed private lobbies */}
                 {needsPass && !isSubscribed && passwordShowing && (
-                  <div className="flex gap-2 mt-2.5">
-                    <input
-                      type="password"
-                      placeholder="Password"
-                      value={joinPassInputs[lobby.name]}
-                      onChange={e =>
-                        setJoinPassInputs(prev => ({ ...prev, [lobby.name]: e.target.value }))
-                      }
-                      onKeyDown={e => e.key === 'Enter' && handleJoin(lobby)}
-                      className="flex-1 text-xs px-2.5 py-1.5 rounded border outline-none"
-                      style={{
-                        background: 'var(--v2-hover)',
-                        borderColor: 'var(--v2-border)',
-                        color: 'var(--v2-text)',
-                      }}
-                      onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
-                      onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
-                      autoFocus
-                    />
-                    <button
-                      onClick={() => handleJoin(lobby)}
-                      className="text-xs px-3 py-1.5 rounded transition-colors"
-                      style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-accent-hover)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
-                    >
-                      Go
-                    </button>
+                  <div className="mt-2.5 space-y-1.5">
+                    {lobby.name === pendingPrivateLobbyId && joinError && (
+                      <p className="text-[11px]" style={{ color: '#f87171' }}>{joinError}</p>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        value={joinPassInputs[lobby.name]}
+                        onChange={e => {
+                          setJoinPassInputs(prev => ({ ...prev, [lobby.name]: e.target.value }))
+                          onClearJoinError?.()
+                        }}
+                        onKeyDown={e => e.key === 'Enter' && handleJoin(lobby)}
+                        className="flex-1 text-xs px-2.5 py-1.5 rounded border outline-none"
+                        style={{
+                          background: 'var(--v2-hover)',
+                          borderColor: 'var(--v2-border)',
+                          color: 'var(--v2-text)',
+                        }}
+                        onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
+                        onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleJoin(lobby)}
+                        className="text-xs px-3 py-1.5 rounded transition-colors"
+                        style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-accent-hover)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
+                      >
+                        Go
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -287,19 +308,7 @@ export function LobbySelector({
                 </select>
               </div>
 
-              <div className="flex items-center justify-between gap-4">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={newPrivate}
-                    onChange={e => setNewPrivate(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-(--v2-accent)"
-                  />
-                  <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>
-                    Private (invite only)
-                  </span>
-                </label>
-
+              <div className="flex items-center justify-end gap-4">
                 <div className="flex gap-2">
                   <button
                     onClick={() => { setCreating(false); setError(null) }}

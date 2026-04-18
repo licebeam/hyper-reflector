@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Swords, User } from "lucide-react";
+import { Coffee, Swords, User } from "lucide-react";
 import type { V2User } from "../types";
 import { CountryFlag } from "./CountryFlag";
 import { UserTitle } from "./UserTitle";
@@ -314,6 +314,38 @@ function MatchPairRow({ players }: { players: V2User[] }) {
   );
 }
 
+// ── AFK row ────────────────────────────────────────────────────────────────────
+
+function AfkRow({ user }: { user: V2User }) {
+  return (
+    <div
+      className="flex items-center gap-2 px-3 py-2.5 border-b"
+      style={{ borderColor: "var(--v2-border)", opacity: 0.5 }}
+    >
+      <Coffee size={11} className="shrink-0" style={{ color: "var(--v2-muted)" }} />
+      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <CountryFlag code={user.countryCode ?? ""} className="h-2.5 shrink-0" />
+        <span
+          className="text-xs truncate"
+          style={{ color: "var(--v2-text)" }}
+          title={user.userName}
+        >
+          {user.userName}
+        </span>
+        <span
+          className="text-[9px] px-1 rounded shrink-0"
+          style={{
+            color: "var(--v2-muted)",
+            background: "color-mix(in srgb, var(--v2-muted) 12%, transparent)",
+          }}
+        >
+          AFK
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ── List ───────────────────────────────────────────────────────────────────────
 
 type PlayerListProps = {
@@ -329,24 +361,47 @@ export function PlayerList({
   onViewProfile,
   onChallenge,
 }: PlayerListProps) {
-  const available = users.filter(u => !u.currentMatchId);
-  const inMatch = users.filter(u => !!u.currentMatchId);
+  const available: V2User[] = [];
+  const inMatchRaw: V2User[] = [];
+  const afk: V2User[] = [];
+
+  for (const u of users) {
+    if (u.isAfk) {
+      afk.push(u);
+    } else if (u.currentMatchId) {
+      inMatchRaw.push(u);
+    } else {
+      available.push(u);
+    }
+  }
 
   // Group in-match users into pairs by their currentMatchId
   const matchGroups = new Map<string, V2User[]>();
-  for (const u of inMatch) {
+  for (const u of inMatchRaw) {
     const key = u.currentMatchId!;
     if (!matchGroups.has(key)) matchGroups.set(key, []);
     matchGroups.get(key)!.push(u);
   }
-  // For any group with only 1 player, add a placeholder so the row still renders
-  const matchPairs = Array.from(matchGroups.values());
+
+  // Solo match groups = opponent is in a different lobby ("vs ???") → treat as AFK
+  const matchPairs: V2User[][] = [];
+  for (const group of matchGroups.values()) {
+    if (group.length === 1) {
+      afk.push(group[0]);
+    } else {
+      matchPairs.push(group);
+    }
+  }
+
+  const inMatchCount = matchPairs.reduce((n, p) => n + p.length, 0);
+  const isEmpty = available.length === 0 && matchPairs.length === 0 && afk.length === 0;
 
   return (
     <div
       className="flex flex-col h-full border-l"
       style={{ borderColor: "var(--v2-border)" }}
     >
+      {/* ── Available ── */}
       <div
         className="px-3 py-2 border-b shrink-0"
         style={{ borderColor: "var(--v2-border)" }}
@@ -359,8 +414,8 @@ export function PlayerList({
         </span>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {available.length === 0 && matchPairs.length === 0 && (
+      <div className="flex-1 min-h-0 overflow-y-scroll">
+        {isEmpty && (
           <p
             className="text-xs text-center pt-6 px-3"
             style={{ color: "var(--v2-muted)" }}
@@ -381,24 +436,53 @@ export function PlayerList({
             />
           );
         })}
+      </div>
 
-        {matchPairs.length > 0 && (
-          <>
-            <div
-              className="px-3 pt-3 pb-1 flex items-center gap-1.5"
-              style={{ borderTop: available.length > 0 ? '1px solid var(--v2-border)' : undefined }}
+      {/* ── In Match ── */}
+      {matchPairs.length > 0 && (
+        <div
+          className="shrink-0 flex flex-col border-t"
+          style={{ borderColor: "var(--v2-border)", height: "160px" }}
+        >
+          <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 shrink-0">
+            <Swords size={11} style={{ color: "var(--v2-muted)" }} />
+            <span
+              className="text-[10px] font-semibold uppercase tracking-wide"
+              style={{ color: "var(--v2-muted)" }}
             >
-              <Swords size={11} style={{ color: 'var(--v2-muted)' }} />
-              <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--v2-muted)' }}>
-                In Match ({inMatch.length})
-              </span>
-            </div>
+              In Match ({inMatchCount})
+            </span>
+          </div>
+          <div className="overflow-y-scroll flex-1 min-h-0">
             {matchPairs.map((players, i) => (
               <MatchPairRow key={players[0]?.uid ?? i} players={players} />
             ))}
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── AFK ── */}
+      {afk.length > 0 && (
+        <div
+          className="shrink-0 flex flex-col border-t"
+          style={{ borderColor: "var(--v2-border)", height: "104px" }}
+        >
+          <div className="px-3 pt-2 pb-1 flex items-center gap-1.5 shrink-0">
+            <Coffee size={11} style={{ color: "var(--v2-muted)" }} />
+            <span
+              className="text-[10px] font-semibold uppercase tracking-wide"
+              style={{ color: "var(--v2-muted)" }}
+            >
+              AFK ({afk.length})
+            </span>
+          </div>
+          <div className="overflow-y-scroll flex-1 min-h-0">
+            {afk.map((user) => (
+              <AfkRow key={user.uid} user={user} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

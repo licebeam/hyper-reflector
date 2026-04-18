@@ -511,7 +511,6 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
                         theme.id === t.id ? "var(--v2-hover)" : "transparent",
                     }}
                   >
-                    <span className="text-lg mb-1">{t.emoji}</span>
                     <span
                       className="text-sm font-medium"
                       style={{ color: "var(--v2-text)" }}

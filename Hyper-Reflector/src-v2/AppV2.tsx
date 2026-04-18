@@ -54,19 +54,27 @@ type RankQueuePopupProps = {
 };
 
 function RankQueuePopup({ data, onAccept, onDecline }: RankQueuePopupProps) {
-  const secondsLeft = Math.max(0, Math.ceil((data.expiresAt - Date.now()) / 1000));
+  const secondsLeft = Math.max(
+    0,
+    Math.ceil((data.expiresAt - Date.now()) / 1000),
+  );
   const [countdown, setCountdown] = useState(secondsLeft);
 
   useEffect(() => {
     const id = setInterval(() => {
-      setCountdown(Math.max(0, Math.ceil((data.expiresAt - Date.now()) / 1000)));
+      setCountdown(
+        Math.max(0, Math.ceil((data.expiresAt - Date.now()) / 1000)),
+      );
     }, 500);
     return () => clearInterval(id);
   }, [data.expiresAt]);
 
-  const pingLabel = data.playerA.ping !== null
-    ? (data.playerA.ping === 0 ? "< 1 ms" : `${Math.round(data.playerA.ping)} ms`)
-    : null;
+  const pingLabel =
+    data.playerA.ping !== null
+      ? data.playerA.ping === 0
+        ? "< 1 ms"
+        : `${Math.round(data.playerA.ping)} ms`
+      : null;
 
   function PlayerCard({ p }: { p: RankQueuePendingData["playerA"] }) {
     return (
@@ -90,17 +98,29 @@ function RankQueuePopup({ data, onAccept, onDecline }: RankQueuePopupProps) {
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.6)" }}>
+    <div
+      className="fixed inset-0 flex items-center justify-center z-50"
+      style={{ background: "rgba(0,0,0,0.6)" }}
+    >
       <div
-        className="w-80 rounded-xl shadow-2xl border overflow-hidden"
-        style={{ background: "var(--v2-surface)", borderColor: "var(--v2-border)" }}
+        className="w-120 rounded-xl shadow-2xl border overflow-hidden"
+        style={{
+          background: "var(--v2-surface)",
+          borderColor: "var(--v2-border)",
+        }}
       >
         {/* Title bar */}
         <div
           className="px-4 py-3 border-b flex items-center justify-between"
-          style={{ borderColor: "var(--v2-border)", background: "var(--v2-hover)" }}
+          style={{
+            borderColor: "var(--v2-border)",
+            background: "var(--v2-hover)",
+          }}
         >
-          <span className="text-sm font-semibold" style={{ color: "var(--v2-accent)" }}>
+          <span
+            className="text-sm font-semibold"
+            style={{ color: "var(--v2-accent)" }}
+          >
             Match Found!
           </span>
           <span
@@ -115,18 +135,26 @@ function RankQueuePopup({ data, onAccept, onDecline }: RankQueuePopupProps) {
         <div className="flex items-center gap-2 px-4 py-4">
           <PlayerCard p={data.playerA} />
           <div className="flex flex-col items-center gap-1 shrink-0">
-            <span className="text-xs font-bold" style={{ color: "var(--v2-muted)" }}>VS</span>
+            <span
+              className="text-xs font-bold"
+              style={{ color: "var(--v2-muted)" }}
+            >
+              VS
+            </span>
             {pingLabel && (
-              <span className="text-[10px]" style={{ color: "var(--v2-muted)" }}>{pingLabel}</span>
+              <span
+                className="text-[10px]"
+                style={{ color: "var(--v2-muted)" }}
+              >
+                {pingLabel}
+              </span>
             )}
           </div>
           <PlayerCard p={data.playerB} />
         </div>
 
         {/* Actions */}
-        <div
-          className="flex gap-2 px-4 pb-4"
-        >
+        <div className="flex gap-2 px-4 pb-4">
           <button
             onClick={onAccept}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
@@ -137,7 +165,11 @@ function RankQueuePopup({ data, onAccept, onDecline }: RankQueuePopupProps) {
           <button
             onClick={onDecline}
             className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium border transition-opacity hover:opacity-80"
-            style={{ background: "var(--v2-hover)", color: "var(--v2-muted)", borderColor: "var(--v2-border)" }}
+            style={{
+              background: "var(--v2-hover)",
+              color: "var(--v2-muted)",
+              borderColor: "var(--v2-border)",
+            }}
           >
             <X size={14} /> Decline
           </button>
@@ -159,7 +191,8 @@ function AppV2Inner() {
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
   const [lobbySelectorOpen, setLobbySelectorOpen] = useState(false);
   const [notifMuted, setNotifMuted] = useState(false);
-  const rankQueueGame = useSettingsStore(s => s.rankQueueGame);
+  const [isAfk, setIsAfk] = useState(false);
+  const rankQueueGame = useSettingsStore((s) => s.rankQueueGame);
 
   const {
     status,
@@ -185,6 +218,10 @@ function AppV2Inner() {
     toggleRankQueue,
     rankQueueAccept,
     rankQueueDecline,
+    setAfk,
+    lobbyPasswords,
+    lobbyJoinError,
+    clearLobbyJoinError,
   } = useWebSocket(user, notifMuted);
 
   useEffect(() => {
@@ -199,7 +236,12 @@ function AppV2Inner() {
         await api.addLoggedInUser(auth);
         const userData = await api.getUserByAuth(auth);
 
-        const FALLBACK_TITLE = { bgColor: '#1f1f24', border: '#37373f', color: '#f2f2f7', title: 'Contender' };
+        const FALLBACK_TITLE = {
+          bgColor: "#1f1f24",
+          border: "#37373f",
+          color: "#f2f2f7",
+          title: "Contender",
+        };
 
         if (userData && userData.uid) {
           const v2User = mapToV2User(userData, firebaseUser.email);
@@ -225,7 +267,12 @@ function AppV2Inner() {
         }
       } catch (err) {
         console.warn("[v2] Backend unavailable, using Firebase identity", err);
-        const FALLBACK_TITLE = { bgColor: '#1f1f24', border: '#37373f', color: '#f2f2f7', title: 'Contender' };
+        const FALLBACK_TITLE = {
+          bgColor: "#1f1f24",
+          border: "#37373f",
+          color: "#f2f2f7",
+          title: "Contender",
+        };
         const pendingName = sessionStorage.getItem("v2_pending_display_name");
         const fallbackUser: V2User = {
           uid: firebaseUser.uid,
@@ -299,9 +346,20 @@ function AppV2Inner() {
     toggleRankQueue(isQueue, rankQueueGame);
   };
 
+  const handleToggleAfk = () => {
+    const next = !isAfk;
+    setIsAfk(next);
+    setAfk(next);
+  };
+
   // Merge live ping data and hook-managed rank queue state into the current user.
   const effectiveUser: V2User | null = user
-    ? { ...user, lastKnownPings: selfPings.length > 0 ? selfPings : user.lastKnownPings, isRankQueued }
+    ? {
+        ...user,
+        lastKnownPings: selfPings.length > 0 ? selfPings : user.lastKnownPings,
+        isRankQueued,
+        isAfk,
+      }
     : null;
 
   // CSS vars applied here cascade to every child via inheritance
@@ -312,7 +370,8 @@ function AppV2Inner() {
         {
           ...(vars as unknown as React.CSSProperties),
           "--v2-bg-image": `url(${bgImage})`,
-          color: "var(--v2-text)",
+          backgroundColor: vars["--v2-bg"],
+          color: vars["--v2-text"],
         } as React.CSSProperties
       }
     >
@@ -353,11 +412,17 @@ function AppV2Inner() {
           {(status === "disconnected" || status === "error") && (
             <div
               className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center gap-2 py-1.5 text-xs font-medium"
-              style={{ background: isReconnecting ? "#78350f" : "#7f1d1d", color: "#fef3c7" }}
+              style={{
+                background: isReconnecting ? "#78350f" : "#7f1d1d",
+                color: "#fef3c7",
+              }}
             >
               <span
                 className="w-1.5 h-1.5 rounded-full"
-                style={{ background: isReconnecting ? "#fbbf24" : "#f87171", animation: isReconnecting ? "pulse 1.5s infinite" : "none" }}
+                style={{
+                  background: isReconnecting ? "#fbbf24" : "#f87171",
+                  animation: isReconnecting ? "pulse 1.5s infinite" : "none",
+                }}
               />
               {isReconnecting
                 ? "Disconnected — reconnecting…"
@@ -369,23 +434,35 @@ function AppV2Inner() {
             <Header
               onToggleRankQueued={handleSetIsRankQueued}
               subscribedLobbyIds={subscribedLobbyIds}
+              privateLobbyIds={lobbyList.filter(l => l.isPrivate).map(l => l.name)}
               activeLobbyId={activeLobbyId}
-              onSelectLobby={(id) => { setActiveLobbyId(id); setPage("lobby"); }}
+              onSelectLobby={(id) => {
+                setActiveLobbyId(id);
+                setPage("lobby");
+              }}
               onCloseLobby={unsubscribeLobby}
               onAddLobby={() => setLobbySelectorOpen(true)}
               onReorderLobbies={reorderLobbies}
               status={status}
               currentUser={effectiveUser}
               onViewProfile={handleViewProfile}
-              notifications={
-                (Object.values(allLobbyMessages) as import('./types').V2Message[][])
-                  .flat()
-                  .filter(m => m.role === 'challenge' && m.challengeOpponentId === effectiveUser?.uid)
-              }
+              notifications={(
+                Object.values(
+                  allLobbyMessages,
+                ) as import("./types").V2Message[][]
+              )
+                .flat()
+                .filter(
+                  (m) =>
+                    m.role === "challenge" &&
+                    m.challengeOpponentId === effectiveUser?.uid,
+                )}
               onAcceptNotification={handleAcceptChallenge}
               onDeclineNotification={handleDeclineChallenge}
               notifMuted={notifMuted}
-              onToggleNotifMuted={() => setNotifMuted(m => !m)}
+              onToggleNotifMuted={() => setNotifMuted((m) => !m)}
+              isAfk={isAfk}
+              onToggleAfk={handleToggleAfk}
               rankQueueGame={getGameName(rankQueueGame)}
             />
 
@@ -395,7 +472,10 @@ function AppV2Inner() {
                   messages={messages}
                   lobbyUsers={lobbyUsers}
                   currentUser={effectiveUser}
-                  lobbyGame={lobbyList.find(l => l.name === activeLobbyId)?.gameName}
+                  lobbyGame={
+                    lobbyList.find((l) => l.name === activeLobbyId)?.gameName
+                  }
+                  lobbyPassword={lobbyPasswords[activeLobbyId]}
                   onSendMessage={sendMessage}
                   onViewProfile={handleViewProfile}
                   onChallenge={handleChallenge}
@@ -439,7 +519,9 @@ function AppV2Inner() {
           subscribedLobbyIds={subscribedLobbyIds}
           onJoin={(id, pass) => subscribeLobby(id, pass)}
           onCreate={createLobby}
-          onClose={() => setLobbySelectorOpen(false)}
+          onClose={() => { setLobbySelectorOpen(false); clearLobbyJoinError(); }}
+          joinError={lobbyJoinError}
+          onClearJoinError={clearLobbyJoinError}
         />
       )}
 
@@ -447,8 +529,15 @@ function AppV2Inner() {
       {rankQueuePending && (
         <RankQueuePopup
           data={rankQueuePending}
-          onAccept={() => void rankQueueAccept(rankQueuePending.matchId, rankQueuePending.isMock)}
-          onDecline={() => rankQueueDecline(rankQueuePending.matchId, rankQueuePending.isMock)}
+          onAccept={() =>
+            void rankQueueAccept(
+              rankQueuePending.matchId,
+              rankQueuePending.isMock,
+            )
+          }
+          onDecline={() =>
+            rankQueueDecline(rankQueuePending.matchId, rankQueuePending.isMock)
+          }
         />
       )}
     </div>
