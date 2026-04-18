@@ -1,4 +1,4 @@
-import { Bell, BellOff, Check, Plus, Swords, User, X } from "lucide-react";
+import { Bell, BellOff, Check, Lock, Plus, Swords, User, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import type { V2Message } from "../types";
 import {
@@ -44,6 +44,7 @@ const STATUS_LABEL: Record<ConnectionStatus, string> = {
 type SortableTabProps = {
   lobbyId: string;
   isActive: boolean;
+  isPrivate: boolean;
   onSelect: () => void;
   onClose: () => void;
 };
@@ -51,6 +52,7 @@ type SortableTabProps = {
 function SortableTab({
   lobbyId,
   isActive,
+  isPrivate,
   onSelect,
   onClose,
 }: SortableTabProps) {
@@ -94,8 +96,9 @@ function SortableTab({
       title={lobbyId}
       onClick={onSelect}
     >
-      <span className="truncate min-w-0 text-left pointer-events-none">
-        {lobbyId}
+      <span className="flex items-center gap-1 truncate min-w-0 text-left pointer-events-none">
+        {isPrivate && <Lock size={9} className="shrink-0 opacity-70" />}
+        <span className="truncate">{lobbyId}</span>
       </span>
       {!isDefault && (
         <span
@@ -133,11 +136,14 @@ type NotificationsPanelProps = {
   notifications: V2Message[];
   allNotifications: V2Message[];
   muted: boolean;
+  isAfk: boolean;
   currentUserUid?: string;
+  bellRef: React.RefObject<HTMLDivElement | null>;
   onAccept: (id: string) => void;
   onDecline: (id: string) => void;
   onClear: () => void;
   onToggleMute: () => void;
+  onToggleAfk: () => void;
   onClose: () => void;
 };
 
@@ -145,23 +151,29 @@ function NotificationsPanel({
   notifications,
   allNotifications,
   muted,
+  isAfk,
+  bellRef,
   onAccept,
   onDecline,
   onClear,
   onToggleMute,
+  onToggleAfk,
   onClose,
 }: NotificationsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const insidePanel = panelRef.current?.contains(target);
+      const insideBell = bellRef.current?.contains(target);
+      if (!insidePanel && !insideBell) {
         onClose();
       }
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [onClose]);
+  }, [onClose, bellRef]);
 
   return (
     <div
@@ -186,6 +198,23 @@ function NotificationsPanel({
           Notifications
         </span>
         <div className="flex items-center gap-2">
+          <button
+            onClick={onToggleAfk}
+            className="text-[10px] px-1.5 py-0.5 rounded transition-colors"
+            style={{
+              color: isAfk ? "var(--v2-accent)" : "var(--v2-muted)",
+              background: isAfk ? "color-mix(in srgb, var(--v2-accent) 12%, transparent)" : "transparent",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--v2-text)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = isAfk ? "var(--v2-accent)" : "var(--v2-muted)")
+            }
+            title={isAfk ? "Clear AFK" : "Set AFK"}
+          >
+            AFK
+          </button>
           <button
             onClick={onToggleMute}
             className="text-[10px] px-1.5 py-0.5 rounded transition-colors"
@@ -307,6 +336,7 @@ function NotificationsPanel({
 type HeaderProps = {
   onToggleRankQueued: (isQueue: boolean) => void;
   subscribedLobbyIds: string[];
+  privateLobbyIds: string[];
   activeLobbyId: string;
   onSelectLobby: (id: string) => void;
   onCloseLobby: (id: string) => void;
@@ -320,12 +350,15 @@ type HeaderProps = {
   onDeclineNotification: (id: string) => void;
   notifMuted: boolean;
   onToggleNotifMuted: () => void;
+  isAfk: boolean;
+  onToggleAfk: () => void;
   rankQueueGame: string;
 };
 
 export function Header({
   onToggleRankQueued,
   subscribedLobbyIds,
+  privateLobbyIds,
   activeLobbyId,
   onSelectLobby,
   onCloseLobby,
@@ -339,6 +372,8 @@ export function Header({
   onDeclineNotification,
   notifMuted,
   onToggleNotifMuted,
+  isAfk,
+  onToggleAfk,
   rankQueueGame,
 }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false);
@@ -395,6 +430,7 @@ export function Header({
                 key={lobbyId}
                 lobbyId={lobbyId}
                 isActive={lobbyId === activeLobbyId}
+                isPrivate={privateLobbyIds.includes(lobbyId)}
                 onSelect={() => onSelectLobby(lobbyId)}
                 onClose={() => onCloseLobby(lobbyId)}
               />
@@ -544,6 +580,7 @@ export function Header({
                 allNotifications={notifications}
                 muted={notifMuted}
                 currentUserUid={currentUser.uid}
+                bellRef={bellRef}
                 onAccept={(id) => {
                   onAcceptNotification(id);
                 }}
@@ -554,6 +591,8 @@ export function Header({
                   setClearedIds(new Set(notifications.map((n) => n.id)))
                 }
                 onToggleMute={onToggleNotifMuted}
+                isAfk={isAfk}
+                onToggleAfk={onToggleAfk}
                 onClose={() => setNotifOpen(false)}
               />
             )}

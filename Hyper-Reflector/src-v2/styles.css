@@ -38,22 +38,40 @@
 
 .v2-animated-bg {
   position: relative;
-  /* Multi-layer gradient: accent spotlight at top + directional depth fill */
+  isolation: isolate;
+}
+
+/* Accent spotlights — behind all content, degrade gracefully if color-mix unsupported */
+.v2-animated-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
   background:
     radial-gradient(
       ellipse 80% 55% at 50% -5%,
-      color-mix(in srgb, var(--v2-accent) 22%, transparent) 0%,
+      color-mix(
+          in srgb,
+          var(--v2-accent) var(--v2-spotlight-intensity, 22%),
+          transparent
+        )
+        0%,
       transparent 100%
     ),
     radial-gradient(
       ellipse 50% 40% at -5% 105%,
-      color-mix(in srgb, var(--v2-accent) 9%, transparent) 0%,
+      color-mix(
+          in srgb,
+          var(--v2-accent) var(--v2-spotlight-secondary, 9%),
+          transparent
+        )
+        0%,
       transparent 70%
-    ),
-    linear-gradient(160deg, var(--v2-grad-from) 0%, var(--v2-grad-to) 100%);
+    );
 }
 
-/* Pattern tiled on top of the gradient — opacity independently controllable */
+/* Pattern tiled above spotlights, still behind all content */
 .v2-animated-bg::before {
   content: "";
   position: absolute;
@@ -63,6 +81,9 @@
   background-repeat: repeat;
   background-position: 0 0;
   opacity: var(--v2-pattern-opacity, 0.12);
+  filter: var(--v2-pattern-filter, none);
+  mix-blend-mode: var(--v2-pattern-blend, normal);
   animation: v2-bg-scroll 30s linear infinite;
   pointer-events: none;
+  z-index: -1;
 }

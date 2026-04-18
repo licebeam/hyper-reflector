@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Swords, Check, X } from "lucide-react";
+import { Send, Swords, Check, X, Eye, EyeOff } from "lucide-react";
 import type { V2Message } from "../types";
 import { getGameName } from "../games";
 
@@ -106,6 +106,7 @@ type ChatPanelProps = {
   messages: V2Message[];
   currentUserUid?: string;
   lobbyGame?: string;
+  lobbyPassword?: string;
   onSend: (text: string) => boolean;
   onAcceptChallenge?: (messageId: string) => void;
   onDeclineChallenge?: (messageId: string) => void;
@@ -115,11 +116,13 @@ export function ChatPanel({
   messages,
   currentUserUid,
   lobbyGame,
+  lobbyPassword,
   onSend,
   onAcceptChallenge,
   onDeclineChallenge,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -143,9 +146,28 @@ export function ChatPanel({
     <div className="flex flex-col h-full">
       {/* Messages */}
       <div className="flex-1 p-3 space-y-1.5 min-h-0 overflow-y-scroll">
-        <p className="text-[10px] font-medium uppercase tracking-wide pb-1" style={{ color: 'var(--v2-muted)' }}>
-          {getGameName(lobbyGame)}
-        </p>
+        <div className="flex items-center gap-2 pb-1">
+          <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--v2-muted)' }}>
+            {getGameName(lobbyGame)}
+          </span>
+          {lobbyPassword && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-mono" style={{ color: 'var(--v2-muted)' }}>
+                {showPassword ? lobbyPassword : '••••••'}
+              </span>
+              <button
+                onClick={() => setShowPassword(s => !s)}
+                className="flex items-center justify-center transition-colors"
+                style={{ color: 'var(--v2-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
+                title={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={11} /> : <Eye size={11} />}
+              </button>
+            </div>
+          )}
+        </div>
         {messages.length === 0 && (
           <p className="text-sm text-center pt-8" style={{ color: "var(--v2-muted)" }}>
             No messages yet. Say hello!
