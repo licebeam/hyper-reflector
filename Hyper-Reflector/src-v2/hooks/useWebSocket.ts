@@ -18,6 +18,7 @@ const DEFAULT_LOBBY_ID = 'Hyper Reflector'
 const MAX_MESSAGES = 50
 const MAX_SUBSCRIPTIONS = 5
 const STORAGE_KEY = 'v2_subscribed_lobbies'
+const PASSWORDS_STORAGE_KEY = 'v2_lobby_passwords'
 
 // ── Mock users for the debug/bot lobby ────────────────────────────────────────
 
@@ -99,6 +100,15 @@ function normalizeUser(data: any): V2User | null {
   }
 }
 
+function loadSavedPasswords(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(PASSWORDS_STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    if (typeof parsed === 'object' && parsed !== null) return parsed
+  } catch {}
+  return {}
+}
+
 function loadSavedLobbies(): string[] {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
@@ -163,8 +173,9 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const isRankQueuedRef = useRef(false)
   const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean }>>([])
   const [rankQueuePending, setRankQueuePending] = useState<RankQueuePendingData | null>(null)
-  const [lobbyPasswords, setLobbyPasswords] = useState<Record<string, string>>({})
-  const lobbyPasswordsRef = useRef<Record<string, string>>({})
+  const initialPasswords = useRef(loadSavedPasswords())
+  const [lobbyPasswords, setLobbyPasswords] = useState<Record<string, string>>(initialPasswords.current)
+  const lobbyPasswordsRef = useRef<Record<string, string>>(initialPasswords.current)
   const [lobbyJoinError, setLobbyJoinError] = useState<string | null>(null)
 
   // Reconnect state
@@ -192,10 +203,14 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   useEffect(() => { userRef.current = user }, [user])
   useEffect(() => { notifMutedRef.current = notifMuted }, [notifMuted])
 
-  // Persist subscribed lobbies to localStorage whenever they change
+  // Persist subscribed lobbies and passwords to localStorage whenever they change
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(subscribedLobbyIds)) } catch {}
   }, [subscribedLobbyIds])
+
+  useEffect(() => {
+    try { localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(lobbyPasswords)) } catch {}
+  }, [lobbyPasswords])
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -605,7 +620,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
           case 'webrtc-ping-offer': {
             if (!myUid || !payload.from || !payload.offer) break
-            if (isInMatchRef.current) {
+            if (isInMatchRef.current || isRankQueuedRef.current) {
               try { socket.send(JSON.stringify({ type: 'webrtc-ping-decline', to: payload.from, from: myUid })) } catch {}
               break
             }
@@ -938,6 +953,9 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     }
     setAllLobbyMessages(prev => { const n = { ...prev }; delete n[lobbyId]; allLobbyMessagesRef.current = n; return n })
     setAllLobbyUsers(prev => { const n = { ...prev }; delete n[lobbyId]; allLobbyUsersRef.current = n; return n })
+    const { [lobbyId]: _, ...remainingPasswords } = lobbyPasswordsRef.current
+    lobbyPasswordsRef.current = remainingPasswords
+    setLobbyPasswords(remainingPasswords)
   }, [setActiveLobbyIdBoth])
 
   const createLobby = useCallback((lobbyId: string, pass: string, isPrivate: boolean, gameName?: string): boolean => {

@@ -80,7 +80,7 @@
   background-size: 720px auto;
   background-repeat: repeat;
   background-position: 0 0;
-  opacity: var(--v2-pattern-opacity, 0.12);
+  opacity: var(--v2-pattern-opacity, 1);
   filter: var(--v2-pattern-filter, none);
   mix-blend-mode: var(--v2-pattern-blend, normal);
   animation: v2-bg-scroll 30s linear infinite;
