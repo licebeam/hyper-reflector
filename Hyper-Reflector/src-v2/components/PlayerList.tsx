@@ -110,6 +110,7 @@ type RowProps = {
   onViewProfile?: (uid: string) => void;
   onChallenge?: (uid: string) => void;
   currentUser?: V2User | null;
+  challengeDisabled?: boolean;
 };
 
 function PlayerRow({
@@ -118,6 +119,7 @@ function PlayerRow({
   onViewProfile,
   onChallenge,
   currentUser,
+  challengeDisabled,
 }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const expanded = hovered;
@@ -219,21 +221,23 @@ function PlayerRow({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onChallenge(user.uid);
+                        if (!challengeDisabled) onChallenge(user.uid);
                       }}
+                      disabled={!!challengeDisabled}
                       className="flex items-center gap-1 text-[16px] px-2 py-0.5 rounded font-medium transition-colors"
                       style={{
-                        background: "var(--v2-accent)",
-                        color: "var(--v2-accent-fg)",
-                        cursor: "pointer",
+                        background: challengeDisabled ? "var(--v2-hover)" : "var(--v2-accent)",
+                        color: challengeDisabled ? "var(--v2-muted)" : "var(--v2-accent-fg)",
+                        cursor: challengeDisabled ? "not-allowed" : "pointer",
+                        opacity: challengeDisabled ? 0.5 : 1,
                       }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background =
-                          "var(--v2-accent-hover)")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = "var(--v2-accent)")
-                      }
+                      onMouseEnter={(e) => {
+                        if (!challengeDisabled) e.currentTarget.style.background = "var(--v2-accent-hover)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!challengeDisabled) e.currentTarget.style.background = challengeDisabled ? "var(--v2-hover)" : "var(--v2-accent)";
+                      }}
+                      title={challengeDisabled ? "Cannot challenge while in a match or searching" : undefined}
                     >
                       <Swords size={16} /> Challenge
                     </button>
@@ -353,6 +357,7 @@ type PlayerListProps = {
   currentUser?: V2User | null;
   onViewProfile?: (uid: string) => void;
   onChallenge?: (uid: string) => void;
+  challengeDisabled?: boolean;
 };
 
 export function PlayerList({
@@ -360,6 +365,7 @@ export function PlayerList({
   currentUser,
   onViewProfile,
   onChallenge,
+  challengeDisabled,
 }: PlayerListProps) {
   const available: V2User[] = [];
   const inMatchRaw: V2User[] = [];
@@ -433,6 +439,7 @@ export function PlayerList({
               onViewProfile={!isSelf ? onViewProfile : undefined}
               onChallenge={!isSelf ? onChallenge : undefined}
               currentUser={currentUser}
+              challengeDisabled={challengeDisabled}
             />
           );
         })}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X, Users, Lock, Plus, Check } from 'lucide-react'
 import type { V2Lobby } from '../types'
 import { GAMES, DEFAULT_GAME_ROM } from '../games'
+import { validateName } from '../utils/validation'
 
 type LobbySelectorProps = {
   lobbies: V2Lobby[]
@@ -52,10 +53,8 @@ export function LobbySelector({
 
   const handleCreate = () => {
     const name = newName.trim()
-    if (!name || name.length < 2) {
-      setError('Lobby name must be at least 2 characters.')
-      return
-    }
+    const nameError = validateName(name, { max: 24, label: 'Lobby name' })
+    if (nameError) { setError(nameError); return }
     const ok = onCreate(name, newPass.trim(), newPass.trim() !== '', newGame)
     if (ok) onClose()
     else setError('Could not create lobby. Make sure you are connected.')
@@ -256,6 +255,7 @@ export function LobbySelector({
                   type="text"
                   placeholder="Lobby name"
                   value={newName}
+                  maxLength={24}
                   onChange={e => { setNewName(e.target.value); setError(null) }}
                   className="flex-1 text-xs px-2.5 py-1.5 rounded border outline-none"
                   style={{

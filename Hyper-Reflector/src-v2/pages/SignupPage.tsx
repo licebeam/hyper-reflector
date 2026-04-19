@@ -1,18 +1,9 @@
 import { useState } from 'react'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
-import {
-  RegExpMatcher,
-  englishDataset,
-  englishRecommendedTransformers,
-} from 'obscenity'
 import type { FirebaseError } from 'firebase/app'
 import { auth } from '../../src/utils/firebase'
 import api from '../../src/external-api/requests'
-
-const matcher = new RegExpMatcher({
-  ...englishDataset.build(),
-  ...englishRecommendedTransformers,
-})
+import { validateName } from '../utils/validation'
 
 type SignupPageProps = {
   onBack: () => void
@@ -37,10 +28,9 @@ export function SignupPage({ onBack }: SignupPageProps) {
   const update = (key: keyof typeof form, value: string) =>
     setForm(prev => ({ ...prev, [key]: value }))
 
-  const validateName = (value: string) => {
-    if (!value.trim()) { setNameWarning('Display name is required.'); return }
-    if (matcher.hasMatch(value)) { setNameWarning('Please pick a different display name.'); return }
-    setNameWarning(null)
+  const handleValidateName = (value: string) => {
+    const error = validateName(value, { label: 'Display name' })
+    setNameWarning(error)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,7 +111,7 @@ export function SignupPage({ onBack }: SignupPageProps) {
               maxLength={16}
               placeholder="OrchidKid"
               disabled={loading}
-              onChange={e => { update('name', e.target.value); validateName(e.target.value) }}
+              onChange={e => { update('name', e.target.value); handleValidateName(e.target.value) }}
               className="rounded px-3 py-2 text-sm border outline-none transition-colors disabled:opacity-50"
               style={inputStyle(nameInvalid)}
               onFocus={e => (e.currentTarget.style.borderColor = nameInvalid ? '#f87171' : 'var(--v2-accent)')}

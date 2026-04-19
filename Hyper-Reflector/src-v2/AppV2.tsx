@@ -205,6 +205,7 @@ function AppV2Inner() {
     setActiveLobbyId,
     lobbyList,
     selfPings,
+    isInMatch,
     isRankQueued,
     rankQueuePending,
     sendMessage,
@@ -219,6 +220,7 @@ function AppV2Inner() {
     rankQueueAccept,
     rankQueueDecline,
     setAfk,
+    pushProfileUpdate,
     lobbyPasswords,
     lobbyJoinError,
     clearLobbyJoinError,
@@ -464,6 +466,7 @@ function AppV2Inner() {
               isAfk={isAfk}
               onToggleAfk={handleToggleAfk}
               rankQueueGame={getGameName(rankQueueGame)}
+              isInMatch={isInMatch}
             />
 
             <main className="flex-1 overflow-hidden">
@@ -479,6 +482,7 @@ function AppV2Inner() {
                   onSendMessage={sendMessage}
                   onViewProfile={handleViewProfile}
                   onChallenge={handleChallenge}
+                  challengeDisabled={isInMatch || isRankQueued}
                   onAcceptChallenge={handleAcceptChallenge}
                   onDeclineChallenge={handleDeclineChallenge}
                 />
@@ -495,9 +499,13 @@ function AppV2Inner() {
                     profileUid={viewingProfileId}
                     currentUser={user}
                     onBack={() => setViewingProfileId(null)}
-                    onUserUpdated={(updated) =>
-                      setUser((prev) => (prev ? { ...prev, ...updated } : prev))
-                    }
+                    onUserUpdated={(updated) => {
+                      setUser((prev) => {
+                        const next = prev ? { ...prev, ...updated } : prev
+                        if (next) pushProfileUpdate(next)
+                        return next
+                      })
+                    }}
                   />
                 ) : (
                   <ProfilesPage

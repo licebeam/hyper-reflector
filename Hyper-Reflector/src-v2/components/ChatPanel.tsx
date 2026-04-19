@@ -175,9 +175,9 @@ export function ChatPanel({
         )}
 
         {messages.map((msg) => (
-          <div key={msg.id}>
+          <div key={msg.id} className="overflow-hidden">
             {msg.role === "user" && (
-              <span>
+              <div className="min-w-0">
                 <span
                   className="font-semibold text-sm"
                   style={{
@@ -192,16 +192,19 @@ export function ChatPanel({
                 <span className="text-xs ml-1.5" style={{ color: "var(--v2-muted)" }}>
                   {formatTime(msg.timeStamp)}
                 </span>
-                <span className="text-sm ml-2" style={{ color: "var(--v2-chat-msg)" }}>
+                <span
+                  className="text-sm ml-2 wrap-break-word"
+                  style={{ color: "var(--v2-chat-msg)", wordBreak: "break-word", overflowWrap: "anywhere" }}
+                >
                   {msg.text}
                 </span>
-              </span>
+              </div>
             )}
 
             {msg.role === "system" && (
-              <span className="text-xs italic" style={{ color: "var(--v2-muted)" }}>
+              <p className="text-xs italic wrap-break-word overflow-hidden" style={{ color: "var(--v2-muted)", overflowWrap: "anywhere" }}>
                 {msg.text}
-              </span>
+              </p>
             )}
 
             {msg.role === "challenge" && (
@@ -220,9 +223,10 @@ export function ChatPanel({
 
       {/* Input bar */}
       <div
-        className="border-t p-3 flex gap-2 shrink-0"
+        className="border-t p-3 flex flex-col gap-1.5 shrink-0"
         style={{ borderColor: "var(--v2-border)" }}
       >
+        <div className="flex gap-2">
         <input
           type="text"
           value={input}
@@ -249,6 +253,15 @@ export function ChatPanel({
         >
           <Send size={14} />
         </button>
+        </div>
+        {input.length > MAX_LENGTH * 0.8 && (
+          <p
+            className="text-[10px] text-right"
+            style={{ color: input.length >= MAX_LENGTH ? "#f87171" : "var(--v2-muted)" }}
+          >
+            {MAX_LENGTH - input.length} remaining
+          </p>
+        )}
       </div>
     </div>
   );
