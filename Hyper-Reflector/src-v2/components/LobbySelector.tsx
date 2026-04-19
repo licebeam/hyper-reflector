@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, Users, Lock, Plus, Check } from 'lucide-react'
 import type { V2Lobby } from '../types'
-import { GAMES, DEFAULT_GAME_ROM } from '../games'
+import { GAMES, DEFAULT_GAME_ROM, getGameName } from '../games'
 import { validateName } from '../utils/validation'
 
 type LobbySelectorProps = {
@@ -137,13 +137,24 @@ export function LobbySelector({
                     <div className="w-3.25 shrink-0" />
                   )}
 
-                  {/* Name */}
-                  <span
-                    className="flex-1 text-sm font-medium truncate min-w-0"
-                    style={{ color: 'var(--v2-text)' }}
-                  >
-                    {lobby.name}
-                  </span>
+                  {/* Name + game */}
+                  <div className="flex-1 flex items-center gap-2 min-w-0">
+                    <span
+                      className="text-sm font-medium truncate"
+                      style={{ color: 'var(--v2-text)' }}
+                    >
+                      {lobby.name}
+                    </span>
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
+                      style={{
+                        background: 'color-mix(in srgb, var(--v2-accent) 12%, transparent)',
+                        color: 'var(--v2-accent)',
+                      }}
+                    >
+                      {getGameName(lobby.gameName)}
+                    </span>
+                  </div>
 
                   {/* User count */}
                   <div className="flex items-center gap-1 shrink-0">
