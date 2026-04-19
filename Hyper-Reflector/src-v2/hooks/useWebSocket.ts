@@ -394,6 +394,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       socket.send(JSON.stringify({
         type: 'join',
         user: { ...userRef.current, lobbyId: primaryLobby },
+        pass: lobbyPasswordsRef.current[primaryLobby] ?? '',
       }))
       // Re-subscribe to any additional saved lobbies
       for (const lobbyId of subscribedLobbyIdsRef.current.slice(1)) {
@@ -978,7 +979,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
   const sendChallenge = useCallback(async (targetUid: string): Promise<void> => {
     const currentUser = userRef.current
-    if (!currentUser?.uid || isInMatchRef.current) return
+    if (!currentUser?.uid || isInMatchRef.current || isRankQueuedRef.current) return
 
     if (isMockUserId(targetUid)) {
       const lobbyId = activeLobbyIdRef.current
@@ -1105,6 +1106,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     const socket = socketRef.current
     const currentUser = userRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return
+    if (isQueue && isInMatchRef.current) return
 
     isRankQueuedRef.current = isQueue
     setIsRankQueued(isQueue)
@@ -1224,6 +1226,14 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     setSubscribedLobbyIds(newOrder)
   }, [])
 
+  const pushProfileUpdate = useCallback((updatedUser: V2User): void => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) return
+    try {
+      socket.send(JSON.stringify({ type: 'updateProfile', user: updatedUser }))
+    } catch {}
+  }, [])
+
   const updateLobbyGame = useCallback((lobbyId: string, gameName: string): void => {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN) return
@@ -1258,6 +1268,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     unsubscribeLobby,
     reorderLobbies,
     updateLobbyGame,
+    pushProfileUpdate,
     createLobby,
     sendChallenge,
     acceptChallenge,

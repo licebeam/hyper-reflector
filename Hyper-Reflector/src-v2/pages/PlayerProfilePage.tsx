@@ -7,12 +7,8 @@ import {
   Save,
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import {
-  RegExpMatcher,
-  englishDataset,
-  englishRecommendedTransformers,
-} from "obscenity";
 import api from "../../src/external-api/requests";
+import { validateName } from "../utils/validation";
 import { auth } from "../../src/utils/firebase";
 import type { V2User } from "../types";
 import { CountryFlag } from "../components/CountryFlag";
@@ -71,10 +67,6 @@ type TitleOption = {
 
 const SA_COLORS: [string, string, string] = ["#ECC94B", "#ED8936", "#4299E1"];
 
-const matcher = new RegExpMatcher({
-  ...englishDataset.build(),
-  ...englishRecommendedTransformers,
-});
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -333,12 +325,12 @@ export function PlayerProfilePage({
 
   // ── Name validation ───────────────────────────────────────────────────────────
 
+  const [nameError, setNameError] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!nameDraft.trim()) {
-      setNameInvalid(true);
-      return;
-    }
-    setNameInvalid(matcher.hasMatch(nameDraft));
+    const error = validateName(nameDraft)
+    setNameInvalid(error !== null);
+    setNameError(error);
   }, [nameDraft]);
 
   // ── Derived ───────────────────────────────────────────────────────────────────
@@ -522,12 +514,12 @@ export function PlayerProfilePage({
                             : "var(--v2-border)")
                         }
                       />
-                      {nameInvalid && (
+                      {nameInvalid && nameError && (
                         <p
                           className="text-xs mt-0.5"
                           style={{ color: "#f87171" }}
                         >
-                          Please choose a different name.
+                          {nameError}
                         </p>
                       )}
                     </div>

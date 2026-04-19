@@ -353,6 +353,7 @@ type HeaderProps = {
   isAfk: boolean;
   onToggleAfk: () => void;
   rankQueueGame: string;
+  isInMatch?: boolean;
 };
 
 export function Header({
@@ -375,6 +376,7 @@ export function Header({
   isAfk,
   onToggleAfk,
   rankQueueGame,
+  isInMatch,
 }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [clearedIds, setClearedIds] = useState<Set<string>>(new Set());
@@ -506,19 +508,23 @@ export function Header({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onToggleRankQueued(!isQueued);
+              if (!isInMatch) onToggleRankQueued(!isQueued);
             }}
+            disabled={!!isInMatch}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded font-medium transition-colors whitespace-nowrap"
             style={{
-              background: "var(--v2-accent)",
-              color: "var(--v2-accent-fg)",
+              background: isInMatch ? "var(--v2-hover)" : "var(--v2-accent)",
+              color: isInMatch ? "var(--v2-muted)" : "var(--v2-accent-fg)",
+              cursor: isInMatch ? "not-allowed" : "pointer",
+              opacity: isInMatch ? 0.5 : 1,
             }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = "var(--v2-accent-hover)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "var(--v2-accent)")
-            }
+            onMouseEnter={(e) => {
+              if (!isInMatch) e.currentTarget.style.background = "var(--v2-accent-hover)";
+            }}
+            onMouseLeave={(e) => {
+              if (!isInMatch) e.currentTarget.style.background = "var(--v2-accent)";
+            }}
+            title={isInMatch ? "Cannot queue while in a match" : undefined}
           >
             <Swords size={13} />
             {isQueued ? "Searching..." : "Ranked Queue"}
