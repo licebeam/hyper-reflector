@@ -63,7 +63,7 @@ export const THEMES: V2Theme[] = [
       '--v2-name-other': '#60a5fa',
       '--v2-grad-from': '#1f2937',
       '--v2-grad-to': '#111827',
-      '--v2-pattern-opacity': '0.22',
+      '--v2-pattern-opacity': '1',
     },
   },
   {
@@ -84,7 +84,7 @@ export const THEMES: V2Theme[] = [
       '--v2-name-other': '#34d399',
       '--v2-grad-from': '#1a1035',
       '--v2-grad-to': '#0d0a1e',
-      '--v2-pattern-opacity': '0.2',
+      '--v2-pattern-opacity': '1',
     },
   },
   {
@@ -105,7 +105,7 @@ export const THEMES: V2Theme[] = [
       '--v2-name-other': '#a78bfa',
       '--v2-grad-from': '#0a1f21',
       '--v2-grad-to': '#050f10',
-      '--v2-pattern-opacity': '0.2',
+      '--v2-pattern-opacity': '1',
     },
   },
   {
@@ -126,7 +126,7 @@ export const THEMES: V2Theme[] = [
       '--v2-name-other': '#60a5fa',
       '--v2-grad-from': '#1c060f',
       '--v2-grad-to': '#0f0408',
-      '--v2-pattern-opacity': '0.2',
+      '--v2-pattern-opacity': '1',
     },
   },
   {
@@ -147,7 +147,7 @@ export const THEMES: V2Theme[] = [
       '--v2-name-other': '#f5c842',
       '--v2-grad-from': '#0d1a08',
       '--v2-grad-to': '#060c04',
-      '--v2-pattern-opacity': '0.25',
+      '--v2-pattern-opacity': '1',
     },
   },
   {
@@ -168,7 +168,7 @@ export const THEMES: V2Theme[] = [
       '--v2-name-other': '#34d399',
       '--v2-grad-from': '#080516',
       '--v2-grad-to': '#03010a',
-      '--v2-pattern-opacity': '0.18',
+      '--v2-pattern-opacity': '1',
     },
   },
   {
@@ -214,7 +214,7 @@ export const THEMES: V2Theme[] = [
       '--v2-name-other': '#4ab09a',
       '--v2-grad-from': '#0c1214',
       '--v2-grad-to': '#06080a',
-      '--v2-pattern-opacity': '0.28',
+      '--v2-pattern-opacity': '1',
     },
   },
 ]

@@ -601,9 +601,9 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
                   style={selectStyle}
                 >
                   <option value="0">Off</option>
-                  <option value="0.06">Subtle</option>
-                  <option value="0.12">Medium</option>
-                  <option value="0.22">Strong</option>
+                  <option value=".1">Subtle</option>
+                  <option value=".2">Medium</option>
+                  <option value="0.4">Strong</option>
                 </select>
               </Row>
             </div>
