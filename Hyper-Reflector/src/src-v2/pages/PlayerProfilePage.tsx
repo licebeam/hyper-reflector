@@ -7,9 +7,9 @@ import {
   Save,
 } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import api from "../../src/external-api/requests";
+import api from "../../external-api/requests";
 import { validateName } from "../utils/validation";
-import { auth } from "../../src/utils/firebase";
+import { auth } from "../../utils/firebase";
 import type { V2User } from "../types";
 import { CountryFlag } from "../components/CountryFlag";
 import { UserTitle } from "../components/UserTitle";

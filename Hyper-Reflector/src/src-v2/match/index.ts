@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
 // @ts-ignore
-import keys from '../../src/private/keys'
-import { useSettingsStore, useUserStore } from '../../src/state/store'
-import { resolveMatchLuaPath } from '../../src/utils/pathSettings'
+import keys from '../../private/keys'
+import { useSettingsStore, useUserStore } from '../../state/store'
+import { resolveMatchLuaPath } from '../../utils/pathSettings'
 import { DEFAULT_GAME_ROM } from '../games'
 
 type ProxyMatchArgs = {
