@@ -169,8 +169,10 @@ function buildEmulatorArgs({
 
     if (normalizedPath.endsWith('fs-fbneo.exe') || normalizedPath.endsWith('fs-fbneo')) {
         args.push('--rom', rom)
-        if (luaPath && luaPath.trim().length) {
-            args.push('--lua', luaPath)
+        if(rom ==='sfiii3nr1'){
+            if (luaPath && luaPath.trim().length) {
+                args.push('--lua', luaPath)
+            }
         }
         args.push(
             'direct',

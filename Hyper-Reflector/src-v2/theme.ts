@@ -46,8 +46,8 @@ export type ThemePreference = {
 
 export const THEMES: V2Theme[] = [
   {
-    id: 'dark-orange',
-    name: 'Dark Orange',
+    id: 'orange',
+    name: 'Orange Soda',
     vars: {
       '--v2-bg': '#111827',
       '--v2-surface': '#1f2937',
@@ -67,8 +67,8 @@ export const THEMES: V2Theme[] = [
     },
   },
   {
-    id: 'midnight-purple',
-    name: 'Midnight Purple',
+    id: 'grape',
+    name: 'Grape Soda',
     vars: {
       '--v2-bg': '#0d0a1e',
       '--v2-surface': '#1a1035',
@@ -88,8 +88,8 @@ export const THEMES: V2Theme[] = [
     },
   },
   {
-    id: 'neon-teal',
-    name: 'Neon Teal',
+    id: 'waves',
+    name: 'Waves',
     vars: {
       '--v2-bg': '#050f10',
       '--v2-surface': '#0a1f21',
@@ -109,8 +109,8 @@ export const THEMES: V2Theme[] = [
     },
   },
   {
-    id: 'crimson-night',
-    name: 'Crimson Night',
+    id: 'strawberry',
+    name: 'Strawwwmmberry',
     vars: {
       '--v2-bg': '#0f0408',
       '--v2-surface': '#1c060f',
@@ -151,8 +151,8 @@ export const THEMES: V2Theme[] = [
     },
   },
   {
-    id: 'deep-space',
-    name: 'Deep Space',
+    id: 'space',
+    name: 'Space',
     vars: {
       '--v2-bg': '#03010a',
       '--v2-surface': '#080516',
@@ -219,7 +219,7 @@ export const THEMES: V2Theme[] = [
   },
 ]
 
-export const DEFAULT_THEME_ID = 'dark-orange'
+export const DEFAULT_THEME_ID = 'orange'
 
 // Preset swatch palettes for fun overrides
 export const CHAT_MSG_SWATCHES = [
