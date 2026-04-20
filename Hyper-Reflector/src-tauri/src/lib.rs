@@ -524,6 +524,7 @@ async fn launch_emulator(
     mut args: Vec<String>,
     match_id: Option<String>,
 ) -> Result<(), String> {
+    println!("{:?}", args);
     let proc_arc = proc.inner().clone();
     let resolved = resolve_emulator_path(&app, &exe_path)?;
     resolve_lua_args(&app, &mut args)?;
