@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
 import type { FirebaseError } from 'firebase/app'
-import { auth } from '../../src/utils/firebase'
-import api from '../../src/external-api/requests'
+import { auth } from '../../utils/firebase'
+import api from '../../external-api/requests'
 import { validateName } from '../utils/validation'
 
 type SignupPageProps = {

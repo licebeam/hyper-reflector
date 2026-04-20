@@ -2,11 +2,11 @@ import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { FlaskConical, FolderOpen, Play, Trash2 } from 'lucide-react'
-import { useSettingsStore } from '../../src/state/store'
+import { useSettingsStore } from '../../state/store'
 import {
   ensureDefaultEmulatorPath,
   ensureDefaultTrainingPath,
-} from '../../src/utils/pathSettings'
+} from '../../utils/pathSettings'
 import { GAMES } from '../games'
 
 const SFIII_ROM = 'sfiii3nr1'

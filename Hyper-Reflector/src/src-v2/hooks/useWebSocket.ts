@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
-import { useSettingsStore } from '../../src/state/store'
+import { useSettingsStore } from '../../state/store'
 // @ts-ignore
-import keys from '../../src/private/keys'
+import keys from '../../private/keys'
 import type { V2User, V2Message, V2Lobby, ConnectionStatus } from '../types'
 import {
   initWebRTC,
@@ -11,8 +11,8 @@ import {
   answerCall,
   declineCall as webrtcDeclineCall,
   closeConnectionWithUser,
-} from '../../src/webRTC/WebPeer'
-import { isMockUserId, startMockMatch, startProxyMatch } from '../../src/match'
+} from '../../webRTC/WebPeer'
+import { isMockUserId, startMockMatch, startProxyMatch } from '../../match'
 
 const DEFAULT_LOBBY_ID = 'Hyper Reflector'
 const MAX_MESSAGES = 50

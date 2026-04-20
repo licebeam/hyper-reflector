@@ -7,7 +7,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import hrLogo from "../../src/assets/logo.svg";
+import hrLogo from "../../assets/logo.svg";
 
 export type Page =
   | "lobby"

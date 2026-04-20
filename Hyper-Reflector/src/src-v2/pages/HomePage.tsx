@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { BarChart2 } from "lucide-react";
-import api from "../../src/external-api/requests";
-import { auth } from "../../src/utils/firebase";
+import api from "../../external-api/requests";
+import { auth } from "../../utils/firebase";
 import { useV2Theme } from "../ThemeContext";
 import type { V2User } from "../types";
 

@@ -10,8 +10,8 @@ import {
   Volume2,
   VolumeOff,
 } from "lucide-react";
-import { logout } from "../../src/utils/firebase";
-import { useSettingsStore } from "../../src/state/store";
+import { logout } from "../../utils/firebase";
+import { useSettingsStore } from "../../state/store";
 import { useV2Theme } from "../ThemeContext";
 import {
   THEMES,
