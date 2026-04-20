@@ -385,6 +385,25 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       pendingOffersRef.current.clear()
       pendingByUserRef.current.clear()
       pendingCandidatesRef.current.clear()
+
+      // Mark any still-pending challenge UI messages as declined so they don't
+      // remain interactive after the connection dropped and offers are gone.
+      const staleMessages: Record<string, V2Message[]> = {}
+      let anyStale = false
+      for (const [lid, msgs] of Object.entries(allLobbyMessagesRef.current)) {
+        const patched = msgs.map(m => {
+          if (m.role === 'challenge' && !m.challengeStatus) {
+            anyStale = true
+            return { ...m, challengeStatus: 'declined' as const }
+          }
+          return m
+        })
+        staleMessages[lid] = patched
+      }
+      if (anyStale) {
+        allLobbyMessagesRef.current = staleMessages
+        setAllLobbyMessages(staleMessages)
+      }
       if (peerConnectionRef.current) {
         try { peerConnectionRef.current.close() } catch {}
         peerConnectionRef.current = null
