@@ -7,6 +7,8 @@ export const GAMES: GameEntry[] = [
   { rom: 'sfiii3nr1', name: '3rd Strike' },
   { rom: 'vsavj', name: 'Vampire Savior' },
   { rom: 'sfa2', name: 'Street Fighter Alpha 2' },
+  { rom: 'umk3', name: 'UMK3' },
+  { rom: 'umk3', name: 'test2' },
   // TODO look into the c++ code for reasons why other games wont load.
 ]
 

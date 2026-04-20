@@ -563,9 +563,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
           }
 
           const activeLobbyId = currentLobbyIdRef.current || DEFAULT_LOBBY_ID;
-          const normalizedLobby = activeLobbyId.trim().toLowerCase();
           const inferredGameName =
-            normalizedLobby === "vampire" ? "vsavj" : undefined;
+            useUserStore.getState().lobbies.find((l) => l.name === activeLobbyId)?.gameName ?? undefined;
 
           const involvesMock =
             isMockUserId(challengerId) || isMockUserId(opponentId);
@@ -1306,9 +1305,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
 
       if (isMockUserId(targetUid)) {
         const lobbyId = currentLobbyIdRef.current || DEFAULT_LOBBY_ID;
-        const normalizedLobby = lobbyId.trim().toLowerCase();
         const inferredGameName =
-          normalizedLobby === "vampire" ? "vsavj" : undefined;
+          useUserStore.getState().lobbies.find((l) => l.name === lobbyId)?.gameName ?? undefined;
         const mockName = resolveMockDisplayName(
           targetUid,
           t("Layout.mock.defaultOpponent")
@@ -2342,6 +2340,10 @@ export default function Layout({ children }: { children: ReactElement[] }) {
                     typeof item.isPrivate === "boolean"
                       ? item.isPrivate
                       : Boolean(item.pass && item.pass.length),
+                  gameName:
+                    typeof item.gameName === "string" && item.gameName.trim().length
+                      ? item.gameName.trim()
+                      : undefined,
                 };
 
                 lobbyMap.set(name, normalized);
@@ -2732,9 +2734,8 @@ export default function Layout({ children }: { children: ReactElement[] }) {
             }
 
             const activeLobbyId = currentLobbyIdRef.current || DEFAULT_LOBBY_ID;
-            const normalizedLobby = activeLobbyId.trim().toLowerCase();
             const inferredGameName =
-              normalizedLobby === "vampire" ? "vsavj" : undefined;
+              useUserStore.getState().lobbies.find((l) => l.name === activeLobbyId)?.gameName ?? undefined;
             const requesterUid = globalUserRef.current?.uid;
 
             if (

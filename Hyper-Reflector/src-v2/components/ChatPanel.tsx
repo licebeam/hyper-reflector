@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Swords, Check, X, Eye, EyeOff } from "lucide-react";
 import type { V2Message } from "../types";
-import { getGameName } from "../games";
+import { GAMES, getGameName } from "../games";
 
 const MAX_LENGTH = 120;
 
@@ -110,6 +110,7 @@ type ChatPanelProps = {
   onSend: (text: string) => boolean;
   onAcceptChallenge?: (messageId: string) => void;
   onDeclineChallenge?: (messageId: string) => void;
+  onUpdateGame?: (gameName: string) => void;
 };
 
 export function ChatPanel({
@@ -120,6 +121,7 @@ export function ChatPanel({
   onSend,
   onAcceptChallenge,
   onDeclineChallenge,
+  onUpdateGame,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -147,9 +149,24 @@ export function ChatPanel({
       {/* Messages */}
       <div className="flex-1 p-3 space-y-1.5 min-h-0 overflow-y-scroll">
         <div className="flex items-center gap-2 pb-1">
-          <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--v2-muted)' }}>
-            {getGameName(lobbyGame)}
-          </span>
+          {onUpdateGame ? (
+            <select
+              value={lobbyGame ?? ''}
+              onChange={e => onUpdateGame(e.target.value)}
+              className="text-[10px] font-medium uppercase tracking-wide border-none outline-none bg-transparent cursor-pointer"
+              style={{ color: 'var(--v2-muted)' }}
+            >
+              {GAMES.map(g => (
+                <option key={g.rom} value={g.rom} style={{ background: 'var(--v2-surface)', textTransform: 'none' }}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: 'var(--v2-muted)' }}>
+              {getGameName(lobbyGame)}
+            </span>
+          )}
           {lobbyPassword && (
             <div className="flex items-center gap-1">
               <span className="text-[10px] font-mono" style={{ color: 'var(--v2-muted)' }}>

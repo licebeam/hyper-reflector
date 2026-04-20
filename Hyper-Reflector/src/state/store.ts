@@ -12,6 +12,7 @@ export type LobbySummary = {
     users: number
     pass?: string
     isPrivate?: boolean
+    gameName?: string
 }
 
 const MAX_CHAT_MESSAGES = 50
