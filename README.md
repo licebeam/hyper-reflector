@@ -17,6 +17,11 @@ npm run tauri build   # desktop installers
 
 # How to build:
 
+To build for release the command is 
+```bash
+cargo build --release
+```
+
 In order to run hyper-reflector locally, you'll need to have firebase setup
 https://firebase.google.com/
 
