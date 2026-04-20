@@ -1008,6 +1008,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     if (isMockUserId(targetUid)) {
       const lobbyId = activeLobbyIdRef.current
       const gameName = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName ?? null
+      console.log('current lobby game name', gameName)
       const mockUser = getMockUser(targetUid)
       setIsInMatchBoth(true, targetUid)
       try {
@@ -1038,6 +1039,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const acceptChallenge = useCallback(async (messageId: string): Promise<void> => {
     const currentUser = userRef.current
     if (!currentUser?.uid || isInMatchRef.current) return
+    isInMatchRef.current = true
 
     declineAllPendingExcept(messageId)
 
@@ -1053,6 +1055,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       pendingCandidatesRef.current.delete(from)
       const mockUser = getMockUser(from)
       const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
+      console.log(gameName, 'on accept')
       setIsInMatchBoth(true, from)
       try {
         await startMockMatch({ matchId: messageId, opponentName: mockUser?.userName ?? 'Bot', gameName, playerSlot: 1 })
@@ -1127,6 +1130,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const mockRankTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const toggleRankQueue = useCallback((isQueue: boolean, gameName?: string): void => {
+    console.log('ranked queue selected game', gameName)
     const socket = socketRef.current
     const currentUser = userRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return
@@ -1182,13 +1186,15 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   }, [clearRankQueuePending])
 
   const rankQueueAccept = useCallback(async (matchId: string, isMock?: boolean): Promise<void> => {
+    if (isInMatchRef.current) return
     clearRankQueuePending()
     declineAllPendingExcept()
 
     if (isMock) {
-      if (isInMatchRef.current || !userRef.current) return
+      if (!userRef.current) return
       const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
       setIsInMatchBoth(true, MOCK_USER_1.uid)
+      console.log(gameName, 'ranked accept')
       try {
         await startMockMatch({ matchId, opponentName: MOCK_USER_1.userName, gameName, playerSlot: 0 })
       } catch (err) {
@@ -1263,6 +1269,11 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return
     try {
       socket.send(JSON.stringify({ type: 'updateLobbyGame', lobbyId, gameName }))
+      const updated = lobbyListRef.current.map(l =>
+        l.name === lobbyId ? { ...l, gameName: gameName || undefined } : l
+      )
+      lobbyListRef.current = updated
+      setLobbyList(updated)
     } catch {}
   }, [])
 

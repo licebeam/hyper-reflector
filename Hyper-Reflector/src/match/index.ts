@@ -174,6 +174,7 @@ export async function startMockMatch({
     })
 
     try {
+        await invoke('kill_mock_emulators').catch(() => {})
         await Promise.all([
             invoke('launch_emulator', {
                 exePath: emulatorPath,
