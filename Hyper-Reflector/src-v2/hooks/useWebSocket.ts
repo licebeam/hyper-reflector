@@ -908,6 +908,11 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     const handleEnd = () => {
       setIsInMatchBoth(false)
       closePeerConnection()
+      const socket = socketRef.current
+      const uid = userRef.current?.uid
+      if (socket?.readyState === WebSocket.OPEN && uid) {
+        try { socket.send(JSON.stringify({ type: 'matchEnd', userUID: uid })) } catch {}
+      }
     }
 
     listen('endMatch', handleEnd).then(fn => { unlistenEnd = fn }).catch(() => {})
