@@ -624,8 +624,8 @@ export function Header({
             Profile
           </button>
         )}
-
-        <div
+        {/* TODO: remove version switching */}
+        {/* <div
           className="flex rounded overflow-hidden text-xs font-medium border"
           style={{ borderColor: "var(--v2-border)" }}
         >
@@ -645,7 +645,7 @@ export function Header({
           >
             V2
           </span>
-        </div>
+        </div> */}
       </div>
     </header>
   );
