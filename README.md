@@ -22,6 +22,11 @@ To build for release the command is
 cargo build --release
 ```
 
+To debug a release build - creates a build with debug enabled, check the dev tools console for errors.
+```bash
+npx tauri build --debug
+```
+
 In order to run hyper-reflector locally, you'll need to have firebase setup
 https://firebase.google.com/
 
