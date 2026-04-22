@@ -13,6 +13,7 @@ import {
 import { logout } from "../../utils/firebase";
 import { useSettingsStore } from "../../state/store";
 import { useV2Theme } from "../ThemeContext";
+import { applyRomPath, formatRomPathDisplay } from "../../utils/romPaths";
 import {
   THEMES,
   CHAT_MSG_SWATCHES,
@@ -261,6 +262,11 @@ function SoundRow({
 
 export function SettingsPage({ user, onLogout }: SettingsPageProps) {
   const [resetConfirm, setResetConfirm] = useState(false);
+  const [romPathStatus, setRomPathStatus] = useState<
+    | { kind: "success"; text: string }
+    | { kind: "error"; text: string }
+    | null
+  >(null);
 
   // ── Store reads ──────────────────────────────────────────────────────────────
   const ggpoDelay = useSettingsStore((s) => s.ggpoDelay);
@@ -313,15 +319,30 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
   };
 
   const pickRom = async () => {
+    setRomPathStatus(null);
+    let res: unknown;
     try {
-      const res = await open({
+      res = await open({
         multiple: false,
         directory: true,
         title: "Select ROM directory",
       });
-      if (typeof res === "string") setRomPath(res);
     } catch {
-      /* dismissed */
+      return;
+    }
+
+    if (typeof res !== "string") return;
+
+    const sanitized = formatRomPathDisplay(res);
+    try {
+      await applyRomPath(sanitized);
+      setRomPath(sanitized);
+      setRomPathStatus({ kind: "success", text: sanitized });
+    } catch (err) {
+      setRomPathStatus({
+        kind: "error",
+        text: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 
@@ -425,6 +446,21 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
             >
               {romPath || "Not set"}
             </p>
+            {romPathStatus && (
+              <p
+                className="text-[11px] break-words"
+                style={{
+                  color:
+                    romPathStatus.kind === "success"
+                      ? "var(--v2-accent)"
+                      : "#f87171",
+                }}
+              >
+                {romPathStatus.kind === "success"
+                  ? `Updated emulator config: ${romPathStatus.text}`
+                  : romPathStatus.text}
+              </p>
+            )}
             <button
               onClick={pickRom}
               className="flex items-center gap-1.5 text-xs mt-1 transition-colors"

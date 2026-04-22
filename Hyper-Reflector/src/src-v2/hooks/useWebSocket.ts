@@ -191,6 +191,8 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const subscribedLobbyIdsRef = useRef(initialLobbies.current)
   const activeLobbyIdRef = useRef(DEFAULT_LOBBY_ID)
   const isInMatchRef = useRef(false)
+  // True while we're mid WebRTC handshake (offer/answer/candidates) but before a `match-start`.
+  const isHandshakeInProgressRef = useRef(false)
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const opponentUidRef = useRef<string | null>(null)
   const pendingOffersRef = useRef(new Map<string, { from: string; offer: RTCSessionDescriptionInit }>())
@@ -291,6 +293,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   }, [])
 
   const closePeerConnection = useCallback(() => {
+    isHandshakeInProgressRef.current = false
     if (opponentUidRef.current) {
       closeConnectionWithUser(opponentUidRef.current).catch(() => {})
       opponentUidRef.current = null
@@ -385,6 +388,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       pendingOffersRef.current.clear()
       pendingByUserRef.current.clear()
       pendingCandidatesRef.current.clear()
+      isHandshakeInProgressRef.current = false
 
       // Mark any still-pending challenge UI messages as declined so they don't
       // remain interactive after the connection dropped and offers are gone.
@@ -640,7 +644,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
           case 'webrtc-ping-offer': {
             if (!myUid || !payload.from || !payload.offer) break
-            if (isInMatchRef.current || isRankQueuedRef.current) {
+            if (isInMatchRef.current || isRankQueuedRef.current || isHandshakeInProgressRef.current) {
               try { socket.send(JSON.stringify({ type: 'webrtc-ping-decline', to: payload.from, from: myUid })) } catch {}
               break
             }
@@ -715,6 +719,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
               !isMockUserId(payload.from as string) &&
               !sentMatchRequestRef.current.has(payload.from as string)
             ) {
+              isHandshakeInProgressRef.current = true
               socket.send(JSON.stringify({
                 type: 'request-match',
                 challengerId: requesterUid,
@@ -754,6 +759,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
             if (payload.from) {
               if (opponentUidRef.current === payload.from) closePeerConnection()
               sentMatchRequestRef.current.delete(payload.from as string)
+              isHandshakeInProgressRef.current = false
               addSystemMessage('Challenge was declined.')
             }
             break
@@ -771,11 +777,13 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
             const gameName = typeof payload.gameName === 'string' && payload.gameName ? payload.gameName : undefined
             // Clear any pending ranked match popup now that the match is starting
             clearRankQueuePending()
+            isHandshakeInProgressRef.current = false
             setIsInMatchBoth(true, opponentUid)
             try {
               await startProxyMatch({ matchId, opponentUid, playerSlot, serverHost, serverPort, gameName })
             } catch (err) {
               console.error('[v2] Failed to start proxy match:', err)
+              isHandshakeInProgressRef.current = false
               setIsInMatchBoth(false)
             }
             sentMatchRequestRef.current.delete(opponentUid)
@@ -790,6 +798,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
           }
 
           case 'match-start-error': {
+            isHandshakeInProgressRef.current = false
             setIsInMatchBoth(false)
             if (typeof payload.opponentId === 'string') sentMatchRequestRef.current.delete(payload.opponentId)
             if (typeof payload.challengerId === 'string') sentMatchRequestRef.current.delete(payload.challengerId)
@@ -1024,6 +1033,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return
     closePeerConnection()
     sentMatchRequestRef.current.delete(targetUid)
+    isHandshakeInProgressRef.current = true
 
     try {
       const peer = await initWebRTC(currentUser.uid, targetUid, socket)
@@ -1032,6 +1042,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       await startCall(peer, socket, targetUid, currentUser.uid, true)
     } catch (err) {
       console.error('[v2] Failed to initiate challenge:', err)
+      isHandshakeInProgressRef.current = false
       closePeerConnection()
     }
   }, [setIsInMatchBoth, closePeerConnection])
@@ -1039,14 +1050,13 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const acceptChallenge = useCallback(async (messageId: string): Promise<void> => {
     const currentUser = userRef.current
     if (!currentUser?.uid || isInMatchRef.current) return
-    isInMatchRef.current = true
-
-    declineAllPendingExcept(messageId)
 
     const pendingOffer = pendingOffersRef.current.get(messageId)
-    updateChallengeMessage(messageId, { challengeStatus: 'accepted', challengeResponder: currentUser.userName })
-
-    if (!pendingOffer) return
+    if (!pendingOffer) {
+      addSystemMessage('Could not accept challenge (offer missing). Ask them to re-challenge.')
+      updateChallengeMessage(messageId, { challengeStatus: 'declined', challengeResponder: currentUser.userName })
+      return
+    }
     const { from, offer } = pendingOffer
 
     if (isMockUserId(from)) {
@@ -1068,11 +1078,17 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN) {
+      addSystemMessage('Could not accept challenge (not connected).')
+      updateChallengeMessage(messageId, { challengeStatus: 'declined', challengeResponder: currentUser.userName })
       pendingOffersRef.current.delete(messageId)
       pendingByUserRef.current.delete(from)
       pendingCandidatesRef.current.delete(from)
       return
     }
+
+    declineAllPendingExcept(messageId)
+    updateChallengeMessage(messageId, { challengeStatus: 'accepted', challengeResponder: currentUser.userName })
+    isHandshakeInProgressRef.current = true
 
     if (peerConnectionRef.current) {
       try { peerConnectionRef.current.close() } catch {}
@@ -1095,12 +1111,14 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       await answerCall(peer, socket, from, currentUser.uid)
     } catch (err) {
       console.error('[v2] Failed to accept challenge:', err)
+      isHandshakeInProgressRef.current = false
       closePeerConnection()
     } finally {
       pendingOffersRef.current.delete(messageId)
       pendingByUserRef.current.delete(from)
+      pendingCandidatesRef.current.delete(from)
     }
-  }, [setIsInMatchBoth, closePeerConnection, updateChallengeMessage, declineAllPendingExcept])
+  }, [setIsInMatchBoth, closePeerConnection, updateChallengeMessage, declineAllPendingExcept, addSystemMessage])
 
   const declineChallenge = useCallback(async (messageId: string): Promise<void> => {
     const currentUser = userRef.current

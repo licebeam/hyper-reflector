@@ -4,12 +4,14 @@ export type GameEntry = {
 }
 
 export const GAMES: GameEntry[] = [
-  { rom: 'sfiii3nr1', name: '3rd Strike' },
+  { rom: 'sfiii3nr1', name: 'Street Fighter III 3rd Strike' },
   { rom: 'vsavj', name: 'Vampire Savior' },
+  { rom: 'ssf2xjr1', name: 'Super Street Fighter II X (ST)' },
   { rom: 'sfa2', name: 'Street Fighter Alpha 2' },
-  { rom: 'umk3', name: 'UMK3' },
-  { rom: 'umk3', name: 'test2' },
-  // TODO look into the c++ code for reasons why other games wont load.
+  { rom: 'sfa3', name: 'Street Fighter Alpha 3' },
+  { rom: 'umk3', name: 'Ultimate Mortal Kombat 3' },
+  { rom: 'kof98', name: "The King of Fighters'98" },
+  { rom: 'turfmast', name: 'Neo Turf Masters' },
 ]
 
 export const DEFAULT_GAME_ROM = 'sfiii3nr1'
