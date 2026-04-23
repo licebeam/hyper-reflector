@@ -85,6 +85,7 @@ pub struct StartArgs {
     pub player: u8,                // proxyStartData.player + 1
     pub delay: u16,                // config.app.emuDelay
     pub user_name: String,         // for passing to emulator
+    pub net_delay: String,         // for passing to emulator for delay test
     pub game_name: Option<String>, // just for fun
     // ports (defaults to 7000/7001 like your code)
     pub emulator_game_port: Option<u16>, // where emulator expects its peer (default 7000)
@@ -320,13 +321,6 @@ impl ProxyRuntime {
         let emu_listen_port = self.emu_listener.local_addr()?.port();
         let emu_game_port = self.args.emulator_game_port.unwrap_or(7000);
 
-        // self.app.emit_all("proxy-log",
-        //   format!("Starting emulator: {} (listen:{emu_listen_port} game:{emu_game_port})", self.args.emulator_path)
-        // ).ok();
-        let _ = self
-            .app
-            .emit_to(EventTarget::any(), "proxy-log", format!("Port busy"));
-
         let mut cmd = TokioCommand::new(&self.args.emulator_path);
         let mut provided_args = self.args.emulator_args.clone();
 
@@ -344,6 +338,8 @@ impl ProxyRuntime {
                 self.args.delay.to_string(),
                 "--name".to_string(),
                 self.args.user_name.clone(),
+                "--net-delay".to_string(),
+                self.args.net_delay.clone(),
             ];
         }
 
@@ -351,6 +347,27 @@ impl ProxyRuntime {
         // Example args - replace with what FBNeo needs in your environment:
         //   --local-port 7000 --remote-ip 127.0.0.1 --remote-port <emu_listener_port> --player N --delay D --name user
         resolve_lua_args(&self.app, &mut provided_args).map_err(|e| anyhow!(e))?;
+
+        // Ensure `--net-delay` is present even if the frontend forgot to include it in `emulator_args`.
+        if !self.args.net_delay.trim().is_empty()
+            && !Self::args_contain_net_delay(&provided_args)
+        {
+            provided_args.push("--net-delay".to_string());
+            provided_args.push(self.args.net_delay.clone());
+        }
+
+        let _ = self.app.emit_to(
+            EventTarget::any(),
+            "proxy-log",
+            format!(
+                "Launching emulator: {} (listen:{} game:{}) args={:?}",
+                self.args.emulator_path, emu_listen_port, emu_game_port, provided_args
+            ),
+        );
+        println!(
+            "Launching emulator: {} (listen:{} game:{}) args={:?}",
+            self.args.emulator_path, emu_listen_port, emu_game_port, provided_args
+        );
         cmd.args(provided_args);
 
         let child = cmd.spawn()?;
@@ -616,6 +633,13 @@ impl ProxyRuntime {
 }
 
 impl ProxyRuntime {
+    fn args_contain_net_delay(args: &[String]) -> bool {
+        args.iter().any(|a| {
+            a.eq_ignore_ascii_case("--net-delay")
+                || a.to_ascii_lowercase().contains("--net-delay")
+        })
+    }
+
     fn rewrite_emulator_ports(args: &mut Vec<String>, local_port: u16, remote_port: u16) {
         let local_addr = format!("127.0.0.1:{local_port}");
         let remote_addr = format!("127.0.0.1:{remote_port}");

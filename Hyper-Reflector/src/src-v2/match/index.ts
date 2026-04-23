@@ -84,6 +84,7 @@ export async function startProxyMatch({
             delay: delayValue,
             user_name: globalUser.userName || globalUser.userEmail || 'Player',
             game_name: romName,
+            net_delay: 'off',
         },
     })
 }
@@ -180,7 +181,8 @@ function buildEmulatorArgs({
             '-n', playerName,
             '-l', `127.0.0.1:${localPort}`,
             '-r', `127.0.0.1:${remotePort}`,
-            '-d', String(delay)
+            '-d', String(delay),
+            '--net-delay', String("off")
         )
         return args
     }
@@ -188,6 +190,7 @@ function buildEmulatorArgs({
     if (normalizedPath.endsWith('fcadefbneo.exe') || normalizedPath.endsWith('fcadefbneo')) {
         const connection = `quark:direct,${rom},${localPort},127.0.0.1,${remotePort},${playerIndex},${delay},0`
         args.push(connection)
+        args.push('--net-delay', 'off')
         if (luaPath && luaPath.trim().length) {
             args.push('--lua', luaPath)
         }
@@ -203,7 +206,8 @@ function buildEmulatorArgs({
         '-n', playerName,
         '-l', `127.0.0.1:${localPort}`,
         '-r', `127.0.0.1:${remotePort}`,
-        '-d', String(delay)
+        '-d', String(delay),
+        '--net-delay', String("off")
     )
 
     return args
