@@ -100,6 +100,7 @@ export async function startProxyMatch({
                 delay: delayValue,
                 user_name: globalUser.userName || globalUser.userEmail || 'Player',
                 game_name: romName,
+                net_delay: 'off'
             },
         })
     } catch (error) {

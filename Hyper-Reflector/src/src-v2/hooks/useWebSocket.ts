@@ -12,7 +12,7 @@ import {
   declineCall as webrtcDeclineCall,
   closeConnectionWithUser,
 } from '../../webRTC/WebPeer'
-import { isMockUserId, startMockMatch, startProxyMatch } from '../../match'
+import { isMockUserId, startMockMatch, startProxyMatch } from '../match'
 
 const DEFAULT_LOBBY_ID = 'Hyper Reflector'
 const MAX_MESSAGES = 50
