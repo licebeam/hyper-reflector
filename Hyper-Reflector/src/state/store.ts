@@ -61,6 +61,8 @@ type SettingsState = {
     setRomPath: (path: string) => void
     rankQueueGame: string
     setRankQueueGame: (rom: string) => void
+    isAfkPref: boolean
+    setIsAfkPref: (v: boolean) => void
 }
 
 type SignalStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -216,6 +218,8 @@ export const useSettingsStore = create<SettingsState>()(
             setRomPath: (path) => set({ romPath: path }),
             rankQueueGame: 'sfiii3nr1',
             setRankQueueGame: (rom) => set({ rankQueueGame: rom }),
+            isAfkPref: false,
+            setIsAfkPref: (v) => set({ isAfkPref: v }),
         }),
         {
             name: 'settings',

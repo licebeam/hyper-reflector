@@ -196,8 +196,10 @@ function AppV2Inner() {
   const [page, setPage] = useState<Page>("lobby");
   const [viewingProfileId, setViewingProfileId] = useState<string | null>(null);
   const [lobbySelectorOpen, setLobbySelectorOpen] = useState(false);
-  const [notifMuted, setNotifMuted] = useState(false);
-  const [isAfk, setIsAfk] = useState(false);
+  const notifMuted = useSettingsStore((s) => s.notificationsMuted);
+  const setNotifMuted = useSettingsStore((s) => s.setNotificationsMuted);
+  const isAfk = useSettingsStore((s) => s.isAfkPref);
+  const setIsAfkPref = useSettingsStore((s) => s.setIsAfkPref);
   const rankQueueGame = useSettingsStore((s) => s.rankQueueGame);
   const emulatorPathSetting = useSettingsStore((s) => s.emulatorPath);
 
@@ -240,6 +242,13 @@ function AppV2Inner() {
     void ensureDefaultMentionSound(emulatorPathSetting);
     void ensureDefaultWinSound(emulatorPathSetting);
   }, [emulatorPathSetting]);
+
+  // Re-propagate persisted AFK state to server whenever the socket becomes connected.
+  useEffect(() => {
+    if (status === 'connected' && user && isAfk) {
+      setAfk(true);
+    }
+  }, [status, user?.uid]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (firebaseUser) => {
@@ -365,7 +374,7 @@ function AppV2Inner() {
 
   const handleToggleAfk = () => {
     const next = !isAfk;
-    setIsAfk(next);
+    setIsAfkPref(next);
     setAfk(next);
   };
 
@@ -478,7 +487,7 @@ function AppV2Inner() {
               onAcceptNotification={handleAcceptChallenge}
               onDeclineNotification={handleDeclineChallenge}
               notifMuted={notifMuted}
-              onToggleNotifMuted={() => setNotifMuted((m) => !m)}
+              onToggleNotifMuted={() => setNotifMuted(!notifMuted)}
               isAfk={isAfk}
               onToggleAfk={handleToggleAfk}
               rankQueueGame={getGameName(rankQueueGame)}
