@@ -199,6 +199,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const pendingByUserRef = useRef(new Map<string, string>())
   const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>())
   const sentMatchRequestRef = useRef(new Set<string>())
+  const outgoingChallengeStatusMsgRef = useRef(new Map<string, string>())
   const rankQueuePendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Keep refs in sync
@@ -313,6 +314,18 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     })
   }, [addMessageToLobby])
 
+  const resolveUserNameForUid = useCallback((uid: string): string => {
+    const lobbyId = activeLobbyIdRef.current || DEFAULT_LOBBY_ID
+    const activeUsers = allLobbyUsersRef.current[lobbyId] ?? []
+    const foundActive = activeUsers.find(u => u.uid === uid)
+    if (foundActive?.userName) return foundActive.userName
+    for (const users of Object.values(allLobbyUsersRef.current)) {
+      const found = users.find(u => u.uid === uid)
+      if (found?.userName) return found.userName
+    }
+    return uid
+  }, [])
+
   // Patch a challenge message wherever it lives across all lobbies
   const updateChallengeMessage = useCallback((messageId: string, patch: Partial<V2Message>) => {
     setAllLobbyMessages(prev => {
@@ -389,6 +402,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       pendingByUserRef.current.clear()
       pendingCandidatesRef.current.clear()
       isHandshakeInProgressRef.current = false
+      outgoingChallengeStatusMsgRef.current.clear()
 
       // Mark any still-pending challenge UI messages as declined so they don't
       // remain interactive after the connection dropped and offers are gone.
@@ -708,6 +722,21 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
               console.error('[v2] Failed to set remote description from answer:', err)
             }
 
+            // Update the "You challenged X" local feedback message (caller side)
+            // to confirm the opponent accepted by answering the offer.
+            if (payload.from) {
+              const fromUid = payload.from as string
+              const msgId = outgoingChallengeStatusMsgRef.current.get(fromUid)
+              if (msgId) {
+                const displayName = resolveUserNameForUid(fromUid)
+                updateChallengeMessage(msgId, {
+                  text: `${displayName} accepted your challenge.`,
+                  timeStamp: Date.now(),
+                })
+                outgoingChallengeStatusMsgRef.current.delete(fromUid)
+              }
+            }
+
             const lobbyForMatch = activeLobbyIdRef.current || DEFAULT_LOBBY_ID
             const inferredGameName = lobbyListRef.current.find(l => l.name === lobbyForMatch)?.gameName
             const requesterUid = userRef.current?.uid
@@ -757,6 +786,16 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
           case 'webrtc-ping-decline': {
             if (payload.from) {
+              const fromUid = payload.from as string
+              const msgId = outgoingChallengeStatusMsgRef.current.get(fromUid)
+              if (msgId) {
+                const displayName = resolveUserNameForUid(fromUid)
+                updateChallengeMessage(msgId, {
+                  text: `${displayName} declined your challenge.`,
+                  timeStamp: Date.now(),
+                })
+                outgoingChallengeStatusMsgRef.current.delete(fromUid)
+              }
               if (opponentUidRef.current === payload.from) closePeerConnection()
               sentMatchRequestRef.current.delete(payload.from as string)
               isHandshakeInProgressRef.current = false
@@ -823,7 +862,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       socket.close()
       if (socketRef.current === socket) socketRef.current = null
     }
-  }, [user?.uid, reconnectTick, setLobbyUsersForId, addMessageToLobby, setActiveLobbyIdBoth, setIsInMatchBoth, closePeerConnection, addSystemMessage, updateChallengeMessage, clearRankQueuePending])
+  }, [user?.uid, reconnectTick, setLobbyUsersForId, addMessageToLobby, setActiveLobbyIdBoth, setIsInMatchBoth, closePeerConnection, addSystemMessage, updateChallengeMessage, clearRankQueuePending, resolveUserNameForUid])
 
   // ── Mock challenge interval (debug lobby only) ────────────────────────────
 
@@ -1014,6 +1053,20 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     const currentUser = userRef.current
     if (!currentUser?.uid || isInMatchRef.current || isRankQueuedRef.current) return
 
+    const lobbyIdForMessage = activeLobbyIdRef.current || DEFAULT_LOBBY_ID
+    const opponentName = isMockUserId(targetUid)
+      ? (getMockUser(targetUid)?.userName ?? targetUid)
+      : resolveUserNameForUid(targetUid)
+
+    const statusMsgId = `sys-challenge-${Date.now()}-${Math.random()}`
+    outgoingChallengeStatusMsgRef.current.set(targetUid, statusMsgId)
+    addMessageToLobby(lobbyIdForMessage, {
+      id: statusMsgId,
+      role: 'system',
+      text: `You challenged ${opponentName}.`,
+      timeStamp: Date.now(),
+    })
+
     if (isMockUserId(targetUid)) {
       const lobbyId = activeLobbyIdRef.current
       const gameName = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName ?? null
@@ -1045,7 +1098,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       isHandshakeInProgressRef.current = false
       closePeerConnection()
     }
-  }, [setIsInMatchBoth, closePeerConnection])
+  }, [setIsInMatchBoth, closePeerConnection, addMessageToLobby, resolveUserNameForUid])
 
   const acceptChallenge = useCallback(async (messageId: string): Promise<void> => {
     const currentUser = userRef.current

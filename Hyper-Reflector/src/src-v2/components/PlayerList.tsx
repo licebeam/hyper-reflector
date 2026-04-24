@@ -85,7 +85,8 @@ function UserAvatar({ user }: { user: V2User }) {
   const showImg = !!user.userProfilePic && !imgFailed;
   return (
     <div
-      className="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold"
+      id="user-image-chat"
+      className="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold hover:scale-200"
       style={{ background: "var(--v2-accent)", color: "var(--v2-accent-fg)" }}
     >
       {showImg ? (

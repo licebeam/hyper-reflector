@@ -21,6 +21,12 @@ import { useWebSocket, type RankQueuePendingData } from "./hooks/useWebSocket";
 import { auth } from "../utils/firebase";
 import api from "../external-api/requests";
 import { useUserStore, useSettingsStore } from "../state/store";
+import {
+  ensureDefaultChallengeSound,
+  ensureDefaultMentionSound,
+  ensureDefaultWinSound,
+  isTauriEnv,
+} from "../utils/pathSettings";
 import type { V2User } from "./types";
 import { getGameName } from "./games";
 import { Check, X } from "lucide-react";
@@ -193,6 +199,7 @@ function AppV2Inner() {
   const [notifMuted, setNotifMuted] = useState(false);
   const [isAfk, setIsAfk] = useState(false);
   const rankQueueGame = useSettingsStore((s) => s.rankQueueGame);
+  const emulatorPathSetting = useSettingsStore((s) => s.emulatorPath);
 
   const {
     status,
@@ -225,6 +232,14 @@ function AppV2Inner() {
     lobbyJoinError,
     clearLobbyJoinError,
   } = useWebSocket(user, notifMuted);
+
+  // Ensure bundled default sound paths are populated (especially after reset).
+  useEffect(() => {
+    if (!isTauriEnv()) return;
+    void ensureDefaultChallengeSound(emulatorPathSetting);
+    void ensureDefaultMentionSound(emulatorPathSetting);
+    void ensureDefaultWinSound(emulatorPathSetting);
+  }, [emulatorPathSetting]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, async (firebaseUser) => {
