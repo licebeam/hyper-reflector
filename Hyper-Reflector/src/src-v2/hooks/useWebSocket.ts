@@ -201,6 +201,8 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const sentMatchRequestRef = useRef(new Set<string>())
   const outgoingChallengeStatusMsgRef = useRef(new Map<string, string>())
   const rankQueuePendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const rankQueueGameNameRef = useRef<string>('sfiii3nr1')
+  const wasRankedMatchRef = useRef(false)
 
   // Keep refs in sync
   useEffect(() => { userRef.current = user }, [user])
@@ -238,24 +240,43 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     isInMatchRef.current = val
     setIsInMatch(val)
 
-    // If a match ends while the user was rank-queued, clear queue state so the
-    // button resets to "Ranked Queue" and the server knows they left the queue.
-    if (!val && isRankQueuedRef.current) {
-      isRankQueuedRef.current = false
-      setIsRankQueued(false)
+    if (!val) {
       const socket = socketRef.current
       const currentUser = userRef.current
-      if (socket?.readyState === WebSocket.OPEN && currentUser?.uid) {
-        try {
-          socket.send(JSON.stringify({
-            type: 'updateSocketState',
-            data: {
-              uid: currentUser.uid,
-              lobbyId: activeLobbyIdRef.current,
-              stateToUpdate: { key: 'isRankQueued', value: false },
-            },
-          }))
-        } catch {}
+      if (wasRankedMatchRef.current) {
+        // Ranked match ended — re-queue the player automatically
+        wasRankedMatchRef.current = false
+        isRankQueuedRef.current = true
+        setIsRankQueued(true)
+        if (socket?.readyState === WebSocket.OPEN && currentUser?.uid) {
+          try {
+            socket.send(JSON.stringify({
+              type: 'updateSocketState',
+              data: {
+                uid: currentUser.uid,
+                lobbyId: activeLobbyIdRef.current,
+                stateToUpdate: { key: 'isRankQueued', value: true },
+                rankQueueGameName: rankQueueGameNameRef.current,
+              },
+            }))
+          } catch {}
+        }
+      } else if (isRankQueuedRef.current) {
+        // Challenge match ended while rank-queued — clear the queue
+        isRankQueuedRef.current = false
+        setIsRankQueued(false)
+        if (socket?.readyState === WebSocket.OPEN && currentUser?.uid) {
+          try {
+            socket.send(JSON.stringify({
+              type: 'updateSocketState',
+              data: {
+                uid: currentUser.uid,
+                lobbyId: activeLobbyIdRef.current,
+                stateToUpdate: { key: 'isRankQueued', value: false },
+              },
+            }))
+          } catch {}
+        }
       }
     }
 
@@ -501,14 +522,19 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
               typeof sender.lobbyId === 'string' && sender.lobbyId.trim()
                 ? sender.lobbyId.trim()
                 : activeLobbyIdRef.current
+            const messageText = String(payload.message || '')
             addMessageToLobby(msgLobbyId, {
               id: payload.id || `msg-${Date.now()}`,
               role: 'user',
-              text: String(payload.message || ''),
+              text: messageText,
               timeStamp: typeof payload.timeStamp === 'number' ? payload.timeStamp : Date.now(),
               senderUid: sender.uid,
               userName: sender.userName || sender.name || sender.uid || 'Unknown',
             })
+            const currentUserName = userRef.current?.userName
+            if (currentUserName && messageText.toLowerCase().includes(`@${currentUserName.toLowerCase()}`)) {
+              playMentionSound(notifMutedRef.current)
+            }
             break
           }
 
@@ -649,6 +675,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
           case 'rank-queue-timeout':
           case 'rank-queue-cancelled':
             clearRankQueuePending()
+            wasRankedMatchRef.current = false
             addSystemMessage(
               payload.type === 'rank-queue-cancelled' && payload.reason === 'opponent-declined'
                 ? 'Your opponent declined the ranked match.'
@@ -676,7 +703,10 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
               if (found) { challengerName = found.userName; break }
             }
 
-            const activeLobbyGame = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName
+            const senderLobbyId = (payload.lobbyId as string | undefined) && subscribedLobbyIdsRef.current.includes(payload.lobbyId as string)
+              ? (payload.lobbyId as string)
+              : activeLobbyIdRef.current
+            const activeLobbyGame = lobbyListRef.current.find(l => l.name === senderLobbyId)?.gameName
 
             if (existingMsgId) {
               updateChallengeMessage(existingMsgId, {
@@ -687,7 +717,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
               })
             } else {
               playChallengeSound(notifMutedRef.current)
-              addMessageToLobby(activeLobbyIdRef.current, {
+              addMessageToLobby(senderLobbyId, {
                 id: messageId,
                 role: 'challenge',
                 text: `${challengerName} wants to challenge you!`,
@@ -838,6 +868,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
           case 'match-start-error': {
             isHandshakeInProgressRef.current = false
+            wasRankedMatchRef.current = false
             setIsInMatchBoth(false)
             if (typeof payload.opponentId === 'string') sentMatchRequestRef.current.delete(payload.opponentId)
             if (typeof payload.challengerId === 'string') sentMatchRequestRef.current.delete(payload.challengerId)
@@ -1092,7 +1123,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const peer = await initWebRTC(currentUser.uid, targetUid, socket)
       peerConnectionRef.current = peer
       opponentUidRef.current = targetUid
-      await startCall(peer, socket, targetUid, currentUser.uid, true)
+      await startCall(peer, socket, targetUid, currentUser.uid, true, activeLobbyIdRef.current)
     } catch (err) {
       console.error('[v2] Failed to initiate challenge:', err)
       isHandshakeInProgressRef.current = false
@@ -1166,6 +1197,9 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       console.error('[v2] Failed to accept challenge:', err)
       isHandshakeInProgressRef.current = false
       closePeerConnection()
+      if (socket.readyState === WebSocket.OPEN && currentUser.uid) {
+        try { await webrtcDeclineCall(socket, from, currentUser.uid) } catch {}
+      }
     } finally {
       pendingOffersRef.current.delete(messageId)
       pendingByUserRef.current.delete(from)
@@ -1209,6 +1243,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
     isRankQueuedRef.current = isQueue
     setIsRankQueued(isQueue)
+    if (isQueue) rankQueueGameNameRef.current = gameName ?? 'sfiii3nr1'
 
     try {
       socket.send(JSON.stringify({
@@ -1264,6 +1299,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     if (isMock) {
       if (!userRef.current) return
       const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
+      wasRankedMatchRef.current = true
       setIsInMatchBoth(true, MOCK_USER_1.uid)
       console.log(gameName, 'ranked accept')
       try {
@@ -1278,18 +1314,36 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN || !userRef.current) return
     try {
+      wasRankedMatchRef.current = true
       socket.send(JSON.stringify({ type: 'rank-queue-accept', matchId, uid: userRef.current.uid }))
     } catch {}
   }, [clearRankQueuePending, setIsInMatchBoth, declineAllPendingExcept])
 
   const rankQueueDecline = useCallback((matchId: string, isMock?: boolean): void => {
     clearRankQueuePending()
-    if (isMock) return
 
     const socket = socketRef.current
-    if (!socket || socket.readyState !== WebSocket.OPEN || !userRef.current) return
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return
+
+    if (!isMock) {
+      try {
+        socket.send(JSON.stringify({ type: 'rank-queue-decline', matchId, uid: currentUser.uid }))
+      } catch {}
+    }
+
+    isRankQueuedRef.current = true
+    setIsRankQueued(true)
     try {
-      socket.send(JSON.stringify({ type: 'rank-queue-decline', matchId, uid: userRef.current.uid }))
+      socket.send(JSON.stringify({
+        type: 'updateSocketState',
+        data: {
+          uid: currentUser.uid,
+          lobbyId: activeLobbyIdRef.current,
+          stateToUpdate: { key: 'isRankQueued', value: true },
+          rankQueueGameName: rankQueueGameNameRef.current,
+        },
+      }))
     } catch {}
   }, [clearRankQueuePending])
 

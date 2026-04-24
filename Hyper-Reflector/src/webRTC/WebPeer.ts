@@ -65,7 +65,8 @@ export async function startCall(
     signalingSocket: WebSocket,
     to: string,
     from: string,
-    isCaller?: boolean // debug feature
+    isCaller?: boolean, // debug feature
+    lobbyId?: string
 ) {
     if (!isCaller) return
 
@@ -81,6 +82,7 @@ export async function startCall(
                 to,
                 from,
                 offer,
+                lobbyId,
             })
         )
     }
