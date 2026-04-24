@@ -13,6 +13,19 @@ import {
   closeConnectionWithUser,
 } from '../../webRTC/WebPeer'
 import { isMockUserId, startMockMatch, startProxyMatch } from '../match'
+import api from '../../external-api/requests'
+import { auth } from '../../utils/firebase'
+import { isTauriEnv } from '../../utils/pathSettings'
+import {
+  readMatchCommandFile,
+  clearMatchCommandFile,
+  readMatchStatsFile,
+  clearMatchStatsFile,
+} from '../../utils/matchFiles'
+import { parseMatchData } from '../../utils/matchParser'
+import { buildCondensedMatchPayload } from '../../utils/matchUtils'
+
+
 
 const DEFAULT_LOBBY_ID = 'Hyper Reflector'
 const MAX_MESSAGES = 50
@@ -202,6 +215,12 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const outgoingChallengeStatusMsgRef = useRef(new Map<string, string>())
   const rankQueuePendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const rankQueueGameNameRef = useRef<string>('sfiii3nr1')
+
+  // Match tracking for hyper_track_match file polling
+  const activeMatchIdRef = useRef<string | null>(null)
+  const localPlayerSlotRef = useRef<0 | 1>(0)
+  const lastMatchUuidRef = useRef<string | null>(null)
+  const matchUploadPendingRef = useRef(false)
   const wasRankedMatchRef = useRef(false)
 
   // Keep refs in sync
@@ -847,6 +866,8 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
             // Clear any pending ranked match popup now that the match is starting
             clearRankQueuePending()
             isHandshakeInProgressRef.current = false
+            activeMatchIdRef.current = matchId
+            localPlayerSlotRef.current = playerSlot
             setIsInMatchBoth(true, opponentUid)
             try {
               await startProxyMatch({ matchId, opponentUid, playerSlot, serverHost, serverPort, gameName })
@@ -1103,9 +1124,12 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const gameName = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName ?? null
       console.log('current lobby game name', gameName)
       const mockUser = getMockUser(targetUid)
+      const mockMatchId = `mock-${Date.now()}`
+      activeMatchIdRef.current = mockMatchId
+      localPlayerSlotRef.current = 0
       setIsInMatchBoth(true, targetUid)
       try {
-        await startMockMatch({ matchId: `mock-${Date.now()}`, opponentName: mockUser?.userName ?? 'Bot', gameName, playerSlot: 0 })
+        await startMockMatch({ matchId: mockMatchId, opponentName: mockUser?.userName ?? 'Bot', gameName, playerSlot: 0 })
       } catch (err) {
         console.error('[v2] Failed to start mock match:', err)
         setIsInMatchBoth(false)
@@ -1123,6 +1147,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const peer = await initWebRTC(currentUser.uid, targetUid, socket)
       peerConnectionRef.current = peer
       opponentUidRef.current = targetUid
+      localPlayerSlotRef.current = 0
       await startCall(peer, socket, targetUid, currentUser.uid, true, activeLobbyIdRef.current)
     } catch (err) {
       console.error('[v2] Failed to initiate challenge:', err)
@@ -1150,6 +1175,8 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const mockUser = getMockUser(from)
       const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
       console.log(gameName, 'on accept')
+      activeMatchIdRef.current = messageId
+      localPlayerSlotRef.current = 1
       setIsInMatchBoth(true, from)
       try {
         await startMockMatch({ matchId: messageId, opponentName: mockUser?.userName ?? 'Bot', gameName, playerSlot: 1 })
@@ -1183,6 +1210,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const peer = await initWebRTC(currentUser.uid, from, socket)
       peerConnectionRef.current = peer
       opponentUidRef.current = from
+      localPlayerSlotRef.current = 1
 
       await peer.setRemoteDescription(new RTCSessionDescription(offer))
 
@@ -1300,6 +1328,8 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       if (!userRef.current) return
       const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
       wasRankedMatchRef.current = true
+      activeMatchIdRef.current = matchId
+      localPlayerSlotRef.current = 0
       setIsInMatchBoth(true, MOCK_USER_1.uid)
       console.log(gameName, 'ranked accept')
       try {
@@ -1405,6 +1435,94 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   // Derived: active-tab slice
   const lobbyUsers = allLobbyUsers[activeLobbyId] ?? []
   const messages = allLobbyMessages[activeLobbyId] ?? []
+
+  const handleMatchStats = useCallback(async (rawData: string) => {
+    if (!rawData?.trim()) return
+    matchUploadPendingRef.current = true
+    try {
+      const parsed = parseMatchData(rawData)
+      if (!parsed) return
+
+      const pickValue = (entry: unknown): string | number | undefined => {
+        if (Array.isArray(entry)) {
+          const last = entry[entry.length - 1]
+          return typeof last === 'string' || typeof last === 'number' ? last : undefined
+        }
+        return typeof entry === 'string' || typeof entry === 'number' ? entry : undefined
+      }
+
+      const rawMatchUuid = pickValue(parsed['match-uuid'])
+      const matchUuid = rawMatchUuid !== undefined ? String(rawMatchUuid) : undefined
+      if (matchUuid && lastMatchUuidRef.current === matchUuid) return
+      if (matchUuid) lastMatchUuidRef.current = matchUuid
+
+      const viewer = userRef.current
+      if (!viewer?.uid || !auth.currentUser) return
+
+      const opponentUid = opponentUidRef.current
+      const isPlayerOne = localPlayerSlotRef.current === 0
+      const involvesMockOpponent = opponentUid ? isMockUserId(opponentUid) : false
+      if (!isPlayerOne && opponentUid && !involvesMockOpponent) {
+        console.info('[match-tracker] skipping upload — not the designated uploader')
+        return
+      }
+
+      const resolvedOpponentUid = opponentUid || 'unknown-opponent'
+      const matchId = activeMatchIdRef.current || matchUuid || `local-${viewer.uid}-${Date.now()}`
+
+      const condensed = buildCondensedMatchPayload(parsed)
+      await api.uploadMatchData(auth, {
+        matchId,
+        player1: isPlayerOne ? viewer.uid : resolvedOpponentUid,
+        player2: isPlayerOne ? resolvedOpponentUid : viewer.uid,
+        matchData: { raw: JSON.stringify(condensed) },
+      })
+    } catch (error) {
+      console.error('[match-tracker] Failed to upload match data', error)
+    } finally {
+      matchUploadPendingRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isTauriEnv()) return
+
+    let cancelled = false
+    let busy = false
+
+    const poll = async () => {
+      if (cancelled || busy || matchUploadPendingRef.current) return
+      busy = true
+      try {
+        const command = await readMatchCommandFile()
+        if (!command?.trim()) return
+        await clearMatchCommandFile()
+        if (!command.toLowerCase().includes('read-tracking-file')) return
+
+        const { winSound, winSoundPath } = useSettingsStore.getState()
+        if (winSound && winSoundPath) {
+          invoke('play_sound', { path: winSoundPath }).catch(() => {})
+        }
+
+        const rawStats = await readMatchStatsFile()
+        await clearMatchStatsFile()
+        if (rawStats?.trim()) {
+          console.info('[match-tracker] received stats payload; uploading…')
+          await handleMatchStats(rawStats)
+        }
+      } catch (error) {
+        console.error('[match-tracker] Failed to process match tracking data', error)
+      } finally {
+        busy = false
+      }
+    }
+
+    const intervalId = window.setInterval(() => { void poll() }, 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [handleMatchStats, userRef.current?.uid])
 
   const isReconnecting = status === 'disconnected' && reconnectAttemptRef.current > 0
 
