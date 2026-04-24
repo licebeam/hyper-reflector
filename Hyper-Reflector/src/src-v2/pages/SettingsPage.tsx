@@ -372,7 +372,7 @@ export function SettingsPage({ user, onLogout }: SettingsPageProps) {
       const store = useSettingsStore as typeof useSettingsStore & {
         persist?: { clearStorage?: () => void };
       };
-      store.persist?.clearStorage?.();
+      await store.persist?.clearStorage?.();
       window.location.reload();
     } catch {
       window.location.reload();
