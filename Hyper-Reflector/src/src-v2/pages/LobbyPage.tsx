@@ -36,6 +36,8 @@ export function LobbyPage({
         <ChatPanel
           messages={messages}
           currentUserUid={currentUser?.uid}
+          currentUserName={currentUser?.userName}
+          users={lobbyUsers}
           lobbyGame={lobbyGame}
           lobbyPassword={lobbyPassword}
           onSend={onSendMessage}

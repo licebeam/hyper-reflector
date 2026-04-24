@@ -45,6 +45,7 @@ type SortableTabProps = {
   lobbyId: string;
   isActive: boolean;
   isPrivate: boolean;
+  hasUnread: boolean;
   onSelect: () => void;
   onClose: () => void;
 };
@@ -53,6 +54,7 @@ function SortableTab({
   lobbyId,
   isActive,
   isPrivate,
+  hasUnread,
   onSelect,
   onClose,
 }: SortableTabProps) {
@@ -67,6 +69,8 @@ function SortableTab({
     isDragging,
   } = useSortable({ id: lobbyId });
 
+  const showUnread = hasUnread && !isActive && !isDragging;
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -75,8 +79,8 @@ function SortableTab({
       : isActive
         ? "var(--v2-hover)"
         : "color-mix(in srgb, var(--v2-surface) 60%, transparent)",
-    color: isActive || isDragging ? "var(--v2-text)" : "var(--v2-muted)",
-    borderTop: isActive
+    color: isActive || isDragging || showUnread ? "var(--v2-text)" : "var(--v2-muted)",
+    borderTop: isActive || showUnread
       ? "2px solid var(--v2-accent)"
       : "2px solid var(--v2-border)",
     borderLeft: "1px solid var(--v2-border)",
@@ -92,7 +96,7 @@ function SortableTab({
       style={style}
       {...attributes}
       {...listeners}
-      className="group relative flex items-center justify-between gap-1 w-28 shrink-0 px-2.5 h-8.5 rounded-t-md text-xs select-none"
+      className={`group relative flex items-center justify-between gap-1 w-28 shrink-0 px-2.5 h-8.5 rounded-t-md text-xs select-none${showUnread ? " tab-unread" : ""}`}
       title={lobbyId}
       onClick={onSelect}
     >
@@ -338,6 +342,7 @@ type HeaderProps = {
   subscribedLobbyIds: string[];
   privateLobbyIds: string[];
   activeLobbyId: string;
+  allLobbyMessages: Record<string, V2Message[]>;
   onSelectLobby: (id: string) => void;
   onCloseLobby: (id: string) => void;
   onAddLobby: () => void;
@@ -361,6 +366,7 @@ export function Header({
   subscribedLobbyIds,
   privateLobbyIds,
   activeLobbyId,
+  allLobbyMessages,
   onSelectLobby,
   onCloseLobby,
   onAddLobby,
@@ -381,6 +387,28 @@ export function Header({
   const [notifOpen, setNotifOpen] = useState(false);
   const [clearedIds, setClearedIds] = useState<Set<string>>(new Set());
   const bellRef = useRef<HTMLDivElement>(null);
+  const lastSeenCountsRef = useRef<Record<string, number>>({});
+  const [unreadLobbyIds, setUnreadLobbyIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setUnreadLobbyIds((prev) => {
+      const next = new Set(prev);
+      next.delete(activeLobbyId);
+      lastSeenCountsRef.current[activeLobbyId] =
+        allLobbyMessages[activeLobbyId]?.length ?? 0;
+      for (const [lobbyId, msgs] of Object.entries(allLobbyMessages)) {
+        if (lobbyId === activeLobbyId) continue;
+        if (!(lobbyId in lastSeenCountsRef.current)) {
+          lastSeenCountsRef.current[lobbyId] = msgs.length;
+          continue;
+        }
+        if (msgs.length > lastSeenCountsRef.current[lobbyId]) {
+          next.add(lobbyId);
+        }
+      }
+      return next;
+    });
+  }, [allLobbyMessages, activeLobbyId]);
 
   const switchTo = (version: string) => {
     localStorage.setItem("appVersion", version);
@@ -433,6 +461,7 @@ export function Header({
                 lobbyId={lobbyId}
                 isActive={lobbyId === activeLobbyId}
                 isPrivate={privateLobbyIds.includes(lobbyId)}
+                hasUnread={unreadLobbyIds.has(lobbyId)}
                 onSelect={() => onSelectLobby(lobbyId)}
                 onClose={() => onCloseLobby(lobbyId)}
               />
@@ -511,23 +540,28 @@ export function Header({
               if (!isInMatch) onToggleRankQueued(!isQueued);
             }}
             disabled={!!isInMatch}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded font-medium transition-colors whitespace-nowrap"
+            className={`flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded font-medium transition-colors whitespace-nowrap${isQueued ? ' rank-queue-searching' : ''}`}
             style={{
-              background: isInMatch ? "var(--v2-hover)" : "var(--v2-accent)",
+              background: isInMatch ? "var(--v2-hover)" : isQueued ? undefined : "var(--v2-accent)",
               color: isInMatch ? "var(--v2-muted)" : "var(--v2-accent-fg)",
               cursor: isInMatch ? "not-allowed" : "pointer",
               opacity: isInMatch ? 0.5 : 1,
             }}
             onMouseEnter={(e) => {
-              if (!isInMatch) e.currentTarget.style.background = "var(--v2-accent-hover)";
+              if (!isInMatch && !isQueued) e.currentTarget.style.background = "var(--v2-accent-hover)";
             }}
             onMouseLeave={(e) => {
-              if (!isInMatch) e.currentTarget.style.background = "var(--v2-accent)";
+              if (!isInMatch && !isQueued) e.currentTarget.style.background = "var(--v2-accent)";
             }}
             title={isInMatch ? "Cannot queue while in a match" : undefined}
           >
             <Swords size={13} />
-            {isQueued ? "Searching..." : "Ranked Queue"}
+            <span className="relative inline-flex">
+              <span className="invisible">Ranked Queue</span>
+              <span className="absolute inset-0 flex items-center justify-center">
+                {isQueued ? "Searching..." : "Ranked Queue"}
+              </span>
+            </span>
           </button>
         </div>
       </div>

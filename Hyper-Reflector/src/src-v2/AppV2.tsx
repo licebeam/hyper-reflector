@@ -109,7 +109,7 @@ function RankQueuePopup({ data, onAccept, onDecline }: RankQueuePopupProps) {
       style={{ background: "rgba(0,0,0,0.6)" }}
     >
       <div
-        className="w-120 rounded-xl shadow-2xl border overflow-hidden"
+        className="w-120 rounded-xl shadow-2xl border overflow-hidden rank-popup-enter"
         style={{
           background: "var(--v2-surface)",
           borderColor: "var(--v2-border)",
@@ -453,6 +453,7 @@ function AppV2Inner() {
               subscribedLobbyIds={subscribedLobbyIds}
               privateLobbyIds={lobbyList.filter(l => l.isPrivate).map(l => l.name)}
               activeLobbyId={activeLobbyId}
+              allLobbyMessages={allLobbyMessages}
               onSelectLobby={(id) => {
                 setActiveLobbyId(id);
                 setPage("lobby");

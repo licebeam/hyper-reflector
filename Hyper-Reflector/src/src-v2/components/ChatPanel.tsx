@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Swords, Check, X, Eye, EyeOff } from "lucide-react";
-import type { V2Message } from "../types";
+import type { V2Message, V2User } from "../types";
 import { GAMES, getGameName } from "../games";
 
 const MAX_LENGTH = 120;
@@ -9,6 +9,29 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
+  });
+}
+
+function renderText(text: string, currentUserName?: string) {
+  const parts = text.split(/(@\S+)/g);
+  return parts.map((part, i) => {
+    if (!part.startsWith("@")) return part;
+    const name = part.slice(1);
+    const isSelf =
+      currentUserName && name.toLowerCase() === currentUserName.toLowerCase();
+    return (
+      <span
+        key={i}
+        className={isSelf ? "font-semibold" : ""}
+        style={{
+          color: isSelf
+            ? "var(--v2-accent)"
+            : "color-mix(in srgb, var(--v2-accent) 75%, var(--v2-text))",
+        }}
+      >
+        {part}
+      </span>
+    );
   });
 }
 
@@ -54,46 +77,35 @@ function ChallengeMessage({
             {getGameName(msg.challengeGameName)}
           </span>
         )}
-        <span className="text-xs ml-2" style={{ color: "var(--v2-muted)" }}>
-          {formatTime(msg.timeStamp)}
-        </span>
-
-        {isResolved ? (
-          <div className="mt-1">
-            <span
-              className="text-[10px] font-medium px-1.5 py-0.5 rounded"
-              style={{
-                background: msg.challengeStatus === "accepted" ? "#34d39922" : "#f8717122",
-                color: msg.challengeStatus === "accepted" ? "#34d399" : "#f87171",
-              }}
-            >
-              {msg.challengeStatus === "accepted" ? "Accepted" : "Declined"}
-              {msg.challengeResponder ? ` by ${msg.challengeResponder}` : ""}
-            </span>
-          </div>
-        ) : isRecipient ? (
-          <div className="flex gap-1.5 mt-1.5">
+        {isRecipient && !isResolved && (
+          <div className="flex gap-2 mt-1.5">
             <button
               onClick={() => onAccept(msg.id)}
-              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium transition-colors"
+              className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium transition-opacity hover:opacity-80"
               style={{ background: "#34d399", color: "#000" }}
             >
-              <Check size={10} /> Accept
+              <Check size={11} /> Accept
             </button>
             <button
               onClick={() => onDecline(msg.id)}
-              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium transition-colors"
-              style={{ background: "var(--v2-hover)", color: "var(--v2-muted)", border: "1px solid var(--v2-border)" }}
+              className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium border transition-opacity hover:opacity-80"
+              style={{
+                background: "var(--v2-hover)",
+                color: "var(--v2-muted)",
+                borderColor: "var(--v2-border)",
+              }}
             >
-              <X size={10} /> Decline
+              <X size={11} /> Decline
             </button>
           </div>
-        ) : (
-          <div className="mt-1">
-            <span className="text-[10px] animate-pulse" style={{ color: "var(--v2-muted)" }}>
-              Waiting for response…
-            </span>
-          </div>
+        )}
+        {isResolved && (
+          <span
+            className="text-[10px] ml-2"
+            style={{ color: "var(--v2-muted)" }}
+          >
+            {msg.challengeStatus === "accepted" ? "Accepted" : "Declined"}
+          </span>
         )}
       </div>
     </div>
@@ -105,6 +117,8 @@ function ChallengeMessage({
 type ChatPanelProps = {
   messages: V2Message[];
   currentUserUid?: string;
+  currentUserName?: string;
+  users?: V2User[];
   lobbyGame?: string;
   lobbyPassword?: string;
   onSend: (text: string) => boolean;
@@ -116,6 +130,8 @@ type ChatPanelProps = {
 export function ChatPanel({
   messages,
   currentUserUid,
+  currentUserName,
+  users,
   lobbyGame,
   lobbyPassword,
   onSend,
@@ -125,19 +141,80 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIdx, setMentionIdx] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const mentionCandidates = mentionQuery !== null && users
+    ? users.filter(
+        (u) =>
+          u.uid !== currentUserUid &&
+          u.userName.toLowerCase().startsWith(mentionQuery.toLowerCase()),
+      )
+    : [];
+
+  const getMentionQuery = (text: string, cursor: number): string | null => {
+    const before = text.slice(0, cursor);
+    const match = before.match(/@(\S*)$/);
+    return match ? match[1] : null;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setInput(val);
+    const cursor = e.target.selectionStart ?? val.length;
+    const query = getMentionQuery(val, cursor);
+    setMentionQuery(query);
+    setMentionIdx(0);
+  };
+
+  const selectMention = (userName: string) => {
+    const cursor = inputRef.current?.selectionStart ?? input.length;
+    const before = input.slice(0, cursor);
+    const after = input.slice(cursor);
+    const replaced = before.replace(/@\S*$/, `@${userName} `);
+    setInput(replaced + after);
+    setMentionQuery(null);
+    setMentionIdx(0);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
   const handleSend = () => {
     const text = input.trim();
     if (!text) return;
-    if (onSend(text)) setInput("");
+    if (onSend(text)) {
+      setInput("");
+      setMentionQuery(null);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mentionCandidates.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionIdx((i) => (i + 1) % mentionCandidates.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionIdx((i) => (i - 1 + mentionCandidates.length) % mentionCandidates.length);
+        return;
+      }
+      if (e.key === "Tab" || e.key === "Enter") {
+        e.preventDefault();
+        selectMention(mentionCandidates[mentionIdx].userName);
+        return;
+      }
+      if (e.key === "Escape") {
+        setMentionQuery(null);
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -213,7 +290,7 @@ export function ChatPanel({
                   className="text-sm ml-2 wrap-break-word"
                   style={{ color: "var(--v2-chat-msg)", wordBreak: "break-word", overflowWrap: "anywhere" }}
                 >
-                  {msg.text}
+                  {renderText(msg.text, currentUserName)}
                 </span>
               </div>
             )}
@@ -240,36 +317,64 @@ export function ChatPanel({
 
       {/* Input bar */}
       <div
-        className="border-t p-3 flex flex-col gap-1.5 shrink-0"
+        className="border-t p-3 flex flex-col gap-1.5 shrink-0 relative"
         style={{ borderColor: "var(--v2-border)" }}
       >
+        {/* @ mention dropdown */}
+        {mentionCandidates.length > 0 && (
+          <div
+            className="absolute left-3 right-3 bottom-full mb-1 rounded-lg border overflow-hidden shadow-lg"
+            style={{ background: "var(--v2-surface)", borderColor: "var(--v2-border)" }}
+          >
+            {mentionCandidates.slice(0, 6).map((u, i) => (
+              <button
+                key={u.uid}
+                onMouseDown={(e) => { e.preventDefault(); selectMention(u.userName); }}
+                className="w-full text-left px-3 py-1.5 text-sm transition-colors"
+                style={{
+                  background: i === mentionIdx ? "var(--v2-hover)" : "transparent",
+                  color: "var(--v2-text)",
+                }}
+                onMouseEnter={() => setMentionIdx(i)}
+              >
+                <span className="font-medium" style={{ color: "var(--v2-accent)" }}>@</span>
+                {u.userName}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-2">
-        <input
-          type="text"
-          value={input}
-          maxLength={MAX_LENGTH}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
-          className="flex-1 rounded px-3 py-1.5 text-sm border outline-none transition-colors"
-          style={{
-            background: "var(--v2-hover)",
-            borderColor: "var(--v2-border)",
-            color: "var(--v2-text)",
-          }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--v2-accent)")}
-          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--v2-border)")}
-        />
-        <button
-          onClick={handleSend}
-          disabled={!input.trim()}
-          className="px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ background: "var(--v2-accent)", color: "var(--v2-accent-fg)" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "var(--v2-accent-hover)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "var(--v2-accent)")}
-        >
-          <Send size={14} />
-        </button>
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            maxLength={MAX_LENGTH}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder="Type a message..."
+            className="flex-1 rounded px-3 py-1.5 text-sm border outline-none transition-colors"
+            style={{
+              background: "var(--v2-hover)",
+              borderColor: "var(--v2-border)",
+              color: "var(--v2-text)",
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--v2-accent)")}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "var(--v2-border)";
+              setTimeout(() => setMentionQuery(null), 150);
+            }}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim()}
+            className="px-3 py-1.5 rounded text-sm flex items-center gap-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: "var(--v2-accent)", color: "var(--v2-accent-fg)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--v2-accent-hover)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--v2-accent)")}
+          >
+            <Send size={14} />
+          </button>
         </div>
         {input.length > MAX_LENGTH * 0.8 && (
           <p
