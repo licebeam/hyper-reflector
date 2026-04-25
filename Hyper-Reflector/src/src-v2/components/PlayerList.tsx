@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Coffee, Swords, User } from "lucide-react";
+import { Coffee, Flame, Swords, User } from "lucide-react";
+
+function streakGlowStyle(streak: number): React.CSSProperties {
+  if (streak <= 0) return {};
+  const t = Math.min(streak, 10) / 10; // 0→1
+  const alpha = Math.round(t * 180).toString(16).padStart(2, "0");
+  const spread = 4 + t * 18;
+  return {
+    boxShadow: `inset 0 0 ${spread}px #f97316${alpha}, inset 2px 0 0 #f97316${Math.round(t * 255).toString(16).padStart(2, "0")}`,
+  };
+}
 import type { V2User } from "../types";
 import { CountryFlag } from "./CountryFlag";
 import { UserTitle } from "./UserTitle";
@@ -112,6 +122,8 @@ type RowProps = {
   onChallenge?: (uid: string) => void;
   currentUser?: V2User | null;
   challengeDisabled?: boolean;
+  showStreak?: boolean;
+  measuringUids?: ReadonlySet<string>;
 };
 
 function PlayerRow({
@@ -121,6 +133,8 @@ function PlayerRow({
   onChallenge,
   currentUser,
   challengeDisabled,
+  showStreak,
+  measuringUids,
 }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const expanded = hovered;
@@ -131,12 +145,15 @@ function PlayerRow({
     ping === 0 ? "< 1 ms" : pingMs !== null ? `${pingMs} ms` : null;
   const pColor = pingColor(ping, isUnstable);
 
+  const streak = showStreak ? (user.winStreak ?? 0) : 0;
+
   return (
     <div
-      className="flex items-start gap-2.5 px-3 py-3 border-b transition-colors"
+      className="relative flex items-start gap-2.5 px-3 py-3 border-b transition-colors"
       style={{
         background: hovered ? "var(--v2-hover)" : "transparent",
         borderColor: "var(--v2-border)",
+        ...streakGlowStyle(streak),
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -183,6 +200,13 @@ function PlayerRow({
                   isUnstable={isUnstable}
                   color={pColor}
                 />
+              ) : measuringUids?.has(user.uid) ? (
+                <span
+                  className="text-[10px] animate-pulse"
+                  style={{ color: "var(--v2-muted)" }}
+                >
+                  estimating
+                </span>
               ) : (
                 <span
                   className="text-[10px]"
@@ -213,6 +237,15 @@ function PlayerRow({
                 >
                   {user.accountElo} ELO
                 </span>
+                {streak > 0 && (
+                  <span
+                    className="flex items-center gap-0.5 text-[10px] font-semibold"
+                    style={{ color: "#f97316" }}
+                  >
+                    <Flame size={10} strokeWidth={2.5} />
+                    {streak} streak
+                  </span>
+                )}
               </div>
 
               {/* Action buttons for other players */}
@@ -353,21 +386,28 @@ function AfkRow({ user }: { user: V2User }) {
 
 // ── List ───────────────────────────────────────────────────────────────────────
 
+const STREAK_GAME = 'sfiii3nr1'
+
 type PlayerListProps = {
   users: V2User[];
   currentUser?: V2User | null;
+  lobbyGame?: string;
   onViewProfile?: (uid: string) => void;
   onChallenge?: (uid: string) => void;
   challengeDisabled?: boolean;
+  measuringUids?: ReadonlySet<string>;
 };
 
 export function PlayerList({
   users,
   currentUser,
+  lobbyGame,
   onViewProfile,
   onChallenge,
   challengeDisabled,
+  measuringUids,
 }: PlayerListProps) {
+  const showStreak = !lobbyGame || lobbyGame === STREAK_GAME
   const available: V2User[] = [];
   const inMatchRaw: V2User[] = [];
   const afk: V2User[] = [];
@@ -441,6 +481,8 @@ export function PlayerList({
               onChallenge={!isSelf ? onChallenge : undefined}
               currentUser={currentUser}
               challengeDisabled={challengeDisabled}
+              showStreak={showStreak}
+              measuringUids={measuringUids}
             />
           );
         })}
