@@ -24,6 +24,7 @@ import {
 } from '../../utils/matchFiles'
 import { parseMatchData } from '../../utils/matchParser'
 import { buildCondensedMatchPayload } from '../../utils/matchUtils'
+import { peerLatencyManager } from '../../webRTC/peerLatencyManager'
 
 
 
@@ -47,6 +48,8 @@ const MOCK_USER_1: V2User = {
   gravEmail: '',
   userEmail: 'mock@hyper-reflector.test',
   isRankQueued: false,
+  winStreak: 99,
+  longestWinStreak: 99,
 }
 
 const MOCK_USER_2: V2User = {
@@ -110,6 +113,8 @@ function normalizeUser(data: any): V2User | null {
     isRankQueued: data.isRankQueued === true,
     isAfk: data.isAfk === true,
     currentMatchId: typeof data.currentMatchId === 'string' && data.currentMatchId ? data.currentMatchId : undefined,
+    winStreak: typeof data.winStreak === 'number' ? data.winStreak : undefined,
+    longestWinStreak: typeof data.longestWinStreak === 'number' ? data.longestWinStreak : undefined,
   }
 }
 
@@ -185,6 +190,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const [isRankQueued, setIsRankQueued] = useState(false)
   const isRankQueuedRef = useRef(false)
   const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean }>>([])
+  const [measuringUids, setMeasuringUids] = useState<ReadonlySet<string>>(new Set())
   const [rankQueuePending, setRankQueuePending] = useState<RankQueuePendingData | null>(null)
   const initialPasswords = useRef(loadSavedPasswords())
   const [lobbyPasswords, setLobbyPasswords] = useState<Record<string, string>>(initialPasswords.current)
@@ -226,6 +232,49 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   // Keep refs in sync
   useEffect(() => { userRef.current = user }, [user])
   useEffect(() => { notifMutedRef.current = notifMuted }, [notifMuted])
+
+  // ── Ping measurement wiring ───────────────────────────────────────────────────
+
+  // Set up the callback once — updates lobby user pings when a measurement completes
+  useEffect(() => {
+    peerLatencyManager.onPingRecorded = (targetUid, ping, isUnstable) => {
+      const myUid = userRef.current?.uid
+      setSelfPings(prev => {
+        const filtered = prev.filter(p => p.id !== targetUid)
+        return [...filtered, { id: targetUid, ping, isUnstable }]
+      })
+      if (myUid) {
+        setAllLobbyUsers(prev => {
+          const next: Record<string, V2User[]> = {}
+          for (const [lid, users] of Object.entries(prev)) {
+            next[lid] = users.map(u => {
+              if (u.uid !== myUid) return u
+              const filteredPings = (u.lastKnownPings ?? []).filter(p => p.id !== targetUid)
+              return { ...u, lastKnownPings: [...filteredPings, { id: targetUid, ping, isUnstable }] }
+            })
+          }
+          allLobbyUsersRef.current = next
+          return next
+        })
+      }
+    }
+    peerLatencyManager.onMeasuringChanged = (uid, measuring) => {
+      setMeasuringUids(prev => {
+        const next = new Set(prev)
+        if (measuring) next.add(uid)
+        else next.delete(uid)
+        return next
+      })
+    }
+    return () => {
+      peerLatencyManager.onPingRecorded = undefined
+      peerLatencyManager.onMeasuringChanged = undefined
+    }
+  }, [])
+
+  // Sync viewer, peers, and match status into the manager
+  useEffect(() => { peerLatencyManager.setViewer(user as any) }, [user])
+  useEffect(() => { peerLatencyManager.setInMatch(isInMatch) }, [isInMatch])
 
   // Persist subscribed lobbies and passwords to localStorage whenever they change
   useEffect(() => {
@@ -426,6 +475,8 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     const url = `ws://${keys.COTURN_IP}:${keys.SIGNAL_PORT ?? '3004'}`
     const socket = new WebSocket(url)
     socketRef.current = socket
+
+    peerLatencyManager.attachSocket(socket)
 
     socket.onopen = () => {
       // Successful connection — clear reconnect state
@@ -897,6 +948,13 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
             break
           }
 
+          case 'peer-latency-offer':
+          case 'peer-latency-answer':
+          case 'peer-latency-candidate':
+          case 'peer-latency-decline':
+            peerLatencyManager.handleSignal(payload)
+            break
+
           default:
             break
         }
@@ -913,6 +971,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       }
       socket.close()
       if (socketRef.current === socket) socketRef.current = null
+      peerLatencyManager.attachSocket(null)
     }
   }, [user?.uid, reconnectTick, setLobbyUsersForId, addMessageToLobby, setActiveLobbyIdBoth, setIsInMatchBoth, closePeerConnection, addSystemMessage, updateChallengeMessage, clearRankQueuePending, resolveUserNameForUid])
 
@@ -1436,6 +1495,11 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const lobbyUsers = allLobbyUsers[activeLobbyId] ?? []
   const messages = allLobbyMessages[activeLobbyId] ?? []
 
+  // Keep peerLatencyManager peers in sync with the active lobby
+  useEffect(() => {
+    peerLatencyManager.setPeers(lobbyUsers as any)
+  }, [lobbyUsers])
+
   const handleMatchStats = useCallback(async (rawData: string) => {
     if (!rawData?.trim()) return
     matchUploadPendingRef.current = true
@@ -1494,6 +1558,10 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       if (cancelled || busy || matchUploadPendingRef.current) return
       busy = true
       try {
+        const activeLobby = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)
+        const gameRom = activeLobby?.gameName ?? 'sfiii3nr1'
+        if (gameRom !== 'sfiii3nr1') return
+
         const command = await readMatchCommandFile()
         if (!command?.trim()) return
         await clearMatchCommandFile()
@@ -1559,5 +1627,6 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     lobbyPasswords,
     lobbyJoinError,
     clearLobbyJoinError: () => setLobbyJoinError(null),
+    measuringUids,
   }
 }

@@ -21,6 +21,8 @@ export type V2User = {
   isRankQueued: boolean
   isAfk?: boolean
   currentMatchId?: string
+  winStreak?: number
+  longestWinStreak?: number
 }
 
 export type V2Message = {

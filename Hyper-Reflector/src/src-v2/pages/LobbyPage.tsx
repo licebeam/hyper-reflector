@@ -14,6 +14,7 @@ type LobbyPageProps = {
   onAcceptChallenge?: (messageId: string) => void;
   onDeclineChallenge?: (messageId: string) => void;
   challengeDisabled?: boolean;
+  measuringUids?: ReadonlySet<string>;
 };
 
 export function LobbyPage({
@@ -28,6 +29,7 @@ export function LobbyPage({
   onAcceptChallenge,
   onDeclineChallenge,
   challengeDisabled,
+  measuringUids,
 }: LobbyPageProps) {
   return (
     <div className="flex h-full overflow-hidden">
@@ -51,9 +53,11 @@ export function LobbyPage({
         <PlayerList
           users={lobbyUsers}
           currentUser={currentUser}
+          lobbyGame={lobbyGame}
           onViewProfile={onViewProfile}
           onChallenge={onChallenge}
           challengeDisabled={challengeDisabled}
+          measuringUids={measuringUids}
         />
       </div>
     </div>

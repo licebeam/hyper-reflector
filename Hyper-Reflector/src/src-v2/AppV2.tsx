@@ -48,6 +48,8 @@ function mapToV2User(data: any, fallbackEmail?: string | null): V2User {
     gravEmail: data.gravEmail || "",
     userEmail: data.userEmail || fallbackEmail || "",
     isRankQueued: false,
+    winStreak: typeof data.winStreak === "number" ? data.winStreak : undefined,
+    longestWinStreak: typeof data.longestWinStreak === "number" ? data.longestWinStreak : undefined,
   };
 }
 
@@ -214,6 +216,7 @@ function AppV2Inner() {
     setActiveLobbyId,
     lobbyList,
     selfPings,
+    measuringUids,
     isInMatch,
     isRankQueued,
     rankQueuePending,
@@ -510,6 +513,7 @@ function AppV2Inner() {
                   challengeDisabled={isInMatch || isRankQueued}
                   onAcceptChallenge={handleAcceptChallenge}
                   onDeclineChallenge={handleDeclineChallenge}
+                  measuringUids={measuringUids}
                 />
               )}
               {page === "home" && <HomePage currentUser={user} />}
