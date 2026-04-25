@@ -1,7 +1,9 @@
+// @ts-ignore
 import keys from '../private/keys'
 import { useUserStore } from '../state/store'
-import type { TUser } from '../types/user'
-import { isMockUserId } from '../match'
+import { isMockUserId } from '../src-v2/match'
+
+type TUser = { uid: string; countryCode?: string; isAfk?: boolean; currentMatchId?: string; userName?: string; userEmail?: string; [key: string]: any }
 
 const ICE_SERVERS: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -30,8 +32,8 @@ type MeasurementSession = {
     samples: number[]
     sentCount: number
     pendingCandidates: RTCIceCandidateInit[]
-    timeoutHandle?: ReturnType<typeof setTimeout>
-    completionHandle?: ReturnType<typeof setTimeout>
+    timeoutHandle?: number
+    completionHandle?: number
     startedAt: number
 }
 
@@ -54,7 +56,7 @@ class PeerLatencyManager {
     private measuringTargets = new Set<string>()                      // targetUid → in-progress
     private sessions = new Map<string, MeasurementSession>()
     private lastMeasured = new Map<string, number>()
-    private schedulerHandle?: ReturnType<typeof setTimeout>
+    private schedulerHandle?: number
     private inMatch = false
 
     /** Called when a measurement result is ready. Override to skip the v1 user store. */

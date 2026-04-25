@@ -520,7 +520,17 @@ function AppV2Inner() {
               {page === "lab" && <LabPage />}
               {page === "data" && <DataPage />}
               {page === "settings" && user && (
-                <SettingsPage user={user} onLogout={handleLogout} />
+                <SettingsPage
+                  user={user}
+                  onLogout={handleLogout}
+                  onUpdateUser={(patch) => {
+                    setUser((prev) => {
+                      const next = prev ? { ...prev, ...patch } : prev;
+                      if (next) pushProfileUpdate(next);
+                      return next;
+                    });
+                  }}
+                />
               )}
               {page === "profiles" &&
                 (viewingProfileId ? (
