@@ -189,7 +189,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const [isInMatch, setIsInMatch] = useState(false)
   const [isRankQueued, setIsRankQueued] = useState(false)
   const isRankQueuedRef = useRef(false)
-  const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean }>>([])
+  const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean; networkType?: string }>>([])
   const [measuringUids, setMeasuringUids] = useState<ReadonlySet<string>>(new Set())
   const [rankQueuePending, setRankQueuePending] = useState<RankQueuePendingData | null>(null)
   const initialPasswords = useRef(loadSavedPasswords())
@@ -237,11 +237,11 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
   // Set up the callback once — updates lobby user pings when a measurement completes
   useEffect(() => {
-    peerLatencyManager.onPingRecorded = (targetUid, ping, isUnstable) => {
+    peerLatencyManager.onPingRecorded = (targetUid, ping, isUnstable, networkType) => {
       const myUid = userRef.current?.uid
       setSelfPings(prev => {
         const filtered = prev.filter(p => p.id !== targetUid)
-        return [...filtered, { id: targetUid, ping, isUnstable }]
+        return [...filtered, { id: targetUid, ping, isUnstable, networkType }]
       })
       if (myUid) {
         setAllLobbyUsers(prev => {
@@ -250,7 +250,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
             next[lid] = users.map(u => {
               if (u.uid !== myUid) return u
               const filteredPings = (u.lastKnownPings ?? []).filter(p => p.id !== targetUid)
-              return { ...u, lastKnownPings: [...filteredPings, { id: targetUid, ping, isUnstable }] }
+              return { ...u, lastKnownPings: [...filteredPings, { id: targetUid, ping, isUnstable, networkType }] }
             })
           }
           allLobbyUsersRef.current = next
