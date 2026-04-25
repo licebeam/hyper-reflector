@@ -1,7 +1,7 @@
 // @ts-ignore
 import keys from '../private/keys'
 import { useUserStore } from '../state/store'
-import { isMockUserId } from '../src-v2/match'
+import { isMockUserId } from '../match'
 
 type TUser = { uid: string; countryCode?: string; isAfk?: boolean; currentMatchId?: string; userName?: string; userEmail?: string; [key: string]: any }
 
