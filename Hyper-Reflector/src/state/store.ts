@@ -1,9 +1,8 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { TUser } from '../types/user'
-import type { MatchSummary } from '../types/match'
-import { DEFAULT_THEME_ID, getThemeById } from '../theme/registry'
-import { toThemePreference, type ThemePreference } from '../theme/utils'
+
+type TUser = Record<string, any>
+type MatchSummary = Record<string, any>
 
 export const DEFAULT_LOBBY_ID = 'Hyper Reflector'
 
@@ -36,10 +35,6 @@ type SettingsState = {
     setWinSoundPath: (path: string) => void
     notificationsMuted: boolean
     setNotificationsMuted: (on: boolean) => void
-    darkMode: boolean
-    setDarkMode: (on: boolean) => void
-    theme: ThemePreference
-    setTheme: (t: ThemePreference) => void
     emulatorPath: string
     setEmulatorPath: (path: string) => void
     trainingPath: string
@@ -149,17 +144,6 @@ export const useUserStore = create<UserState>((set) => ({
 }))
 
 
-const defaultTheme = getThemeById(DEFAULT_THEME_ID)
-const defaultThemePreference = toThemePreference(defaultTheme)
-
-const normalizeThemePreference = (pref?: Partial<ThemePreference>): ThemePreference => {
-    if (!pref?.id) {
-        return defaultThemePreference
-    }
-    const definition = getThemeById(pref.id)
-    return toThemePreference(definition)
-}
-
 export const useSettingsStore = create<SettingsState>()(
     persist(
         (set, get) => ({
@@ -181,10 +165,6 @@ export const useSettingsStore = create<SettingsState>()(
             setNotificationsMuted: (on) => set({ notificationsMuted: on }),
             emulatorPath: '',
             setEmulatorPath: (path) => set({ emulatorPath: path }),
-            darkMode: true,
-            setDarkMode: (on) => set({ darkMode: on }),
-            theme: defaultThemePreference,
-            setTheme: (t) => set({ theme: normalizeThemePreference(t) }),
             trainingPath: '',
             trainingPathSource: 'auto',
             setTrainingPath: (path, source = 'auto') => set({ trainingPath: path, trainingPathSource: source }),
@@ -224,17 +204,10 @@ export const useSettingsStore = create<SettingsState>()(
         {
             name: 'settings',
             storage: createJSONStorage(() => localStorage),
-            merge: (persistedState, currentState) => {
-                const persisted = persistedState as Partial<SettingsState> | undefined
-                const next = {
-                    ...currentState,
-                    ...persisted,
-                }
-                next.theme = normalizeThemePreference(persisted?.theme)
-                return next
-            },
-            // optional: only persist selected fields
-            // partialize: (s) => ({ theme: s.theme }),
+            merge: (persistedState, currentState) => ({
+                ...currentState,
+                ...(persistedState as Partial<SettingsState> | undefined),
+            }),
         }
     )
 )

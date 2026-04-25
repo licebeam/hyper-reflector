@@ -1,6 +1,6 @@
 import keys from '../private/keys'
 import { firebaseConfig } from '../private/firebase'
-import type { TUserTitle } from '../types/user'
+type TUserTitle = { title: string; bgColor?: string; border?: string; color?: string; [key: string]: any }
 import { fetch } from '@tauri-apps/plugin-http';
 
 const SERVER = keys.COTURN_IP

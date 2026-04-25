@@ -1,4 +1,4 @@
-import type { TUser } from '../types/user'
+type TUser = { uid?: string; lastKnownPings?: any[]; [key: string]: any }
 
 type PingRecord = {
     id: string
