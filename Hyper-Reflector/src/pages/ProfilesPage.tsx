@@ -7,8 +7,8 @@ import {
   RefreshCcw,
   User,
 } from "lucide-react";
-import api from "../../external-api/requests";
-import { auth } from "../../utils/firebase";
+import api from "../external-api/requests";
+import { auth } from "../utils/firebase";
 import type { V2User } from "../types";
 import { CountryFlag } from "../components/CountryFlag";
 import { UserTitle } from "../components/UserTitle";

@@ -10,10 +10,10 @@ import {
   Volume2,
   VolumeOff,
 } from "lucide-react";
-import { logout } from "../../utils/firebase";
-import { useSettingsStore } from "../../state/store";
+import { logout } from "../utils/firebase";
+import { useSettingsStore } from "../state/store";
 import { useV2Theme } from "../ThemeContext";
-import { applyRomPath, formatRomPathDisplay } from "../../utils/romPaths";
+import { applyRomPath, formatRomPathDisplay } from "../utils/romPaths";
 import {
   THEMES,
   CHAT_MSG_SWATCHES,

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { invoke } from '@tauri-apps/api/core'
-import { useSettingsStore } from '../../state/store'
+import { useSettingsStore } from '../state/store'
 // @ts-ignore
-import keys from '../../private/keys'
+import keys from '../private/keys'
 import type { V2User, V2Message, V2Lobby, ConnectionStatus } from '../types'
 import {
   initWebRTC,
@@ -11,20 +11,20 @@ import {
   answerCall,
   declineCall as webrtcDeclineCall,
   closeConnectionWithUser,
-} from '../../webRTC/WebPeer'
+} from '../webRTC/WebPeer'
 import { isMockUserId, startMockMatch, startProxyMatch } from '../match'
-import api from '../../external-api/requests'
-import { auth } from '../../utils/firebase'
-import { isTauriEnv } from '../../utils/pathSettings'
+import api from '../external-api/requests'
+import { auth } from '../utils/firebase'
+import { isTauriEnv } from '../utils/pathSettings'
 import {
   readMatchCommandFile,
   clearMatchCommandFile,
   readMatchStatsFile,
   clearMatchStatsFile,
-} from '../../utils/matchFiles'
-import { parseMatchData } from '../../utils/matchParser'
-import { buildCondensedMatchPayload } from '../../utils/matchUtils'
-import { peerLatencyManager } from '../../webRTC/peerLatencyManager'
+} from '../utils/matchFiles'
+import { parseMatchData } from '../utils/matchParser'
+import { buildCondensedMatchPayload } from '../utils/matchUtils'
+import { peerLatencyManager } from '../webRTC/peerLatencyManager'
 
 
 

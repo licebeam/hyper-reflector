@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { loginEmail } from '../../utils/firebase'
+import { loginEmail } from '../utils/firebase'
 import type { FirebaseError } from 'firebase/app'
 
 type LoginPageProps = {
