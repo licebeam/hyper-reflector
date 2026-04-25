@@ -58,7 +58,7 @@ class PeerLatencyManager {
     private inMatch = false
 
     /** Called when a measurement result is ready. Override to skip the v1 user store. */
-    onPingRecorded?: (targetUid: string, ping: number, isUnstable: boolean) => void
+    onPingRecorded?: (targetUid: string, ping: number, isUnstable: boolean, networkType?: string) => void
     /** Called when a peer starts or finishes being measured — drives "estimating" UI. */
     onMeasuringChanged?: (uid: string, measuring: boolean) => void
 
@@ -176,7 +176,7 @@ class PeerLatencyManager {
             this.measuringTargets.delete(targetUid)
             this.lastMeasured.set(targetUid, Date.now())
             this.onMeasuringChanged?.(targetUid, false)
-            this.onPingRecorded?.(targetUid, ping, isUnstable)
+            this.onPingRecorded?.(targetUid, ping, isUnstable, undefined)
         }, delay)
     }
 
@@ -411,7 +411,7 @@ class PeerLatencyManager {
     private recordMeasurement(targetUid: string, measurement: { ping: number; isUnstable: boolean; networkType?: string }) {
         this.lastMeasured.set(targetUid, Date.now())
         if (this.onPingRecorded) {
-            this.onPingRecorded(targetUid, measurement.ping, measurement.isUnstable)
+            this.onPingRecorded(targetUid, measurement.ping, measurement.isUnstable, measurement.networkType)
             return
         }
         // v1 fallback: write directly to the global user store

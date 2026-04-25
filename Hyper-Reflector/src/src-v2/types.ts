@@ -13,7 +13,7 @@ export type V2User = {
   accountElo: number
   countryCode: string
   userTitle?: UserTitleData
-  lastKnownPings: Array<{ id: string; ping: number | string; isUnstable?: boolean }>
+  lastKnownPings: Array<{ id: string; ping: number | string; isUnstable?: boolean; networkType?: string }>
   knownAliases: string[]
   userProfilePic: string
   gravEmail: string

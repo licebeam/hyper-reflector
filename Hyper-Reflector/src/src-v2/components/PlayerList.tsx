@@ -16,7 +16,7 @@ import { UserTitle } from "./UserTitle";
 
 // ── Ping helpers ───────────────────────────────────────────────────────────────
 
-type PingResult = { ping: number | null; isUnstable?: boolean };
+type PingResult = { ping: number | null; isUnstable?: boolean; networkType?: string };
 
 function toNum(v: unknown): number | null {
   const n = Number(v);
@@ -29,59 +29,89 @@ function resolvePing(
 ): PingResult {
   if (!viewer || viewer.uid === user.uid) return { ping: null };
   const vr = (viewer.lastKnownPings as any[])?.find((p) => p?.id === user.uid);
-  if (vr) return { ping: toNum(vr.ping), isUnstable: vr.isUnstable };
+  if (vr) return { ping: toNum(vr.ping), isUnstable: vr.isUnstable, networkType: vr.networkType };
   const ur = (user.lastKnownPings as any[])?.find((p) => p?.id === viewer.uid);
-  if (ur) return { ping: toNum(ur.ping), isUnstable: ur.isUnstable };
+  if (ur) return { ping: toNum(ur.ping), isUnstable: ur.isUnstable, networkType: ur.networkType };
   return { ping: null };
 }
 
-function pingColor(ping: number | null, isUnstable?: boolean): string {
-  if (ping === null) return "var(--v2-muted)";
+function pingBarCount(ping: number | null): 0 | 1 | 2 | 3 {
+  if (ping === null) return 0;
+  if (ping <= 60) return 3;
+  if (ping <= 120) return 2;
+  if (ping <= 200) return 1;
+  return 0;
+}
+
+function pingBarColor(bars: 0 | 1 | 2 | 3, isUnstable?: boolean): string {
   if (isUnstable) return "#fb923c";
-  if (ping <= 30) return "#34d399";
-  if (ping <= 80) return "#fbbf24";
-  if (ping <= 150) return "#fb923c";
+  if (bars === 3) return "#34d399";
+  if (bars === 2) return "#fbbf24";
+  if (bars === 1) return "#fb923c";
   return "#f87171";
 }
 
-// ── Ping tooltip ───────────────────────────────────────────────────────────────
+// ── Ping bars ──────────────────────────────────────────────────────────────────
 
-type PingBadgeProps = {
-  pingLabel: string;
+type PingBarsProps = {
+  ping: number | null;
   isUnstable?: boolean;
-  color: string;
+  networkType?: string;
 };
 
-function PingBadge({ pingLabel, isUnstable, color }: PingBadgeProps) {
+function PingBars({ ping, isUnstable, networkType }: PingBarsProps) {
   const [rect, setRect] = useState<DOMRect | null>(null);
-  const label = isUnstable ? `~${pingLabel}` : pingLabel;
-  const tooltipText = isUnstable
-    ? `Unstable connection · ${pingLabel}`
-    : pingLabel;
+  const bars = pingBarCount(ping);
+  const color = pingBarColor(bars, isUnstable);
+  const pingLabel = ping === 0 ? "< 1 ms" : ping !== null ? `${Math.round(ping)} ms` : null;
+
+  const tooltipParts = [
+    pingLabel ?? "No ping data",
+    isUnstable ? "Unstable" : null,
+    networkType ?? null,
+  ].filter(Boolean);
 
   return (
     <span
-      className="relative inline-flex items-center"
+      className="relative inline-flex items-end gap-px cursor-default"
+      style={{ height: 11 }}
       onMouseEnter={(e) => setRect(e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => setRect(null)}
     >
-      <span className="text-[10px]" style={{ color }}>
-        {label}
-      </span>
+      {([1, 2, 3] as const).map((n) => (
+        <span
+          key={n}
+          style={{
+            display: "inline-block",
+            width: 3,
+            height: 3 + n * 2.5,
+            borderRadius: 1,
+            background: n <= bars ? color : "var(--v2-border)",
+            alignSelf: "flex-end",
+          }}
+        />
+      ))}
+      {isUnstable && (
+        <span
+          style={{ fontSize: 8, lineHeight: 1, color: "#fb923c", alignSelf: "flex-end", marginLeft: 1 }}
+        >
+          ~
+        </span>
+      )}
       {rect && (
         <span
           className="fixed px-2 py-1 rounded text-[10px] whitespace-nowrap pointer-events-none z-9999"
           style={{
             top: rect.top - 4,
-            left: rect.left + rect.width / 2,
-            transform: "translate(-50%, -100%)",
+            left: rect.right,
+            transform: "translate(-100%, -100%)",
             background: "var(--v2-surface)",
             color: isUnstable ? "#fb923c" : "var(--v2-text)",
             border: "1px solid var(--v2-border)",
             boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
           }}
         >
-          {tooltipText}
+          {tooltipParts.join(" · ")}
         </span>
       )}
     </span>
@@ -139,11 +169,7 @@ function PlayerRow({
   const [hovered, setHovered] = useState(false);
   const expanded = hovered;
 
-  const { ping, isUnstable } = resolvePing(user, currentUser);
-  const pingMs = ping !== null ? Math.round(ping) : null;
-  const pingLabel =
-    ping === 0 ? "< 1 ms" : pingMs !== null ? `${pingMs} ms` : null;
-  const pColor = pingColor(ping, isUnstable);
+  const { ping, isUnstable, networkType } = resolvePing(user, currentUser);
 
   const streak = showStreak ? (user.winStreak ?? 0) : 0;
 
@@ -194,11 +220,11 @@ function PlayerRow({
             style={{ flexDirection: "row", alignItems: "flex-end" }}
           >
             {!isSelf &&
-              (pingLabel !== null ? (
-                <PingBadge
-                  pingLabel={pingLabel}
+              (ping !== null ? (
+                <PingBars
+                  ping={ping}
                   isUnstable={isUnstable}
-                  color={pColor}
+                  networkType={networkType}
                 />
               ) : measuringUids?.has(user.uid) ? (
                 <span
