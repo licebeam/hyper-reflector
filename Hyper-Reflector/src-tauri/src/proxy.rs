@@ -119,6 +119,7 @@ impl ProxyRuntime {
             opponent: Arc::new(Mutex::new(None)),
             punch_match_id: Arc::new(Mutex::new(None)),
             child: Mutex::new(None),
+            reader_task: Mutex::new(None),
             stop_notify: Arc::new(Notify::new()),
             reader_stop: Arc::new(Notify::new()),
             app,
@@ -129,6 +130,45 @@ impl ProxyRuntime {
 
     async fn get_sock(&self) -> Option<Arc<UdpSocket>> {
         self.punch_sock.lock().await.clone()
+    }
+
+    fn proxy_log(&self, msg: impl Into<String>) {
+        let msg = msg.into();
+        println!("[proxy] {msg}");
+        let _ = self
+            .app
+            .emit_to(EventTarget::any(), "proxy-log", msg);
+    }
+
+    async fn is_udp_port_bindable(port: u16) -> Result<(), String> {
+        if port == 0 {
+            return Err("port=0 is not bindable".to_string());
+        }
+        match UdpSocket::bind(SocketAddr::from((Ipv4Addr::UNSPECIFIED, port))).await {
+            Ok(sock) => {
+                drop(sock);
+                Ok(())
+            }
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    async fn wait_for_udp_port_free(&self, port: u16, timeout: Duration) -> Result<(), String> {
+        let deadline = tokio::time::Instant::now() + timeout;
+        let mut attempts: u32 = 0;
+
+        loop {
+            attempts += 1;
+            match Self::is_udp_port_bindable(port).await {
+                Ok(()) => return Ok(()),
+                Err(err) => {
+                    if tokio::time::Instant::now() >= deadline {
+                        return Err(format!("{err} (after {attempts} attempts)"));
+                    }
+                }
+            }
+            sleep(Duration::from_millis(100)).await;
+        }
     }
 
     async fn start(self: &Arc<Self>) -> anyhow::Result<()> {
@@ -148,7 +188,7 @@ impl ProxyRuntime {
         let stop_notify = Arc::clone(&self.stop_notify);
         let reader_stop = Arc::clone(&self.reader_stop);
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             let mut buf = vec![0u8; 65535];
             loop {
                 tokio::select! {
@@ -162,11 +202,7 @@ impl ProxyRuntime {
                                 this.process_server_packet(&buf[..n]).await;
                             }
                             Err(_) => {
-                                let _ = this.app.emit_to(
-                                    EventTarget::any(),
-                                    "proxy-log",
-                                    "punch socket recv error".to_string(),
-                                );
+                                this.proxy_log("punch socket recv error");
                                 break;
                             }
                         }
@@ -174,6 +210,8 @@ impl ProxyRuntime {
                 }
             }
         });
+
+        *self.reader_task.lock().await = Some(handle);
 
         Ok(())
     }
@@ -223,6 +261,14 @@ impl ProxyRuntime {
         })?;
         let server_addr: SocketAddr =
             format!("{}:{}", self.args.server_host, self.args.server_port).parse()?;
+
+        let local = sock
+            .local_addr()
+            .map(|a| a.to_string())
+            .unwrap_or_else(|_| "?".to_string());
+        self.proxy_log(format!(
+            "Holepunch -> server {server_addr} (local {local}, kill={kill})"
+        ));
         sock.send_to(&msg, server_addr).await?;
         Ok(())
     }
@@ -236,12 +282,35 @@ impl ProxyRuntime {
             }
         }
 
-        if let Some(addr) = Self::extract_peer_addr(slice) {
-            if let Some(mid) = Self::extract_match_id(slice) {
+        if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(slice) {
+            if let Some(mid) = env.match_id {
                 *self.punch_match_id.lock().await = Some(mid);
             }
-            self.register_peer_addr(addr).await;
+            if let Some(addr) = Self::parse_addr(&env.peer.address, env.peer.port) {
+                self.register_peer_addr(addr).await;
+            } else {
+                self.proxy_log(format!(
+                    "Invalid opponent address from server: {}:{}",
+                    env.peer.address, env.peer.port
+                ));
+            }
             return true;
+        }
+
+        if let Ok(env) = serde_json::from_slice::<FlatPeerEnvelope>(slice) {
+            if let Some(mid) = env.match_id {
+                *self.punch_match_id.lock().await = Some(mid);
+            }
+            if let (Some(address), Some(port)) = (env.address.as_deref(), env.port) {
+                if let Some(addr) = Self::parse_addr(address, port) {
+                    self.register_peer_addr(addr).await;
+                } else {
+                    self.proxy_log(format!(
+                        "Invalid opponent address from server: {address}:{port}"
+                    ));
+                }
+                return true;
+            }
         }
 
         if Self::looks_like_server_control(slice) {
@@ -252,20 +321,81 @@ impl ProxyRuntime {
     }
 
     async fn register_peer_addr(self: &Arc<Self>, addr: SocketAddr) {
-        *self.opponent.lock().await = Some(addr);
+        {
+            let mut guard = self.opponent.lock().await;
+            if guard.is_some() {
+                return;
+            }
+            *guard = Some(addr);
+        }
+
+        self.proxy_log(format!("Matched opponent address: {addr}"));
 
         // Stop the reader and release the punch socket so the OS frees the port.
         // No ping is sent here — sending from the emulator's port before it binds
         // can leave a lingering ICMP error that causes the emulator's first sendto
         // to fail. GGPO handles the initial hole-punch itself via retries.
+        // Important: this function runs on the reader task. Aborting that task here can cancel
+        // the rest of this function before the emulator launch runs. Instead, notify the reader
+        // to stop, then drop the socket + launch the emulator from a separate task.
         self.reader_stop.notify_waiters();
-        *self.punch_sock.lock().await = None;
-
-        // Brief pause for the OS to fully release the port before the emulator binds.
-        sleep(Duration::from_millis(50)).await;
 
         let this = Arc::clone(self);
         tokio::spawn(async move {
+            if let Some(handle) = this.reader_task.lock().await.take() {
+                handle.abort();
+            }
+
+            // Drop the punch socket as deterministically as possible before launching the emulator.
+            let sock = this.punch_sock.lock().await.take();
+            if let Some(sock) = sock {
+                let deadline = tokio::time::Instant::now() + Duration::from_secs(1);
+                while Arc::strong_count(&sock) > 1 && tokio::time::Instant::now() < deadline {
+                    sleep(Duration::from_millis(5)).await;
+                }
+                this.proxy_log(format!(
+                    "Punch socket strong_count after stop: {}",
+                    Arc::strong_count(&sock)
+                ));
+                drop(sock);
+            }
+
+            // Brief pause so both sides finish their handshake and the OS fully releases the port.
+            sleep(Duration::from_millis(300)).await;
+
+            let emu_game_port = this.args.emulator_game_port.unwrap_or(7000);
+            match this
+                .wait_for_udp_port_free(emu_game_port, Duration::from_secs(5))
+                .await
+            {
+                Ok(()) => this.proxy_log(format!("Emulator UDP port {emu_game_port} is free")),
+                Err(err) => {
+                    this.proxy_log(format!(
+                        "Emulator UDP port {emu_game_port} is NOT free: {err}"
+                    ));
+                    let _ = this.app.emit_to(
+                        EventTarget::any(),
+                        "sendAlert",
+                        json!({
+                            "type": "error",
+                            "message": {
+                                "title": "Emulator port in use",
+                                "description": format!("Port {emu_game_port} is not available. Close any existing emulator/match using it, or change emulator_game_port.")
+                            }
+                        }),
+                    );
+                    let _ = this.stop().await;
+                    return;
+                }
+            }
+
+            if this.args.server_host == addr.ip().to_string() {
+                this.proxy_log(format!(
+                    "Warning: matched peer IP equals server host ({}). This may indicate relay mode or server misreporting the peer address.",
+                    this.args.server_host
+                ));
+            }
+
             if let Err(e) = this.start_emulator(addr).await {
                 let _ = this.app.emit_to(
                     EventTarget::any(),
@@ -285,7 +415,21 @@ impl ProxyRuntime {
 
     async fn start_emulator(self: &Arc<Self>, peer_addr: SocketAddr) -> anyhow::Result<()> {
         let emu_game_port = self.args.emulator_game_port.unwrap_or(7000);
-        let peer_ip = peer_addr.ip().to_string();
+        let peer_ip = match peer_addr.ip() {
+            std::net::IpAddr::V4(v4) => v4.to_string(),
+            std::net::IpAddr::V6(v6) => {
+                if let Some(v4) = v6.to_ipv4_mapped().or_else(|| v6.to_ipv4()) {
+                    v4.to_string()
+                } else {
+                    self.proxy_log(format!(
+                        "Opponent address is IPv6-only (unsupported): {peer_addr}"
+                    ));
+                    return Err(anyhow!(
+                        "Opponent address is IPv6-only (unsupported by emulator): {peer_addr}"
+                    ));
+                }
+            }
+        };
         let peer_port = peer_addr.port();
 
         let mut cmd = TokioCommand::new(&self.args.emulator_path);
@@ -301,12 +445,8 @@ impl ProxyRuntime {
                 peer_port.to_string(),
                 "--player".to_string(),
                 self.args.player.to_string(),
-                "--delay".to_string(),
-                self.args.delay.to_string(),
                 "--name".to_string(),
                 self.args.user_name.clone(),
-                "--net-delay".to_string(),
-                self.args.net_delay.clone(),
             ];
         } else {
             Self::rewrite_emulator_args(&mut provided_args, emu_game_port, &peer_ip, peer_port);
@@ -314,24 +454,22 @@ impl ProxyRuntime {
 
         resolve_lua_args(&self.app, &mut provided_args).map_err(|e| anyhow!(e))?;
 
-        if !self.args.net_delay.trim().is_empty()
-            && !Self::args_contain_net_delay(&provided_args)
-        {
-            provided_args.push("--net-delay".to_string());
-            provided_args.push(self.args.net_delay.clone());
-        }
+        // Ensure delay / net-delay reflect StartArgs even when the UI passes a full arg list.
+        // Also avoids passing `-d 0` or `--net-delay off` (treat those as "use emulator default").
+        self.normalize_delay_and_net_delay(&mut provided_args);
 
-        let _ = self.app.emit_to(
-            EventTarget::any(),
-            "proxy-log",
-            format!(
-                "Launching emulator: {} direct to {}:{} (local:{}) args={:?}",
-                self.args.emulator_path, peer_ip, peer_port, emu_game_port, provided_args
-            ),
-        );
+        self.proxy_log(format!(
+            "Launching emulator: {} direct to {}:{} (local:{}, matched:{}) args={:?}",
+            self.args.emulator_path,
+            peer_ip,
+            peer_port,
+            emu_game_port,
+            peer_addr,
+            provided_args
+        ));
         println!(
-            "Launching emulator: {} direct to {}:{} (local:{}) args={:?}",
-            self.args.emulator_path, peer_ip, peer_port, emu_game_port, provided_args
+            "Launching emulator: {} direct to {}:{} (local:{}, matched:{}) args={:?}",
+            self.args.emulator_path, peer_ip, peer_port, emu_game_port, peer_addr, provided_args
         );
 
         cmd.args(provided_args);
@@ -357,35 +495,32 @@ impl ProxyRuntime {
     pub async fn stop(&self) -> anyhow::Result<()> {
         self.stop_notify.notify_waiters();
         self.reader_stop.notify_waiters();
+        if let Some(handle) = self.reader_task.lock().await.take() {
+            handle.abort();
+        }
         *self.punch_sock.lock().await = None;
         self.kill_emulator_process("proxy-stop").await?;
         Ok(())
     }
 
-    fn extract_peer_addr(payload: &[u8]) -> Option<SocketAddr> {
-        if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(payload) {
-            return Self::parse_addr(&env.peer.address, env.peer.port);
+    fn parse_addr(address: &str, port: u16) -> Option<SocketAddr> {
+        if port == 0 {
+            return None;
         }
-        if let Ok(env) = serde_json::from_slice::<FlatPeerEnvelope>(payload) {
-            if let (Some(address), Some(port)) = (env.address.as_deref(), env.port) {
-                return Self::parse_addr(address, port);
+        let addr = format!("{address}:{port}").parse::<SocketAddr>().ok()?;
+        match addr.ip() {
+            std::net::IpAddr::V4(ip) => {
+                if ip.is_unspecified() || ip.is_multicast() {
+                    return None;
+                }
+            }
+            std::net::IpAddr::V6(ip) => {
+                if ip.is_unspecified() || ip.is_multicast() {
+                    return None;
+                }
             }
         }
-        None
-    }
-
-    fn extract_match_id(payload: &[u8]) -> Option<String> {
-        if let Ok(env) = serde_json::from_slice::<OpponentEnvelope>(payload) {
-            return env.match_id;
-        }
-        if let Ok(env) = serde_json::from_slice::<FlatPeerEnvelope>(payload) {
-            return env.match_id;
-        }
-        None
-    }
-
-    fn parse_addr(address: &str, port: u16) -> Option<SocketAddr> {
-        format!("{address}:{port}").parse::<SocketAddr>().ok()
+        Some(addr)
     }
 
     fn looks_like_server_control(payload: &[u8]) -> bool {
@@ -441,11 +576,7 @@ impl ProxyRuntime {
         );
 
         if let Err(err) = self.stop().await {
-            let _ = self.app.emit_to(
-                EventTarget::any(),
-                "proxy-log",
-                format!("Failed to stop after remote kill: {err}"),
-            );
+            self.proxy_log(format!("Failed to stop after remote kill: {err}"));
         }
     }
 
@@ -463,11 +594,7 @@ impl ProxyRuntime {
                             }
                             Ok(None) => false,
                             Err(err) => {
-                                let _ = watcher.app.emit_to(
-                                    EventTarget::any(),
-                                    "proxy-log",
-                                    format!("Emulator error: {err}"),
-                                );
+                                watcher.proxy_log(format!("Emulator error: {err}"));
                                 guard.take();
                                 true
                             }
@@ -479,11 +606,7 @@ impl ProxyRuntime {
                 if terminated {
                     watcher.notify_match_closed("emulator-exited").await;
                     if let Err(err) = watcher.stop().await {
-                        let _ = watcher.app.emit_to(
-                            EventTarget::any(),
-                            "proxy-log",
-                            format!("Failed to stop after emulator exit: {err}"),
-                        );
+                        watcher.proxy_log(format!("Failed to stop after emulator exit: {err}"));
                     }
                     break;
                 }
@@ -513,11 +636,68 @@ impl ProxyRuntime {
         Ok(())
     }
 
-    fn args_contain_net_delay(args: &[String]) -> bool {
-        args.iter().any(|a| {
-            a.eq_ignore_ascii_case("--net-delay")
-                || a.to_ascii_lowercase().contains("--net-delay")
-        })
+    fn remove_opt_with_value(args: &mut Vec<String>, flags: &[&str]) {
+        let mut idx = 0;
+        while idx < args.len() {
+            if flags.iter().any(|f| args[idx].eq_ignore_ascii_case(f)) {
+                args.remove(idx);
+                if idx < args.len() {
+                    args.remove(idx);
+                }
+                continue;
+            }
+            idx += 1;
+        }
+    }
+
+    fn set_opt_with_value(args: &mut Vec<String>, flags: &[&str], value: &str) {
+        let mut updated_any = false;
+        let mut idx = 0;
+        while idx < args.len() {
+            if flags.iter().any(|f| args[idx].eq_ignore_ascii_case(f)) {
+                if idx + 1 < args.len() {
+                    args[idx + 1] = value.to_string();
+                    updated_any = true;
+                    idx += 2;
+                    continue;
+                } else {
+                    args.push(value.to_string());
+                    updated_any = true;
+                    break;
+                }
+            }
+            idx += 1;
+        }
+
+        if !updated_any {
+            args.push(flags[0].to_string());
+            args.push(value.to_string());
+        }
+    }
+
+    fn normalize_delay_and_net_delay(&self, args: &mut Vec<String>) {
+        // `-d/--delay` is GGPO frame delay. Emulator CLI says "1 is default".
+        // Always pass through the configured delay (including 0) so both sides are explicit.
+        Self::set_opt_with_value(args, &["-d", "--delay"], &self.args.delay.to_string());
+
+        // `--net-delay` in this fork is *artificial* latency for testing (on|off|<ms>).
+        // It should not be used in real matches. We strip it by default and only allow it
+        // when explicitly enabled (e.g. local testing) via `HR_ALLOW_NET_DELAY=1`.
+        let allow_test_net_delay = std::env::var("HR_ALLOW_NET_DELAY")
+            .ok()
+            .is_some_and(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+
+        if !allow_test_net_delay {
+            Self::remove_opt_with_value(args, &["--net-delay"]);
+            return;
+        }
+
+        let net_delay = self.args.net_delay.trim();
+        if net_delay.is_empty() || net_delay.eq_ignore_ascii_case("off") {
+            Self::remove_opt_with_value(args, &["--net-delay"]);
+        } else {
+            Self::set_opt_with_value(args, &["--net-delay"], net_delay);
+        }
     }
 
     // Rewrites emulator args to use the real peer address instead of localhost relay.

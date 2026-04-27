@@ -140,7 +140,63 @@ fn resolve_path_common(app: &AppHandle, raw: &str, empty_msg: &str) -> Result<Pa
 }
 
 pub(crate) fn resolve_emulator_path(app: &AppHandle, raw: &str) -> Result<PathBuf, String> {
-    resolve_path_common(app, raw, "Emulator path is empty")
+    let provided = resolve_path_common(app, raw, "Emulator path is empty")?;
+
+    // Allow passing a folder instead of an executable path (common for local dev builds).
+    // Prefer known emulator binaries, then fall back to a single *.exe in `build/`.
+    if provided.is_dir() {
+        let build_dir = provided.join("build");
+        let mut candidates: Vec<PathBuf> = Vec::new();
+
+        let preferred = [
+            build_dir.join("fs-fbneo.exe"),
+            build_dir.join("fs-fbneod.exe"),
+            provided.join("fs-fbneo.exe"),
+        ];
+
+        for p in preferred {
+            if p.is_file() {
+                return Ok(p);
+            }
+        }
+
+        if build_dir.is_dir() {
+            if let Ok(entries) = fs::read_dir(&build_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path
+                        .extension()
+                        .is_some_and(|ext| ext.eq_ignore_ascii_case("exe"))
+                        && path.is_file()
+                    {
+                        candidates.push(path);
+                    }
+                }
+            }
+        }
+
+        candidates.sort();
+        candidates.dedup();
+
+        if candidates.len() == 1 {
+            return Ok(candidates.remove(0));
+        }
+
+        return Err(format!(
+            "Emulator path is a folder, but no unique executable was found. Please pass the full path to the emulator .exe (got: {}).",
+            provided.display()
+        ));
+    }
+
+    // If a user passes a path without extension on Windows, try adding `.exe`.
+    if cfg!(windows) && provided.extension().is_none() {
+        let with_exe = provided.with_extension("exe");
+        if with_exe.is_file() {
+            return Ok(with_exe);
+        }
+    }
+
+    Ok(provided)
 }
 
 fn resolve_generic_path(app: &AppHandle, raw: &str) -> Result<PathBuf, String> {
