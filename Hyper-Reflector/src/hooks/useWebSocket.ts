@@ -214,6 +214,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const isHandshakeInProgressRef = useRef(false)
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const opponentUidRef = useRef<string | null>(null)
+  const lastMatchOpponentUidRef = useRef<string | null>(null)
   const pendingOffersRef = useRef(new Map<string, { from: string; offer: RTCSessionDescriptionInit }>())
   const pendingByUserRef = useRef(new Map<string, string>())
   const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>())
@@ -224,6 +225,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
   // Match tracking for hyper_track_match file polling
   const activeMatchIdRef = useRef<string | null>(null)
+  const casualSessionRef = useRef(new Map<string, string>())
   const localPlayerSlotRef = useRef<0 | 1>(0)
   const lastMatchUuidRef = useRef<string | null>(null)
   const matchUploadPendingRef = useRef(false)
@@ -1198,6 +1200,10 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
     const socket = socketRef.current
     if (!socket || socket.readyState !== WebSocket.OPEN) return
+    const existingSessionId = casualSessionRef.current.get(targetUid)
+    const sessionId = existingSessionId || `casual-${targetUid}-${Date.now()}`
+    casualSessionRef.current.set(targetUid, sessionId)
+    activeMatchIdRef.current = sessionId
     closePeerConnection()
     sentMatchRequestRef.current.delete(targetUid)
     isHandshakeInProgressRef.current = true
@@ -1206,6 +1212,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const peer = await initWebRTC(currentUser.uid, targetUid, socket)
       peerConnectionRef.current = peer
       opponentUidRef.current = targetUid
+      lastMatchOpponentUidRef.current = targetUid
       localPlayerSlotRef.current = 0
       await startCall(peer, socket, targetUid, currentUser.uid, true, activeLobbyIdRef.current)
     } catch (err) {
@@ -1258,7 +1265,23 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
     declineAllPendingExcept(messageId)
     updateChallengeMessage(messageId, { challengeStatus: 'accepted', challengeResponder: currentUser.userName })
+    activeMatchIdRef.current = messageId
     isHandshakeInProgressRef.current = true
+
+    if (isRankQueuedRef.current) {
+      isRankQueuedRef.current = false
+      setIsRankQueued(false)
+      clearRankQueuePending()
+      const socket2 = socketRef.current
+      if (socket2?.readyState === WebSocket.OPEN) {
+        try {
+          socket2.send(JSON.stringify({
+            type: 'updateSocketState',
+            data: { uid: currentUser.uid, lobbyId: activeLobbyIdRef.current, stateToUpdate: { key: 'isRankQueued', value: false } },
+          }))
+        } catch {}
+      }
+    }
 
     if (peerConnectionRef.current) {
       try { peerConnectionRef.current.close() } catch {}
@@ -1269,6 +1292,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const peer = await initWebRTC(currentUser.uid, from, socket)
       peerConnectionRef.current = peer
       opponentUidRef.current = from
+      lastMatchOpponentUidRef.current = from
       localPlayerSlotRef.current = 1
 
       await peer.setRemoteDescription(new RTCSessionDescription(offer))
@@ -1292,7 +1316,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       pendingByUserRef.current.delete(from)
       pendingCandidatesRef.current.delete(from)
     }
-  }, [setIsInMatchBoth, closePeerConnection, updateChallengeMessage, declineAllPendingExcept, addSystemMessage])
+  }, [setIsInMatchBoth, closePeerConnection, updateChallengeMessage, declineAllPendingExcept, addSystemMessage, clearRankQueuePending])
 
   const declineChallenge = useCallback(async (messageId: string): Promise<void> => {
     const currentUser = userRef.current
@@ -1523,10 +1547,9 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const viewer = userRef.current
       if (!viewer?.uid || !auth.currentUser) return
 
-      const opponentUid = opponentUidRef.current
+      const opponentUid = opponentUidRef.current || lastMatchOpponentUidRef.current
       const isPlayerOne = localPlayerSlotRef.current === 0
-      const involvesMockOpponent = opponentUid ? isMockUserId(opponentUid) : false
-      if (!isPlayerOne && opponentUid && !involvesMockOpponent) {
+      if (!isPlayerOne) {
         console.info('[match-tracker] skipping upload — not the designated uploader')
         return
       }
@@ -1541,6 +1564,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
         player2: isPlayerOne ? resolvedOpponentUid : viewer.uid,
         matchData: { raw: JSON.stringify(condensed) },
       })
+      lastMatchOpponentUidRef.current = null
     } catch (error) {
       console.error('[match-tracker] Failed to upload match data', error)
     } finally {
