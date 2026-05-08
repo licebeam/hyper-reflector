@@ -34,7 +34,7 @@ export async function startProxyMatch({
     serverPort,
     gameName,
 }: ProxyMatchArgs): Promise<void> {
-    const { emulatorPath, ggpoDelay, trainingPath } = useSettingsStore.getState()
+    const { emulatorPath, ggpoDelay, trainingPath, labMusicMuted } = useSettingsStore.getState()
     const { globalUser } = useUserStore.getState()
 
     if (!globalUser?.uid) {
@@ -68,6 +68,13 @@ export async function startProxyMatch({
         rom: romName,
     })
 
+    if (matchLuaPath) {
+        await invoke('write_hyper_settings_cmd', {
+            luaPath: matchLuaPath,
+            musicVolume: labMusicMuted ? 0 : 127,
+        }).catch(() => {})
+    }
+
     await invoke('stop_proxy').catch(() => {})
     await invoke('start_proxy', {
         args: {
@@ -95,7 +102,7 @@ export async function startMockMatch({
     gameName,
     playerSlot,
 }: MockMatchArgs): Promise<void> {
-    const { emulatorPath, ggpoDelay, trainingPath } = useSettingsStore.getState()
+    const { emulatorPath, ggpoDelay, trainingPath, labMusicMuted } = useSettingsStore.getState()
     const { globalUser } = useUserStore.getState()
 
     if (!emulatorPath || !emulatorPath.trim().length) {
@@ -126,6 +133,7 @@ export async function startMockMatch({
         rom: romName,
     })
 
+    // TODO: temp — opponent runs without Lua to test for desyncs
     const opponentArgs = buildEmulatorArgs({
         emulatorPath,
         playerIndex: (playerSlot === 0 ? 2 : 1) as 1 | 2,
@@ -133,14 +141,15 @@ export async function startMockMatch({
         remotePort: opponentPorts.remote,
         playerName: opponentDisplayName,
         delay,
-        luaPath: matchLuaPath,
+        luaPath: undefined,
         rom: romName,
     })
 
+    const musicVolume = labMusicMuted ? 0 : 127
     await invoke('kill_mock_emulators').catch(() => {})
     await Promise.all([
-        invoke('launch_emulator', { exePath: emulatorPath, args: playerArgs, matchId }),
-        invoke('launch_emulator', { exePath: emulatorPath, args: opponentArgs, matchId }),
+        invoke('launch_emulator', { exePath: emulatorPath, args: playerArgs, matchId, musicVolume }),
+        invoke('launch_emulator', { exePath: emulatorPath, args: opponentArgs, matchId, musicVolume }),
     ])
 }
 
@@ -190,7 +199,7 @@ function buildEmulatorArgs({
     if (normalizedPath.endsWith('fcadefbneo.exe') || normalizedPath.endsWith('fcadefbneo')) {
         const connection = `quark:direct,${rom},${localPort},127.0.0.1,${remotePort},${playerIndex},${delay},0`
         args.push(connection)
-        args.push('--net-delay', 'off')
+        args.push('--net-delay', "off")
         if (luaPath && luaPath.trim().length) {
             args.push('--lua', luaPath)
         }

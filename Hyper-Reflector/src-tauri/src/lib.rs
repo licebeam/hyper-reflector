@@ -13,6 +13,7 @@ use walkdir::WalkDir;
 
 mod proxy;
 use proxy::{kill_emulator_only, start_proxy, stop_proxy, ProxyManager};
+mod palette;
 
 // This saves the child process
 struct MockChild {
@@ -201,6 +202,33 @@ pub(crate) fn resolve_emulator_path(app: &AppHandle, raw: &str) -> Result<PathBu
 
 fn resolve_generic_path(app: &AppHandle, raw: &str) -> Result<PathBuf, String> {
     resolve_path_common(app, raw, "Path is empty")
+}
+
+fn write_hyper_settings_to_path(lua_path: &str, music_volume: u8) {
+    // Write next to the Lua script so the script can find it regardless of
+    // how debug.getinfo resolves the path (absolute vs relative to CWD).
+    if let Some(dir) = std::path::Path::new(lua_path).parent() {
+        let _ = fs::write(
+            dir.join("hyper_settings.txt"),
+            format!("music_volume: {}\n", music_volume),
+        );
+    }
+}
+
+/// Write hyper_settings.txt derived from a --lua arg in the args list.
+pub(crate) fn write_hyper_settings(args: &[String], music_volume: u8) {
+    if let Some(lua_path) = args
+        .windows(2)
+        .find(|w| w[0].eq_ignore_ascii_case("--lua"))
+        .map(|w| w[1].as_str())
+    {
+        write_hyper_settings_to_path(lua_path, music_volume);
+    }
+}
+
+#[tauri::command]
+fn write_hyper_settings_cmd(lua_path: String, music_volume: u8) {
+    write_hyper_settings_to_path(&lua_path, music_volume);
 }
 
 pub(crate) fn resolve_lua_args(app: &AppHandle, args: &mut Vec<String>) -> Result<(), String> {
@@ -514,6 +542,7 @@ async fn start_training_mode(
     use_sidecar: bool,
     exe_path: Option<String>,
     mut args: Vec<String>,
+    music_volume: Option<u8>,
 ) -> Result<(), String> {
     let cmd_builder = if use_sidecar {
         app.shell().sidecar("emulator").map_err(|e| e.to_string())?
@@ -531,6 +560,8 @@ async fn start_training_mode(
         .windows(2)
         .find(|w| w[0].eq_ignore_ascii_case("--lua"))
         .and_then(|w| std::path::Path::new(&w[1]).parent().map(|p| p.to_path_buf()));
+
+    write_hyper_settings(&args, music_volume.unwrap_or(127));
 
     let cmd = {
         let c = cmd_builder.args(args);
@@ -579,11 +610,13 @@ async fn launch_emulator(
     exe_path: String,
     mut args: Vec<String>,
     match_id: Option<String>,
+    music_volume: Option<u8>,
 ) -> Result<(), String> {
     println!("{:?}", args);
     let proc_arc = proc.inner().clone();
     let resolved = resolve_emulator_path(&app, &exe_path)?;
     resolve_lua_args(&app, &mut args)?;
+    write_hyper_settings(&args, music_volume.unwrap_or(127));
     let command = app.shell().command(resolved).args(args);
     let (mut rx, child) = command.spawn().map_err(|e| e.to_string())?;
     let pid = child.pid();
@@ -648,6 +681,32 @@ async fn run_custom_process() -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+/// Convert an indexed PNG sprite sheet into a costume JSON file.
+///
+/// Parameters (all optional except `png_path`):
+///   - `color_index`  which costume number to write (determines output filename)
+///   - `slots`        palette slot numbers to populate, in order (default: [0, 6])
+///   - `count`        palette entries per slot (default: 64)
+///   - `offset`       skip this many palette entries at the start (default: 0)
+///
+/// The JSON is written to the same directory as the PNG, named `color{N}.json`.
+/// Returns a summary with the output path and the first color of each slot.
+#[tauri::command]
+fn extract_palette_to_json(
+    png_path: String,
+    color_index: u32,
+    slots: Option<Vec<u32>>,
+    count: Option<usize>,
+    offset: Option<usize>,
+    replicate: Option<bool>,
+) -> Result<palette::ExtractResult, String> {
+    let slots = slots.unwrap_or_else(|| vec![0, 6]);
+    let count = count.unwrap_or(64);
+    let offset = offset.unwrap_or(0);
+    let replicate = replicate.unwrap_or(true);
+    palette::extract_to_json(&png_path, color_index, &slots, count, offset, replicate)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -672,7 +731,9 @@ pub fn run() {
             kill_emulator_only,
             prepare_user_resources,
             read_files_text,
-            write_files_text
+            write_files_text,
+            extract_palette_to_json,
+            write_hyper_settings_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

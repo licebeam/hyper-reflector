@@ -217,6 +217,10 @@ export function ChatPanel({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
+      if (!input.trim()) {
+        inputRef.current?.blur();
+        return;
+      }
       handleSend();
     }
   };

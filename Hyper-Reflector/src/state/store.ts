@@ -47,6 +47,8 @@ type SettingsState = {
     // Last selected game in Lab page
     labSelectedGame: string
     setLabSelectedGame: (rom: string) => void
+    labMusicMuted: boolean
+    setLabMusicMuted: (muted: boolean) => void
     appLanguage: string
     setAppLanguage: (code: string) => void
     mutedUsers: string[]
@@ -177,6 +179,8 @@ export const useSettingsStore = create<SettingsState>()(
                 })),
             labSelectedGame: 'sfiii3nr1',
             setLabSelectedGame: (rom) => set({ labSelectedGame: rom }),
+            labMusicMuted: false,
+            setLabMusicMuted: (muted) => set({ labMusicMuted: muted }),
             appLanguage: 'en',
             setAppLanguage: (code) => set({ appLanguage: code }),
             mutedUsers: [],

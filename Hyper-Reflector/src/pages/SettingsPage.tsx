@@ -299,6 +299,8 @@ export function SettingsPage({ user, onLogout, onUpdateUser }: SettingsPageProps
   const setWinSoundPath = useSettingsStore((s) => s.setWinSoundPath);
   const rankQueueGame = useSettingsStore((s) => s.rankQueueGame);
   const setRankQueueGame = useSettingsStore((s) => s.setRankQueueGame);
+  const labMusicMuted = useSettingsStore((s) => s.labMusicMuted);
+  const setLabMusicMuted = useSettingsStore((s) => s.setLabMusicMuted);
 
   const { theme, overrides, setThemeId, setOverride } = useV2Theme();
 
@@ -417,6 +419,16 @@ export function SettingsPage({ user, onLogout, onUpdateUser }: SettingsPageProps
                 </option>
               ))}
             </select>
+          </Row>
+        </Section>
+
+        {/* ── 3rd Strike ── */}
+        <Section title="3rd Strike">
+          <Row
+            label="Mute music"
+            sub="Silences in-game BGM (Street Fighter III: 3rd Strike) · Experimental, may cause desyncs"
+          >
+            <Toggle checked={labMusicMuted} onChange={setLabMusicMuted} />
           </Row>
         </Section>
 

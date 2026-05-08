@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
-import { FlaskConical, FolderOpen, Play, Trash2 } from 'lucide-react'
+import { FlaskConical, FolderOpen, Play, Trash2, Palette, CheckCircle2 } from 'lucide-react'
 import { useSettingsStore } from '../state/store'
 import {
   ensureDefaultEmulatorPath,
@@ -27,9 +27,23 @@ export function LabPage() {
   const labSelectedGame = useSettingsStore(s => s.labSelectedGame)
   const setLabSelectedGame = useSettingsStore(s => s.setLabSelectedGame)
 
+  const labMusicMuted = useSettingsStore(s => s.labMusicMuted)
+
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [launched, setLaunched] = useState(false)
+
+  // Palette extractor state
+  const [palPngPath, setPalPngPath] = useState<string>('')
+  const [palColorIndex, setPalColorIndex] = useState<number>(0)
+  const [palReplicate, setPalReplicate] = useState<boolean>(true)
+  const [palExtracting, setPalExtracting] = useState(false)
+  const [palResult, setPalResult] = useState<{
+    out_path: string
+    previews: [number, [number, number, number]][]
+    total_palette_entries: number
+  } | null>(null)
+  const [palError, setPalError] = useState<string | null>(null)
 
   const isSfiii = labSelectedGame === SFIII_ROM
   const customLuaPath = luaScripts[labSelectedGame] ?? ''
@@ -74,6 +88,7 @@ export function LabPage() {
         useSidecar: false,
         exePath: resolved,
         args,
+        musicVolume: labMusicMuted ? 0 : 127,
       })
       setLaunched(true)
     } catch (err) {
@@ -108,6 +123,47 @@ export function LabPage() {
   }
 
   const resetLua = () => setLuaScriptForGame(labSelectedGame, '', 'auto')
+
+  const pickPalettePng = async () => {
+    try {
+      const res = await open({
+        multiple: false,
+        directory: false,
+        title: 'Select sprite sheet PNG',
+        filters: [{ name: 'PNG images', extensions: ['png'] }],
+      })
+      if (typeof res !== 'string') return
+      setPalPngPath(res)
+      setPalResult(null)
+      setPalError(null)
+      // Auto-detect color index from filename (e.g. color1.png → 1)
+      const match = res.match(/color(\d+)\.png$/i)
+      if (match) setPalColorIndex(parseInt(match[1], 10))
+    } catch { /* dismissed */ }
+  }
+
+  const handleExtract = async () => {
+    if (!palPngPath) return
+    setPalExtracting(true)
+    setPalResult(null)
+    setPalError(null)
+    try {
+      const result = await invoke<{
+        out_path: string
+        previews: [number, [number, number, number]][]
+        total_palette_entries: number
+      }>('extract_palette_to_json', {
+        pngPath: palPngPath,
+        colorIndex: palColorIndex,
+        replicate: palReplicate,
+      })
+      setPalResult(result)
+    } catch (err) {
+      setPalError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPalExtracting(false)
+    }
+  }
 
   const sectionCls = 'rounded-lg overflow-hidden border'
   const sectionStyle = { borderColor: 'var(--v2-border)' }
@@ -235,6 +291,121 @@ export function LabPage() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Palette extractor */}
+        <div className={sectionCls} style={sectionStyle}>
+          <div className={headerCls} style={headerStyle}>
+            <div className="flex items-center gap-2">
+              <Palette size={13} style={{ color: 'var(--v2-muted)' }} />
+              <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Palette Extractor</span>
+            </div>
+          </div>
+          <div className="px-4 py-4 space-y-3" style={bodyStyle}>
+
+            {/* PNG picker */}
+            <div className="space-y-1">
+              <p className="text-xs font-mono break-all" style={{ color: palPngPath ? 'var(--v2-text)' : 'var(--v2-muted)' }}>
+                {palPngPath || 'No file selected'}
+              </p>
+              <button
+                onClick={pickPalettePng}
+                className="flex items-center gap-1.5 text-xs transition-colors"
+                style={{ color: 'var(--v2-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
+              >
+                <FolderOpen size={13} />
+                Browse for PNG...
+              </button>
+            </div>
+
+            {/* Color index */}
+            {palPngPath && (
+              <div className="flex items-center gap-3">
+                <label className="text-xs" style={{ color: 'var(--v2-muted)' }}>Color index</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={9}
+                  value={palColorIndex}
+                  onChange={e => setPalColorIndex(parseInt(e.target.value, 10) || 0)}
+                  className="w-16 text-xs px-2 py-1 rounded border outline-none text-center"
+                  style={{
+                    background: 'var(--v2-hover)',
+                    borderColor: 'var(--v2-border)',
+                    color: 'var(--v2-text)',
+                  }}
+                />
+                <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>→ color{palColorIndex}.json</span>
+              </div>
+            )}
+
+            {/* Replicate toggle */}
+            {palPngPath && (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={palReplicate}
+                  onChange={e => setPalReplicate(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>
+                  Replicate to all slots (same colors in slot 0 &amp; 6)
+                </span>
+              </label>
+            )}
+
+            {/* Extract button */}
+            {palPngPath && (
+              <button
+                onClick={handleExtract}
+                disabled={palExtracting}
+                className="flex items-center gap-2 px-4 py-2 rounded font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
+                onMouseEnter={e => { if (!palExtracting) e.currentTarget.style.background = 'var(--v2-accent-hover)' }}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
+              >
+                <Palette size={14} />
+                {palExtracting ? 'Extracting...' : 'Extract Palette'}
+              </button>
+            )}
+
+            {/* Error */}
+            {palError && (
+              <p className="text-red-400 text-xs">{palError}</p>
+            )}
+
+            {/* Result */}
+            {palResult && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-xs text-green-400">
+                  <CheckCircle2 size={13} />
+                  <span className="font-mono break-all">{palResult.out_path}</span>
+                </div>
+                <p className="text-xs" style={{ color: 'var(--v2-muted)' }}>
+                  {palResult.total_palette_entries} palette entries found
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {palResult.previews.map(([slot, [r, g, b]]) => (
+                    <div key={slot} className="flex items-center gap-1.5">
+                      <div
+                        className="w-4 h-4 rounded-sm border"
+                        style={{
+                          background: `rgb(${r},${g},${b})`,
+                          borderColor: 'var(--v2-border)',
+                        }}
+                      />
+                      <span className="text-xs font-mono" style={{ color: 'var(--v2-muted)' }}>
+                        slot {slot} — rgb({r},{g},{b})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
 

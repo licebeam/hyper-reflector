@@ -62,7 +62,7 @@ export function NavRail({ currentPage, onNavigate }: NavRailProps) {
         <img src={hrLogo} alt="HR" className="h-8 w-8" />
      
       </div>
-      0.8.9.9a 
+      0.8.9.10a 
       {/* TODO USE ENV VAR OR SOMETHING */}
       <div className="flex flex-col items-center gap-4 flex-1">
         <NavBtn page="home" icon={<Home size={18} />} label="Home" />
