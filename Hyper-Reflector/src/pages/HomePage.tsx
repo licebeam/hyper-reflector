@@ -469,9 +469,6 @@ export function HomePage({ currentUser }: HomePageProps) {
               >
                 Super Art usage
               </h2>
-              <p className="text-xs mb-5" style={{ color: "var(--v2-muted)" }}>
-                SA1 / SA2 / SA3 breakdown per character
-              </p>
               {/* Legend */}
               <div className="flex gap-4 mb-5">
                 {(["SA1", "SA2", "SA3"] as const).map((sa, i) => (

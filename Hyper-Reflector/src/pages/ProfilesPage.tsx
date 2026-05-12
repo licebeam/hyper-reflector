@@ -11,6 +11,7 @@ import api from "../external-api/requests";
 import { auth } from "../utils/firebase";
 import type { V2User } from "../types";
 import { CountryFlag } from "../components/CountryFlag";
+import { CountryPicker } from "../components/CountryPicker";
 import { UserTitle } from "../components/UserTitle";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -24,6 +25,8 @@ type SearchUser = {
   userProfilePic?: string;
   knownAliases?: string[];
 };
+
+type RegionFilter = { type: "all" | "mine" | "other"; code: string | null };
 
 type LeaderboardEntry = {
   user: SearchUser;
@@ -159,6 +162,11 @@ export function ProfilesPage({
     wins: INIT_BOARD,
   });
 
+  const [regionFilters, setRegionFilters] = useState<{ elo: RegionFilter; wins: RegionFilter }>({
+    elo: { type: "all", code: null },
+    wins: { type: "all", code: null },
+  });
+
   const trimmed = useMemo(() => searchTerm.trim(), [searchTerm]);
 
   // Cursor is passed explicitly so this callback is stable (no closing over state)
@@ -197,7 +205,12 @@ export function ProfilesPage({
       if (!auth.currentUser) return;
       setBoards((prev) => ({
         ...prev,
-        [kind]: { ...prev[kind], loading: true, initialized: true },
+        [kind]: {
+          ...prev[kind],
+          loading: true,
+          initialized: true,
+          ...(reset ? { entries: [], cursor: null } : {}),
+        },
       }));
       try {
         const res = await api.getLeaderboard(auth, {
@@ -235,6 +248,28 @@ export function ProfilesPage({
     fetchBoard,
   ]);
 
+  const matchesRegionFilter = useCallback(
+    (entry: LeaderboardEntry, filter: RegionFilter): boolean => {
+      if (filter.type === "all") return true;
+      if (filter.type === "mine") return entry.user.countryCode === currentUser.countryCode;
+      if (filter.type === "other" && filter.code)
+        return entry.user.countryCode?.toUpperCase() === filter.code.toUpperCase();
+      return true;
+    },
+    [currentUser.countryCode],
+  );
+
+  useEffect(() => {
+    const check = (kind: "elo" | "wins") => {
+      const board = boards[kind];
+      if (!board.initialized || board.loading || !board.cursor) return;
+      const visible = board.entries.filter((e) => matchesRegionFilter(e, regionFilters[kind])).length;
+      if (visible < 10) void fetchBoard(kind, false, board.cursor);
+    };
+    check("elo");
+    check("wins");
+  }, [boards, regionFilters, matchesRegionFilter, fetchBoard]);
+
   if (!currentUser) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -252,6 +287,28 @@ export function ProfilesPage({
     desc: string,
   ) => {
     const board = boards[kind];
+    const filter = regionFilters[kind];
+
+    const setFilter = (type: "all" | "mine" | "other", code: string | null = null) =>
+      setRegionFilters((prev) => ({ ...prev, [kind]: { type, code } }));
+
+    const visibleEntries = board.entries.filter((e) => matchesRegionFilter(e, filter));
+
+    const filterBtn = (type: "all" | "mine" | "other", label: string) => (
+      <button
+        key={type}
+        onClick={() => setFilter(type)}
+        className="text-xs px-2 py-1 rounded border transition-colors shrink-0"
+        style={{
+          borderColor: filter.type === type ? "var(--v2-accent)" : "var(--v2-border)",
+          color: filter.type === type ? "var(--v2-accent)" : "var(--v2-muted)",
+          background: "transparent",
+        }}
+      >
+        {label}
+      </button>
+    );
+
     return (
       <div
         className="rounded-lg border"
@@ -261,42 +318,56 @@ export function ProfilesPage({
         }}
       >
         <div
-          className="flex items-center justify-between px-5 py-4 border-b"
+          className="px-5 py-4 border-b space-y-3"
           style={{ borderColor: "var(--v2-border)" }}
         >
-          <div>
-            <div className="flex items-center gap-2">
-              <span style={{ color: "var(--v2-accent)" }}>{icon}</span>
-              <h2
-                className="text-sm font-semibold"
-                style={{ color: "var(--v2-text)" }}
-              >
-                {title}
-              </h2>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span style={{ color: "var(--v2-accent)" }}>{icon}</span>
+                <h2
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--v2-text)" }}
+                >
+                  {title}
+                </h2>
+              </div>
+              <p className="text-xs mt-0.5" style={{ color: "var(--v2-muted)" }}>
+                {desc}
+              </p>
             </div>
-            <p className="text-xs mt-0.5" style={{ color: "var(--v2-muted)" }}>
-              {desc}
-            </p>
+            <button
+              onClick={() => void fetchBoard(kind, true, null)}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors"
+              style={{
+                borderColor: "var(--v2-border)",
+                color: "var(--v2-muted)",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "var(--v2-hover)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "transparent")
+              }
+            >
+              <RefreshCcw size={12} /> Refresh
+            </button>
           </div>
-          <button
-            onClick={() => void fetchBoard(kind, true, null)}
-            className="flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors"
-            style={{
-              borderColor: "var(--v2-border)",
-              color: "var(--v2-muted)",
-            }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = "var(--v2-hover)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = "transparent")
-            }
-          >
-            <RefreshCcw size={12} /> Refresh
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {filterBtn("all", "All")}
+            {filterBtn("mine", "My region")}
+            {filterBtn("other", "Other region")}
+            {filter.type === "other" && (
+              <CountryPicker
+                value={filter.code}
+                onChange={(code) => setFilter("other", code)}
+                onClear={() => setFilter("other", null)}
+              />
+            )}
+          </div>
         </div>
         <div className="p-3 space-y-2">
-          {board.entries.length === 0 && !board.loading && (
+          {visibleEntries.length === 0 && !board.loading && (
             <p
               className="text-xs text-center py-4"
               style={{ color: "var(--v2-muted)" }}
@@ -315,7 +386,7 @@ export function ProfilesPage({
               />
             </div>
           )}
-          {board.entries.map((entry, i) => {
+          {visibleEntries.map((entry, i) => {
             const statLine =
               kind === "elo"
                 ? `ELO ${entry.stats?.accountElo ?? "—"}`
@@ -330,6 +401,14 @@ export function ProfilesPage({
               />
             );
           })}
+          {board.loading && board.entries.length > 0 && (
+            <div className="flex justify-center py-3">
+              <div
+                className="w-4 h-4 rounded-full border-2 animate-spin"
+                style={{ borderColor: "var(--v2-accent)", borderTopColor: "transparent" }}
+              />
+            </div>
+          )}
           {board.entries.length > 0 && (
             <button
               onClick={() => void fetchBoard(kind, false, board.cursor)}

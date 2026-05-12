@@ -537,6 +537,7 @@ function AppV2Inner() {
                         return next
                       })
                     }}
+                    onNavigateToProfile={(uid) => setViewingProfileId(uid)}
                   />
                 ) : (
                   <ProfilesPage

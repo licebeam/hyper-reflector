@@ -23,6 +23,7 @@ export type V2User = {
   currentMatchId?: string
   winStreak?: number
   longestWinStreak?: number
+  createdAt?: number
 }
 
 export type V2Message = {

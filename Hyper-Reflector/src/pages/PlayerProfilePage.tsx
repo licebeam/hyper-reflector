@@ -36,6 +36,8 @@ type PlayerMatch = {
   timestamp?: number;
   player1Name?: string;
   player2Name?: string;
+  player1Uid?: string;
+  player2Uid?: string;
   p1Wins?: number;
   p2Wins?: number;
   player1Char?: string;
@@ -54,6 +56,7 @@ type ProfileData = {
   winStreak?: number;
   longestWinStreak?: number;
   gravEmail?: string;
+  createdAt?: number;
   assignedFlairs?: {
     bgColor: string;
     border: string;
@@ -202,6 +205,7 @@ type PlayerProfilePageProps = {
   currentUser: V2User | null;
   onBack: () => void;
   onUserUpdated?: (updated: Partial<V2User>) => void;
+  onNavigateToProfile?: (uid: string) => void;
 };
 
 export function PlayerProfilePage({
@@ -209,6 +213,7 @@ export function PlayerProfilePage({
   currentUser,
   onBack,
   onUserUpdated,
+  onNavigateToProfile,
 }: PlayerProfilePageProps) {
   const isSelf = !!currentUser && currentUser.uid === profileUid;
   const canEdit = isSelf;
@@ -413,7 +418,7 @@ export function PlayerProfilePage({
     if (matchDetailCache[matchId]) return;
     setFetchingMatchId(matchId);
     try {
-      const result = await (api.getGlobalSet as (a: unknown, u: string, m: string) => Promise<any>)(auth, profileUid, matchId);
+      const result = await (api.getGlobalSet as any)(auth, profileUid, matchId);
       if (result?.globalSet) {
         setMatchDetailCache((prev) => ({ ...prev, [matchId]: result.globalSet }));
       }
@@ -502,6 +507,9 @@ export function PlayerProfilePage({
                       </span>
                     )}
                   </div>
+                  <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+                    Joined {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : "unknown"}
+                  </p>
                   <UserTitle title={profile.userTitle} size="sm" />
                   <div
                     className="flex items-center gap-3 text-xs"
@@ -936,9 +944,19 @@ export function PlayerProfilePage({
                         </div>
                         <div className="flex items-center">
                           <div className="flex-1">
-                            <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
-                              {match.player1Name || "Player 1"}
-                            </p>
+                            {match.player1Uid && onNavigateToProfile ? (
+                              <button
+                                className="text-sm font-semibold text-left hover:underline"
+                                style={{ color: "var(--v2-accent)" }}
+                                onClick={(e) => { e.stopPropagation(); onNavigateToProfile(match.player1Uid!); }}
+                              >
+                                {match.player1Name || "Player 1"}
+                              </button>
+                            ) : (
+                              <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
+                                {match.player1Name || "Player 1"}
+                              </p>
+                            )}
                             {match.player1Char && (
                               <p className="text-xs" style={{ color: "var(--v2-accent)" }}>
                                 {match.player1Char}{match.player1Super ? ` SA${match.player1Super}` : ""}
@@ -952,9 +970,19 @@ export function PlayerProfilePage({
                             vs
                           </span>
                           <div className="flex-1 text-right">
-                            <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
-                              {match.player2Name || "Player 2"}
-                            </p>
+                            {match.player2Uid && onNavigateToProfile ? (
+                              <button
+                                className="text-sm font-semibold w-full text-right hover:underline"
+                                style={{ color: "var(--v2-accent)" }}
+                                onClick={(e) => { e.stopPropagation(); onNavigateToProfile(match.player2Uid!); }}
+                              >
+                                {match.player2Name || "Player 2"}
+                              </button>
+                            ) : (
+                              <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
+                                {match.player2Name || "Player 2"}
+                              </p>
+                            )}
                             {match.player2Char && (
                               <p className="text-xs" style={{ color: "var(--v2-accent)" }}>
                                 {match.player2Char}{match.player2Super ? ` SA${match.player2Super}` : ""}

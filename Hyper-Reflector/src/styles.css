@@ -86,6 +86,12 @@
   animation: rank-popup-in 0.18s ease-out forwards;
 }
 
+/* ── Cursor: pointer on all interactive elements ────────────────────────────── */
+button:not([disabled]),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
 /* ── Animated pattern overlay ────────────────────────────────────────────────── */
 @keyframes v2-bg-scroll {
   from {
