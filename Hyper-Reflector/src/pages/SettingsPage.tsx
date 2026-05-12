@@ -20,13 +20,10 @@ import {
   NAME_SELF_SWATCHES,
   NAME_OTHER_SWATCHES,
 } from "../theme";
-import type { V2User } from "../types";
 import { GAMES } from "../games";
 
 type SettingsPageProps = {
-  user: V2User;
   onLogout: () => void;
-  onUpdateUser?: (patch: Partial<V2User>) => void;
 };
 
 const DELAYS = ["0", "1", "2", "3", "4", "5", "6", "7"];
@@ -261,11 +258,8 @@ function SoundRow({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export function SettingsPage({ user, onLogout, onUpdateUser }: SettingsPageProps) {
+export function SettingsPage({ onLogout }: SettingsPageProps) {
   const [resetConfirm, setResetConfirm] = useState(false);
-  const [gravEmail, setGravEmail] = useState(user.gravEmail ?? "");
-  const [gravEditing, setGravEditing] = useState(false);
-  const [gravDraft, setGravDraft] = useState("");
   const [romPathStatus, setRomPathStatus] = useState<
     | { kind: "success"; text: string }
     | { kind: "error"; text: string }
@@ -674,109 +668,12 @@ export function SettingsPage({ user, onLogout, onUpdateUser }: SettingsPageProps
 
         {/* ── Account ── */}
         <Section title="Account">
-          <Row label="Username">
-            <span
-              className="text-sm font-medium"
-              style={{ color: "var(--v2-accent)" }}
-            >
-              {user.userName}
-            </span>
-          </Row>
-          {user.userEmail && (
-            <Row label="Email">
-              <span className="text-sm" style={{ color: "var(--v2-text)" }}>
-                {user.userEmail}
-              </span>
-            </Row>
-          )}
-          <Row label="ELO">
-            <span className="text-sm" style={{ color: "var(--v2-text)" }}>
-              {user.accountElo}
-            </span>
-          </Row>
-          {/* Gravatar email */}
-          <div className="py-1 space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <p className="text-sm" style={{ color: "var(--v2-text)" }}>
-                  Gravatar Email
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: "var(--v2-muted)" }}>
-                  Sets your profile picture via{" "}
-                  <a
-                    href="https://gravatar.com"
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: "var(--v2-accent)" }}
-                  >
-                    gravatar.com
-                  </a>
-                </p>
-              </div>
-              {!gravEditing && (
-                <button
-                  onClick={() => { setGravDraft(gravEmail); setGravEditing(true); }}
-                  className="text-xs px-2 py-1 rounded border transition-colors shrink-0"
-                  style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)", background: "var(--v2-hover)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "var(--v2-text)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "var(--v2-muted)")}
-                >
-                  Edit
-                </button>
-              )}
-            </div>
-            {gravEditing ? (
-              <div className="flex items-center gap-2">
-                <input
-                  type="email"
-                  value={gravDraft}
-                  onChange={(e) => setGravDraft(e.target.value)}
-                  placeholder="you@example.com"
-                  className="flex-1 text-sm px-2 py-1 rounded border outline-none"
-                  style={{ background: "var(--v2-hover)", borderColor: "var(--v2-border)", color: "var(--v2-text)" }}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      setGravEmail(gravDraft);
-                      onUpdateUser?.({ gravEmail: gravDraft });
-                      setGravEditing(false);
-                    } else if (e.key === "Escape") {
-                      setGravEditing(false);
-                    }
-                  }}
-                />
-                <button
-                  onClick={() => { setGravEmail(gravDraft); onUpdateUser?.({ gravEmail: gravDraft }); setGravEditing(false); }}
-                  className="text-xs px-2 py-1 rounded border transition-colors shrink-0"
-                  style={{ borderColor: "var(--v2-accent)", color: "var(--v2-accent)", background: "transparent" }}
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => setGravEditing(false)}
-                  className="text-xs px-2 py-1 rounded border transition-colors shrink-0"
-                  style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)", background: "transparent" }}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <p className="text-xs font-mono" style={{ color: gravEmail ? "var(--v2-text)" : "var(--v2-muted)" }}>
-                {gravEmail || "Not set"}
-              </p>
-            )}
-          </div>
-          <div
-            className="pt-2 border-t"
-            style={{ borderColor: "var(--v2-border)" }}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors"
           >
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors"
-            >
-              <LogOut size={14} /> Sign out
-            </button>
-          </div>
+            <LogOut size={14} /> Sign out
+          </button>
         </Section>
 
         {/* ── Danger zone ── */}

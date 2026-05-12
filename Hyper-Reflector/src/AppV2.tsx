@@ -519,17 +519,9 @@ function AppV2Inner() {
               {page === "home" && <HomePage currentUser={user} />}
               {page === "lab" && <LabPage />}
               {page === "data" && <DataPage />}
-              {page === "settings" && user && (
+              {page === "settings" && (
                 <SettingsPage
-                  user={user}
                   onLogout={handleLogout}
-                  onUpdateUser={(patch) => {
-                    setUser((prev) => {
-                      const next = prev ? { ...prev, ...patch } : prev;
-                      if (next) pushProfileUpdate(next);
-                      return next;
-                    });
-                  }}
                 />
               )}
               {page === "profiles" &&

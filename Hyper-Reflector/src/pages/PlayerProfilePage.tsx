@@ -38,6 +38,10 @@ type PlayerMatch = {
   player2Name?: string;
   p1Wins?: number;
   p2Wins?: number;
+  player1Char?: string;
+  player2Char?: string;
+  player1Super?: number;
+  player2Super?: number;
 };
 type ProfileData = {
   uid?: string;
@@ -49,6 +53,7 @@ type ProfileData = {
   knownAliases?: string[];
   winStreak?: number;
   longestWinStreak?: number;
+  gravEmail?: string;
   assignedFlairs?: {
     bgColor: string;
     border: string;
@@ -223,7 +228,12 @@ export function PlayerProfilePage({
   const [nameDraft, setNameDraft] = useState("");
   const [nameInvalid, setNameInvalid] = useState(false);
   const [pendingTitle, setPendingTitle] = useState<TitleOption | null>(null);
+  const [gravEmailDraft, setGravEmailDraft] = useState("");
+  const [gravEmailEditing, setGravEmailEditing] = useState(false);
   const [titlePickerOpen, setTitlePickerOpen] = useState(false);
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [matchDetailCache, setMatchDetailCache] = useState<Record<string, unknown>>({});
+  const [fetchingMatchId, setFetchingMatchId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -232,6 +242,14 @@ export function PlayerProfilePage({
   const loadProfile = useCallback(async () => {
     if (!auth.currentUser) return;
     setProfileLoading(true);
+    setPlayerStats(null);
+    setMatches([]);
+    setMatchCursor({});
+    setGravEmailEditing(false);
+    setTitlePickerOpen(false);
+    setSaveError(null);
+    setExpandedMatchId(null);
+    setMatchDetailCache({});
     try {
       const [userData, statsData, titlesData] = await Promise.all([
         api.getUserData(auth, profileUid),
@@ -243,6 +261,7 @@ export function PlayerProfilePage({
         setProfile(p);
         setNameDraft(p.userName || "");
         setPendingTitle(p.userTitle || null);
+        setGravEmailDraft(p.gravEmail || "");
       }
       if (statsData?.playerStatSet)
         setPlayerStats(statsData.playerStatSet as PlayerStats);
@@ -364,18 +383,42 @@ export function PlayerProfilePage({
       payload.userName = trimName;
     if (pendingTitle && pendingTitle.title !== profile.userTitle?.title)
       payload.userTitle = pendingTitle;
+    const trimGravEmail = gravEmailDraft.trim();
+    if (gravEmailEditing && trimGravEmail !== (profile.gravEmail ?? ""))
+      payload.gravEmail = trimGravEmail;
     if (!Object.keys(payload).length) return;
     setSaving(true);
     setSaveError(null);
     try {
       await api.updateUserData(auth, payload);
       setProfile((prev) => (prev ? { ...prev, ...payload } : prev));
+      setGravEmailEditing(false);
       onUserUpdated?.(payload as Partial<V2User>);
     } catch (err) {
       console.error("[v2] PlayerProfilePage: saveProfile failed", err);
       setSaveError("Update failed. Please try again.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ── Match expand ─────────────────────────────────────────────────────────────
+
+  const toggleMatchExpand = async (matchId: string) => {
+    if (expandedMatchId === matchId) {
+      setExpandedMatchId(null);
+      return;
+    }
+    setExpandedMatchId(matchId);
+    if (matchDetailCache[matchId]) return;
+    setFetchingMatchId(matchId);
+    try {
+      const result = await (api.getGlobalSet as (a: unknown, u: string, m: string) => Promise<any>)(auth, profileUid, matchId);
+      if (result?.globalSet) {
+        setMatchDetailCache((prev) => ({ ...prev, [matchId]: result.globalSet }));
+      }
+    } finally {
+      setFetchingMatchId(null);
     }
   };
 
@@ -521,6 +564,44 @@ export function PlayerProfilePage({
                         >
                           {nameError}
                         </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label
+                        className="text-xs font-medium block mb-1"
+                        style={{ color: "var(--v2-muted)" }}
+                      >
+                        Gravatar email
+                      </label>
+                      {gravEmailEditing ? (
+                        <input
+                          type="email"
+                          value={gravEmailDraft}
+                          onChange={(e) => setGravEmailDraft(e.target.value)}
+                          placeholder="you@example.com"
+                          autoFocus
+                          className="w-full rounded px-3 py-1.5 text-sm border outline-none transition-colors"
+                          style={{
+                            background: "var(--v2-hover)",
+                            borderColor: "var(--v2-border)",
+                            color: "var(--v2-text)",
+                          }}
+                          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--v2-accent)")}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--v2-border)")}
+                          onKeyDown={(e) => { if (e.key === "Escape") { setGravEmailDraft(profile?.gravEmail || ""); setGravEmailEditing(false); } }}
+                        />
+                      ) : (
+                        <div
+                          className="flex items-center justify-between gap-2 rounded px-3 py-1.5 border cursor-pointer"
+                          style={{ background: "var(--v2-hover)", borderColor: "var(--v2-border)" }}
+                          onClick={() => setGravEmailEditing(true)}
+                        >
+                          <span className="text-sm" style={{ color: profile?.gravEmail ? "var(--v2-text)" : "var(--v2-muted)" }}>
+                            {profile?.gravEmail ? "••••••••••••" : "Not set"}
+                          </span>
+                          <span className="text-xs shrink-0" style={{ color: "var(--v2-muted)" }}>Edit</span>
+                        </div>
                       )}
                     </div>
 
@@ -821,65 +902,94 @@ export function PlayerProfilePage({
                 </p>
               ) : (
                 matches.map((match, i) => {
+                  const matchKey = match.sessionId || match.id || `${i}`;
                   const date = match.timestamp
                     ? new Date(match.timestamp).toLocaleString()
                     : "Unknown";
+                  const isExpanded = expandedMatchId === matchKey;
+                  const isFetching = fetchingMatchId === matchKey;
+                  const detail = matchDetailCache[matchKey];
                   return (
                     <div
                       key={match.id ?? `${match.sessionId}-${i}`}
-                      className="rounded border p-3"
+                      className="rounded border overflow-hidden"
                       style={{ borderColor: "var(--v2-border)" }}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span
-                          className="text-xs font-medium"
-                          style={{ color: "var(--v2-text)" }}
-                        >
-                          Session {match.sessionId || "unknown"}
-                        </span>
-                        <span
-                          className="text-xs"
-                          style={{ color: "var(--v2-muted)" }}
-                        >
-                          {date}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p
-                            className="text-sm font-semibold"
-                            style={{ color: "var(--v2-text)" }}
-                          >
-                            {match.player1Name || "Player 1"}
-                          </p>
-                          <p
-                            className="text-xs"
-                            style={{ color: "var(--v2-muted)" }}
-                          >
-                            Wins: {match.p1Wins ?? 0}
-                          </p>
+                      <button
+                        className="w-full text-left p-3 transition-colors"
+                        style={{ background: "transparent" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--v2-hover)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        onClick={() => void toggleMatchExpand(matchKey)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium" style={{ color: "var(--v2-text)" }}>
+                            Session {match.sessionId || "unknown"}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs" style={{ color: "var(--v2-muted)" }}>{date}</span>
+                            {isExpanded
+                              ? <ChevronUp size={12} style={{ color: "var(--v2-muted)" }} />
+                              : <ChevronDown size={12} style={{ color: "var(--v2-muted)" }} />
+                            }
+                          </div>
                         </div>
-                        <span
-                          className="text-xs"
-                          style={{ color: "var(--v2-muted)" }}
-                        >
-                          vs
-                        </span>
-                        <div className="text-right">
-                          <p
-                            className="text-sm font-semibold"
-                            style={{ color: "var(--v2-text)" }}
-                          >
-                            {match.player2Name || "Player 2"}
-                          </p>
-                          <p
-                            className="text-xs"
-                            style={{ color: "var(--v2-muted)" }}
-                          >
-                            Wins: {match.p2Wins ?? 0}
-                          </p>
+                        <div className="flex items-center">
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
+                              {match.player1Name || "Player 1"}
+                            </p>
+                            {match.player1Char && (
+                              <p className="text-xs" style={{ color: "var(--v2-accent)" }}>
+                                {match.player1Char}{match.player1Super ? ` SA${match.player1Super}` : ""}
+                              </p>
+                            )}
+                            <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+                              Wins: {match.p1Wins ?? 0}
+                            </p>
+                          </div>
+                          <span className="w-8 text-center text-xs shrink-0" style={{ color: "var(--v2-muted)" }}>
+                            vs
+                          </span>
+                          <div className="flex-1 text-right">
+                            <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
+                              {match.player2Name || "Player 2"}
+                            </p>
+                            {match.player2Char && (
+                              <p className="text-xs" style={{ color: "var(--v2-accent)" }}>
+                                {match.player2Char}{match.player2Super ? ` SA${match.player2Super}` : ""}
+                              </p>
+                            )}
+                            <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+                              Wins: {match.p2Wins ?? 0}
+                            </p>
+                          </div>
                         </div>
-                      </div>
+                      </button>
+                      {isExpanded && (
+                        <div
+                          className="border-t px-3 py-3"
+                          style={{ borderColor: "var(--v2-border)", background: "var(--v2-hover)" }}
+                        >
+                          {isFetching ? (
+                            <div className="flex justify-center py-3">
+                              <div
+                                className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+                                style={{ borderColor: "var(--v2-accent)", borderTopColor: "transparent" }}
+                              />
+                            </div>
+                          ) : detail ? (
+                            <pre
+                              className="text-xs overflow-auto max-h-64 whitespace-pre-wrap break-all"
+                              style={{ color: "var(--v2-text)" }}
+                            >
+                              {JSON.stringify(detail, null, 2)}
+                            </pre>
+                          ) : (
+                            <p className="text-xs" style={{ color: "var(--v2-muted)" }}>No data available.</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })
