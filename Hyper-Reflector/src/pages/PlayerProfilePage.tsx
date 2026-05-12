@@ -30,6 +30,7 @@ type PlayerStats = {
   accountElo?: number;
   characters?: Record<string, PlayerCharacterStats>;
 };
+type MatchCharEntry = { char: string | null; super?: number | null };
 type PlayerMatch = {
   id?: string;
   sessionId?: string;
@@ -40,10 +41,14 @@ type PlayerMatch = {
   player2Uid?: string;
   p1Wins?: number;
   p2Wins?: number;
+  // legacy single-value fields (old sessions)
   player1Char?: string;
   player2Char?: string;
   player1Super?: number;
   player2Super?: number;
+  // new array fields (sessions after the update)
+  player1Chars?: MatchCharEntry[];
+  player2Chars?: MatchCharEntry[];
 };
 type ProfileData = {
   uid?: string;
@@ -83,7 +88,12 @@ function normalizeSuperChoices(
 ): SuperArtStats[] {
   if (!choice) return [];
   if (Array.isArray(choice)) return choice;
-  return Object.values(choice);
+  const result: SuperArtStats[] = [];
+  for (const [key, val] of Object.entries(choice)) {
+    const idx = parseInt(key, 10);
+    if (!isNaN(idx) && idx >= 0 && idx <= 2) result[idx] = val;
+  }
+  return result;
 }
 
 
@@ -522,11 +532,21 @@ export function PlayerProfilePage({
                   </div>
                   {Array.isArray(profile.knownAliases) &&
                     profile.knownAliases.length > 0 && (
-                      <p
-                        className="text-xs"
-                        style={{ color: "var(--v2-muted)" }}
-                      >
-                        aka {profile.knownAliases.slice(0, 5).join(", ")}
+                      <p className="text-xs flex items-center gap-1.5" style={{ color: "var(--v2-muted)" }}>
+                        aka {profile.knownAliases[profile.knownAliases.length - 1]}
+                        {profile.knownAliases.length > 1 && (
+                          <span
+                            className="text-xs px-1 py-0.5 rounded border"
+                            style={{
+                              borderColor: "var(--v2-border)",
+                              color: "var(--v2-muted)",
+                              cursor: "default",
+                            }}
+                            title={profile.knownAliases.slice(0, -1).join(", ")}
+                          >
+                            +{profile.knownAliases.length - 1}
+                          </span>
+                        )}
                       </p>
                     )}
                 </div>
@@ -931,16 +951,11 @@ export function PlayerProfilePage({
                         onClick={() => void toggleMatchExpand(matchKey)}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-medium" style={{ color: "var(--v2-text)" }}>
-                            Session {match.sessionId || "unknown"}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs" style={{ color: "var(--v2-muted)" }}>{date}</span>
-                            {isExpanded
-                              ? <ChevronUp size={12} style={{ color: "var(--v2-muted)" }} />
-                              : <ChevronDown size={12} style={{ color: "var(--v2-muted)" }} />
-                            }
-                          </div>
+                          <span className="text-xs" style={{ color: "var(--v2-muted)" }}>{date}</span>
+                          {isExpanded
+                            ? <ChevronUp size={12} style={{ color: "var(--v2-muted)" }} />
+                            : <ChevronDown size={12} style={{ color: "var(--v2-muted)" }} />
+                          }
                         </div>
                         <div className="flex items-center">
                           <div className="flex-1">
@@ -957,11 +972,31 @@ export function PlayerProfilePage({
                                 {match.player1Name || "Player 1"}
                               </p>
                             )}
-                            {match.player1Char && (
-                              <p className="text-xs" style={{ color: "var(--v2-accent)" }}>
-                                {match.player1Char}{match.player1Super ? ` SA${match.player1Super}` : ""}
-                              </p>
-                            )}
+                            {(() => {
+                              const chars = (match.player1Chars?.length
+                                ? match.player1Chars
+                                : match.player1Char
+                                  ? [{ char: match.player1Char, super: match.player1Super }]
+                                  : []
+                              ).filter((c) => c.char);
+                              if (!chars.length) return null;
+                              const first = chars[0];
+                              const rest = chars.slice(1);
+                              return (
+                                <p className="text-xs flex items-center gap-1.5" style={{ color: "var(--v2-accent)" }}>
+                                  {first.char}{first.super != null ? ` SA${first.super + 1}` : ""}
+                                  {rest.length > 0 && (
+                                    <span
+                                      className="text-xs px-1 py-0.5 rounded border"
+                                      style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)", cursor: "default" }}
+                                      title={rest.map((c) => `${c.char}${c.super != null ? ` SA${c.super + 1}` : ""}`).join(", ")}
+                                    >
+                                      +{rest.length}
+                                    </span>
+                                  )}
+                                </p>
+                              );
+                            })()}
                             <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
                               Wins: {match.p1Wins ?? 0}
                             </p>
@@ -983,11 +1018,31 @@ export function PlayerProfilePage({
                                 {match.player2Name || "Player 2"}
                               </p>
                             )}
-                            {match.player2Char && (
-                              <p className="text-xs" style={{ color: "var(--v2-accent)" }}>
-                                {match.player2Char}{match.player2Super ? ` SA${match.player2Super}` : ""}
-                              </p>
-                            )}
+                            {(() => {
+                              const chars = (match.player2Chars?.length
+                                ? match.player2Chars
+                                : match.player2Char
+                                  ? [{ char: match.player2Char, super: match.player2Super }]
+                                  : []
+                              ).filter((c) => c.char);
+                              if (!chars.length) return null;
+                              const first = chars[0];
+                              const rest = chars.slice(1);
+                              return (
+                                <p className="text-xs flex items-center gap-1.5 justify-end" style={{ color: "var(--v2-accent)" }}>
+                                  {first.char}{first.super != null ? ` SA${first.super + 1}` : ""}
+                                  {rest.length > 0 && (
+                                    <span
+                                      className="text-xs px-1 py-0.5 rounded border"
+                                      style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)", cursor: "default" }}
+                                      title={rest.map((c) => `${c.char}${c.super != null ? ` SA${c.super + 1}` : ""}`).join(", ")}
+                                    >
+                                      +{rest.length}
+                                    </span>
+                                  )}
+                                </p>
+                              );
+                            })()}
                             <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
                               Wins: {match.p2Wins ?? 0}
                             </p>
@@ -996,9 +1051,12 @@ export function PlayerProfilePage({
                       </button>
                       {isExpanded && (
                         <div
-                          className="border-t px-3 py-3"
+                          className="border-t px-3 py-3 space-y-2"
                           style={{ borderColor: "var(--v2-border)", background: "var(--v2-hover)" }}
                         >
+                          <p className="text-xs font-medium" style={{ color: "var(--v2-muted)" }}>
+                            Session {match.sessionId || "unknown"}
+                          </p>
                           {isFetching ? (
                             <div className="flex justify-center py-3">
                               <div
