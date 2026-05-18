@@ -13,6 +13,7 @@ import { auth } from "../utils/firebase";
 import type { V2User } from "../types";
 import { CountryFlag } from "../components/CountryFlag";
 import { UserTitle } from "../components/UserTitle";
+import { MeterChart } from "../components/MeterChart";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -139,6 +140,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
     </div>
   );
 }
+
 
 function CharSADonut({
   name,
@@ -1065,12 +1067,168 @@ export function PlayerProfilePage({
                               />
                             </div>
                           ) : detail ? (
-                            <pre
-                              className="text-xs overflow-auto max-h-64 whitespace-pre-wrap break-all"
-                              style={{ color: "var(--v2-text)" }}
-                            >
-                              {JSON.stringify(detail, null, 2)}
-                            </pre>
+                            <>
+                              {Array.isArray(detail.matches) && detail.matches.map((m: any, i: number) => {
+                                let parsed: any = null;
+                                try { parsed = JSON.parse(m.matchData?.raw ?? ""); } catch { /* unparseable */ }
+                                const toArr = (v: any): number[] =>
+                                  Array.isArray(v) ? v : typeof v === "number" ? [v] : [];
+                                const p1Meter = toArr(parsed?.["p1-meter-gained"]);
+                                const p2Meter = toArr(parsed?.["p2-meter-gained"]);
+                                const p1Wins = m.result === "1";
+                                const p1Super = m.player1Super != null ? ` SA${m.player1Super + 1}` : "";
+                                const p2Super = m.player2Super != null ? ` SA${m.player2Super + 1}` : "";
+                                const p1Knockdowns = parsed?.["p1-knockdowns"] ?? null;
+                                const p2Knockdowns = parsed?.["p2-knockdowns"] ?? null;
+                                const p1FastWakeups = parsed?.["p1-fast-wakeups"] ?? null;
+                                const p2FastWakeups = parsed?.["p2-fast-wakeups"] ?? null;
+                                const p1Parries = parsed?.["p1-parries"] ?? null;
+                                const p2Parries = parsed?.["p2-parries"] ?? null;
+                                const p1Throws = parsed?.["p1-throws"] ?? null;
+                                const p2Throws = parsed?.["p2-throws"] ?? null;
+                                const p1SupersUsed = parsed?.["p1-supers-used"] ?? null;
+                                const p2SupersUsed = parsed?.["p2-supers-used"] ?? null;
+                                const p1ThrowTechs = parsed?.["p1-throw-techs"] ?? null;
+                                const p2ThrowTechs = parsed?.["p2-throw-techs"] ?? null;
+                                const p1ThrowWhiffs = parsed?.["p1-throw-whiffs"] ?? null;
+                                const p2ThrowWhiffs = parsed?.["p2-throw-whiffs"] ?? null;
+                                const hasKdData = p1Knockdowns !== null || p2Knockdowns !== null;
+                                const hasFwData = p1FastWakeups !== null || p2FastWakeups !== null;
+                                const hasParryData = p1Parries !== null || p2Parries !== null;
+                                const hasThrowData = p1Throws !== null || p2Throws !== null;
+                                const hasSuperData = p1SupersUsed !== null || p2SupersUsed !== null;
+                                const hasTechData = p1ThrowTechs !== null || p2ThrowTechs !== null;
+                                const hasWhiffData = p1ThrowWhiffs !== null || p2ThrowWhiffs !== null;
+                                return (
+                                  <div
+                                    key={i}
+                                    className="rounded border p-2 space-y-1"
+                                    style={{ borderColor: "var(--v2-border)" }}
+                                  >
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span style={{ color: "var(--v2-muted)" }}>Game {i + 1}</span>
+                                      <div className="flex items-center gap-3">
+                                        <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>
+                                          {m.player1Char || "?"}{p1Super}
+                                        </span>
+                                        <span style={{ color: "var(--v2-muted)" }}>vs</span>
+                                        <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>
+                                          {m.player2Char || "?"}{p2Super}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {(p1Meter.length >= 2 || p2Meter.length >= 2) && (
+                                      <div>
+                                        <p className="text-xs mb-0.5" style={{ color: "var(--v2-muted)" }}>Meter build</p>
+                                        <MeterChart
+                                          p1Samples={p1Meter}
+                                          p2Samples={p2Meter}
+                                          p1Color={p1Wins ? "var(--v2-accent)" : "var(--v2-muted)"}
+                                          p2Color={!p1Wins ? "var(--v2-accent)" : "var(--v2-muted)"}
+                                        />
+                                        <div className="flex gap-3 mt-0.5">
+                                          <span className="text-xs flex items-center gap-1">
+                                            <span className="inline-block w-2 h-0.5 rounded" style={{ background: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }} />
+                                            <span style={{ color: "var(--v2-muted)" }}>{detail.player1Name || "P1"} ({parsed?.["p1-total-meter-gained"] ?? "—"})</span>
+                                          </span>
+                                          <span className="text-xs flex items-center gap-1">
+                                            <span className="inline-block w-2 h-0.5 rounded" style={{ background: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }} />
+                                            <span style={{ color: "var(--v2-muted)" }}>{detail.player2Name || "P2"} ({parsed?.["p2-total-meter-gained"] ?? "—"})</span>
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {(hasKdData || hasFwData) && (
+                                      <div
+                                        className="grid grid-cols-2 gap-x-4 gap-y-0.5 pt-1 mt-1 border-t text-xs"
+                                        style={{ borderColor: "var(--v2-border)" }}
+                                      >
+                                        {hasKdData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>
+                                              Times knocked down
+                                            </span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1Knockdowns ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2Knockdowns ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasFwData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>
+                                              Quick rises
+                                            </span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1FastWakeups ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2FastWakeups ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasParryData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Parries</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1Parries ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2Parries ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasThrowData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Throws</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1Throws ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2Throws ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasWhiffData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Throw whiffs</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1ThrowWhiffs ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2ThrowWhiffs ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasTechData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Throw techs</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1ThrowTechs ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2ThrowTechs ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasSuperData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Supers used</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1SupersUsed ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2SupersUsed ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <pre
+                                className="text-xs overflow-auto max-h-64 whitespace-pre-wrap break-all"
+                                style={{ color: "var(--v2-text)" }}
+                              >
+                                {JSON.stringify(detail, null, 2)}
+                              </pre>
+                            </>
                           ) : (
                             <p className="text-xs" style={{ color: "var(--v2-muted)" }}>No data available.</p>
                           )}
