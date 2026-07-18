@@ -757,7 +757,13 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
           case 'webrtc-ping-offer': {
             if (!myUid || !payload.from || !payload.offer) break
-            if (isInMatchRef.current || isRankQueuedRef.current || isHandshakeInProgressRef.current) {
+            // TODO: also decline if the challenger is spectating once spectating exists
+            if (
+              isInMatchRef.current ||
+              isRankQueuedRef.current ||
+              isHandshakeInProgressRef.current ||
+              useSettingsStore.getState().isUserMuted(payload.from as string)
+            ) {
               try { socket.send(JSON.stringify({ type: 'webrtc-ping-decline', to: payload.from, from: myUid })) } catch {}
               break
             }
@@ -1006,6 +1012,8 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const myUid = userRef.current?.uid
       const myName = userRef.current?.userName ?? 'Player'
       if (!myUid) return
+
+      if (useSettingsStore.getState().isUserMuted(mockUser.uid)) return
 
       // 50/50 between a challenge and an @mention
       if (Math.random() < 0.5) {

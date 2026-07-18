@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Swords, Check, X, Eye, EyeOff } from "lucide-react";
 import type { V2Message, V2User } from "../types";
 import { GAMES, getGameName } from "../games";
+import { useSettingsStore } from "../state/store";
 
 const MAX_LENGTH = 120;
 
@@ -145,10 +146,15 @@ export function ChatPanel({
   const [mentionIdx, setMentionIdx] = useState(0);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mutedUsers = useSettingsStore((s) => s.mutedUsers);
+
+  const visibleMessages = messages.filter(
+    (m) => m.role !== "user" || !m.senderUid || !mutedUsers.includes(m.senderUid),
+  );
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [visibleMessages]);
 
   const mentionCandidates = mentionQuery !== null && users
     ? users.filter(
@@ -266,13 +272,13 @@ export function ChatPanel({
             </div>
           )}
         </div>
-        {messages.length === 0 && (
+        {visibleMessages.length === 0 && (
           <p className="text-sm text-center pt-8" style={{ color: "var(--v2-muted)" }}>
             No messages yet. Say hello!
           </p>
         )}
 
-        {messages.map((msg) => (
+        {visibleMessages.map((msg) => (
           <div key={msg.id} className="overflow-hidden">
             {msg.role === "user" && (
               <div className="min-w-0">

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Coffee, Flame, Swords, User } from "lucide-react";
+import { BellOff, Coffee, Flame, Swords, User } from "lucide-react";
+import { useSettingsStore } from "../state/store";
 
 function streakGlowStyle(streak: number): React.CSSProperties {
   if (streak <= 0) return {};
@@ -168,6 +169,8 @@ function PlayerRow({
 }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const expanded = hovered;
+  const isMuted = useSettingsStore((s) => s.isUserMuted(user.uid));
+  const toggleMutedUser = useSettingsStore((s) => s.toggleMutedUser);
 
   const { ping, isUnstable, networkType } = resolvePing(user, currentUser);
 
@@ -179,6 +182,7 @@ function PlayerRow({
       style={{
         background: hovered ? "var(--v2-hover)" : "transparent",
         borderColor: "var(--v2-border)",
+        opacity: !isSelf && isMuted ? 0.5 : 1,
         ...streakGlowStyle(streak),
       }}
       onMouseEnter={() => setHovered(true)}
@@ -201,6 +205,14 @@ function PlayerRow({
               style={{ color: "var(--v2-muted)" }}
             >
               (you)
+            </span>
+          )}
+          {!isSelf && isMuted && (
+            <span
+              className="flex items-center gap-0.5 text-[10px] px-1 rounded shrink-0"
+              style={{ color: "var(--v2-muted)", background: "color-mix(in srgb, var(--v2-muted) 12%, transparent)" }}
+            >
+              <BellOff size={9} /> Muted
             </span>
           )}
           {user.userTitle?.title && <UserTitle title={user.userTitle} />}
@@ -281,23 +293,29 @@ function PlayerRow({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!challengeDisabled) onChallenge(user.uid);
+                        if (!challengeDisabled && !isMuted) onChallenge(user.uid);
                       }}
-                      disabled={!!challengeDisabled}
+                      disabled={!!challengeDisabled || isMuted}
                       className="flex items-center gap-1 text-[16px] px-2 py-0.5 rounded font-medium transition-colors"
                       style={{
-                        background: challengeDisabled ? "var(--v2-hover)" : "var(--v2-accent)",
-                        color: challengeDisabled ? "var(--v2-muted)" : "var(--v2-accent-fg)",
-                        cursor: challengeDisabled ? "not-allowed" : "pointer",
-                        opacity: challengeDisabled ? 0.5 : 1,
+                        background: challengeDisabled || isMuted ? "var(--v2-hover)" : "var(--v2-accent)",
+                        color: challengeDisabled || isMuted ? "var(--v2-muted)" : "var(--v2-accent-fg)",
+                        cursor: challengeDisabled || isMuted ? "not-allowed" : "pointer",
+                        opacity: challengeDisabled || isMuted ? 0.5 : 1,
                       }}
                       onMouseEnter={(e) => {
-                        if (!challengeDisabled) e.currentTarget.style.background = "var(--v2-accent-hover)";
+                        if (!challengeDisabled && !isMuted) e.currentTarget.style.background = "var(--v2-accent-hover)";
                       }}
                       onMouseLeave={(e) => {
-                        if (!challengeDisabled) e.currentTarget.style.background = challengeDisabled ? "var(--v2-hover)" : "var(--v2-accent)";
+                        if (!challengeDisabled && !isMuted) e.currentTarget.style.background = "var(--v2-accent)";
                       }}
-                      title={challengeDisabled ? "Cannot challenge while in a match or searching" : undefined}
+                      title={
+                        isMuted
+                          ? "Unmute to challenge"
+                          : challengeDisabled
+                          ? "Cannot challenge while in a match or searching"
+                          : undefined
+                      }
                     >
                       <Swords size={16} /> Challenge
                     </button>
@@ -325,6 +343,24 @@ function PlayerRow({
                       <User size={16} /> Profile
                     </button>
                   )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleMutedUser(user.uid);
+                    }}
+                    className="flex items-center gap-1 text-[16px] px-2 py-0.5 rounded font-medium border transition-colors"
+                    style={{
+                      background: "transparent",
+                      color: "var(--v2-muted)",
+                      borderColor: "var(--v2-border)",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--v2-text)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--v2-muted)")}
+                    title={isMuted ? "Unmute player" : "Mute player"}
+                  >
+                    <BellOff size={16} /> {isMuted ? "Unmute" : "Mute"}
+                  </button>
                 </div>
               )}
             </div>

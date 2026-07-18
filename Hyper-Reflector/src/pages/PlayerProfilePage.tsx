@@ -17,6 +17,10 @@ import { MeterChart } from "../components/MeterChart";
 import { MatchReplay, type ReplayFrame } from "../components/MatchReplay";
 import { readPositionReplayFile } from "../utils/matchFiles";
 
+// Position replay is an unfinished prototype (parsing is fragile, no UI polish) —
+// hidden until it's ready. Flip to true to bring it back for local testing.
+const SHOW_POSITION_REPLAY_PROTOTYPE = false;
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type SuperArtStats = { wins?: number; losses?: number };
@@ -363,6 +367,7 @@ export function PlayerProfilePage({
   }, [matchesOpen, fetchMatches, matches.length]);
 
   useEffect(() => {
+    if (!SHOW_POSITION_REPLAY_PROTOTYPE) return;
     if (!matchesOpen || replayFrames) return;
     void readPositionReplayFile().then((raw) => {
       if (!raw) return;
@@ -972,7 +977,7 @@ export function PlayerProfilePage({
           </div>
           {matchesOpen && (
             <div className="p-4 space-y-2">
-              {replayFrames && replayFrames.length > 0 && (
+              {SHOW_POSITION_REPLAY_PROTOTYPE && replayFrames && replayFrames.length > 0 && (
                 <div
                   className="rounded border p-2 space-y-1"
                   style={{ borderColor: "var(--v2-border)" }}
