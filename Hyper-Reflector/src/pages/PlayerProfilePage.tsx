@@ -14,6 +14,8 @@ import type { V2User } from "../types";
 import { CountryFlag } from "../components/CountryFlag";
 import { UserTitle } from "../components/UserTitle";
 import { MeterChart } from "../components/MeterChart";
+import { MatchReplay, type ReplayFrame } from "../components/MatchReplay";
+import { readPositionReplayFile } from "../utils/matchFiles";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -253,6 +255,7 @@ export function PlayerProfilePage({
   const [fetchingMatchId, setFetchingMatchId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [replayFrames, setReplayFrames] = useState<ReplayFrame[] | null>(null);
 
   // ── Load profile ─────────────────────────────────────────────────────────────
 
@@ -358,6 +361,62 @@ export function PlayerProfilePage({
     if (matchesOpen && matches.length === 0)
       void fetchMatches("initial", null, null);
   }, [matchesOpen, fetchMatches, matches.length]);
+
+  useEffect(() => {
+    if (!matchesOpen || replayFrames) return;
+    void readPositionReplayFile().then((raw) => {
+      if (!raw) return;
+      try {
+        const data = JSON.parse(raw);
+        if (Array.isArray(data?.frames) && data.frames.length > 0) {
+          const rawFrames = data.frames as unknown[][];
+          const parsed: ReplayFrame[] = rawFrames.map((f) => ({
+            p1x: f[0] as number, p1y: f[1] as number,
+            p2x: f[2] as number, p2y: f[3] as number,
+            p1hp:      (f[4]  as number) ?? null,
+            p2hp:      (f[5]  as number) ?? null,
+            p1sa:      (f[6]  as number) ?? null,
+            p2sa:      (f[7]  as number) ?? null,
+            projs:     Array.isArray(f[8]) ? f[8] as [number, number][] : [],
+            p1stun:    (f[9]  as number) ?? null,
+            p2stun:    (f[10] as number) ?? null,
+            p1stunMax: (f[11] as number) ?? null,
+            p2stunMax: (f[12] as number) ?? null,
+            p1dizzy:   false,
+            p2dizzy:   false,
+            p1crouch:  (f[17] as number) === 32 || (f[17] as number) === 33,
+            p2crouch:  (f[18] as number) === 32 || (f[18] as number) === 33,
+          }));
+          // Stateful dizzy detection — mirrors effie's is_stunned logic:
+          // set when stun_activate fires (=1) or stun_timer is counting down (1-249)
+          // clear when stun_timer hits 0 or resets to >=250 and activate is not firing
+          let p1Dizzy = false, p2Dizzy = false;
+          for (let i = 0; i < rawFrames.length; i++) {
+            const f = rawFrames[i];
+            const p1Timer    = f[13] as number;
+            const p2Timer    = f[14] as number;
+            const p1Activate = f[15] as number;
+            const p2Activate = f[16] as number;
+            if (p1Activate === 1 || (p1Timer > 0 && p1Timer < 250)) p1Dizzy = true;
+            if (p2Activate === 1 || (p2Timer > 0 && p2Timer < 250)) p2Dizzy = true;
+            if (p1Dizzy && p1Activate !== 1 && (p1Timer === 0 || p1Timer >= 250)) p1Dizzy = false;
+            if (p2Dizzy && p2Activate !== 1 && (p2Timer === 0 || p2Timer >= 250)) p2Dizzy = false;
+            parsed[i].p1dizzy = p1Dizzy;
+            parsed[i].p2dizzy = p2Dizzy;
+          }
+          // Latch HP at 0 once a player is KO'd — prevents spurious reset during KO animation
+          let p1Dead = false, p2Dead = false;
+          for (const frame of parsed) {
+            if (frame.p1hp === 0) p1Dead = true;
+            if (frame.p2hp === 0) p2Dead = true;
+            if (p1Dead) frame.p1hp = 0;
+            if (p2Dead) frame.p2hp = 0;
+          }
+          setReplayFrames(parsed);
+        }
+      } catch { /* ignore malformed file */ }
+    });
+  }, [matchesOpen, replayFrames]);
 
   // ── Name validation ───────────────────────────────────────────────────────────
 
@@ -913,6 +972,15 @@ export function PlayerProfilePage({
           </div>
           {matchesOpen && (
             <div className="p-4 space-y-2">
+              {replayFrames && replayFrames.length > 0 && (
+                <div
+                  className="rounded border p-2 space-y-1"
+                  style={{ borderColor: "var(--v2-border)" }}
+                >
+                  <p className="text-xs font-medium" style={{ color: "var(--v2-muted)" }}>Last game — position replay</p>
+                  <MatchReplay frames={replayFrames} />
+                </div>
+              )}
               {matchesLoading ? (
                 <div className="flex justify-center py-4">
                   <div
