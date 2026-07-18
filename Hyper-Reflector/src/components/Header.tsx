@@ -410,10 +410,6 @@ export function Header({
     });
   }, [allLobbyMessages, activeLobbyId]);
 
-  const switchTo = (version: string) => {
-    localStorage.setItem("appVersion", version);
-    window.location.reload();
-  };
   const isQueued = currentUser?.isRankQueued ?? false;
 
   const visibleNotifs = notifications.filter((n) => !clearedIds.has(n.id));
@@ -658,28 +654,6 @@ export function Header({
             Profile
           </button>
         )}
-        {/* TODO: remove version switching */}
-        {/* <div
-          className="flex rounded overflow-hidden text-xs font-medium border"
-          style={{ borderColor: "var(--v2-border)" }}
-        >
-          <button
-            className="px-2 py-1 transition-colors"
-            style={{ background: "var(--v2-hover)", color: "var(--v2-muted)" }}
-            onClick={() => switchTo("v1")}
-          >
-            V1
-          </button>
-          <span
-            className="px-2 py-1"
-            style={{
-              background: "var(--v2-accent)",
-              color: "var(--v2-accent-fg)",
-            }}
-          >
-            V2
-          </span>
-        </div> */}
       </div>
     </header>
   );

@@ -20,6 +20,14 @@ const JITTER_UNSTABLE_THRESHOLD = 6
 const TICK_FAST_MS = 1_000   // when unmeasured peers exist
 const TICK_IDLE_MS = 15_000  // once everyone is covered
 
+// A peer that fails this many outbound attempts in a row (excluding explicit
+// "busy" declines) is almost certainly behind a NAT we can't traverse without
+// a TURN relay, which we deliberately don't use (it adds too much latency to
+// be a meaningful ping reading). Back off hard instead of retrying every
+// MEASUREMENT_TTL_MS forever and looping through "estimating" endlessly.
+const UNREACHABLE_THRESHOLD = 2
+const UNREACHABLE_BACKOFF_MS = 10 * 60 * 1000
+
 type MeasurementDirection = 'outbound' | 'inbound'
 
 type MeasurementSession = {
@@ -56,6 +64,7 @@ class PeerLatencyManager {
     private measuringTargets = new Set<string>()                      // targetUid → in-progress
     private sessions = new Map<string, MeasurementSession>()
     private lastMeasured = new Map<string, number>()
+    private consecutiveFailures = new Map<string, number>()
     private schedulerHandle?: number
     private inMatch = false
 
@@ -63,18 +72,28 @@ class PeerLatencyManager {
     onPingRecorded?: (targetUid: string, ping: number, isUnstable: boolean, networkType?: string) => void
     /** Called when a peer starts or finishes being measured — drives "estimating" UI. */
     onMeasuringChanged?: (uid: string, measuring: boolean) => void
+    /** Called when a peer crosses the unreachable threshold, or recovers from it. */
+    onReachabilityChanged?: (uid: string, unreachable: boolean) => void
 
     constructor() {
         if (typeof window !== 'undefined') this.reschedule()
     }
 
     setViewer(viewer?: TUser | null) {
+        const hadViewer = !!this.viewer
         this.viewer = viewer || undefined
-        if (!viewer) this.resetAllSessions()
+        if (!viewer) { this.resetAllSessions(); return }
+        // First time we get a viewer, jump the scheduler instead of waiting out
+        // whatever idle backoff it was already sitting in.
+        if (!hadViewer) this.reschedule(true)
     }
 
     setPeers(peers: TUser[]) {
+        const hadPeers = this.peers.length > 0
         this.peers = Array.isArray(peers) ? peers : []
+        // Same reasoning as setViewer: don't make the first peers of a freshly
+        // joined lobby wait out an existing idle timer before getting measured.
+        if (!hadPeers && this.peers.length > 0) this.reschedule(true)
     }
 
     setInMatch(active: boolean) {
@@ -87,10 +106,21 @@ class PeerLatencyManager {
         if (!socket) this.resetAllSessions()
     }
 
-    /** Force an immediate remeasurement for a specific uid (e.g. on challenge / rank match). */
+    /**
+     * Force an immediate, out-of-band remeasurement for a specific uid — bypasses
+     * the scheduler's slot/priority queue entirely instead of just marking the
+     * peer stale and hoping it wins the next scheduled pick. Used for explicit
+     * user actions (e.g. clicking a ping badge).
+     */
     triggerMeasureNow(uid: string) {
+        if (!this.viewer?.uid || this.inMatch) return
+        if (this.measuringTargets.has(uid)) return
         this.lastMeasured.delete(uid)
-        this.reschedule(true)
+        if (isMockUserId(uid)) {
+            this.simulateMockMeasurement(uid)
+        } else {
+            void this.startOutboundMeasurement(uid)
+        }
     }
 
     handleSignal(payload: LatencySignalPayload): boolean {
@@ -106,13 +136,20 @@ class PeerLatencyManager {
 
     // ── Scheduler ─────────────────────────────────────────────────────────────
 
+    /** Peers repeatedly failing to connect get a much longer retry interval. */
+    private ttlFor(uid: string): number {
+        return (this.consecutiveFailures.get(uid) ?? 0) >= UNREACHABLE_THRESHOLD
+            ? UNREACHABLE_BACKOFF_MS
+            : MEASUREMENT_TTL_MS
+    }
+
     private reschedule(immediate = false) {
         if (this.schedulerHandle) clearTimeout(this.schedulerHandle)
         const hasWork = this.peers.some(p => {
             if (!p?.uid || p.uid === this.viewer?.uid) return false
             if (this.measuringTargets.has(p.uid)) return false
             const last = this.lastMeasured.get(p.uid)
-            return !last || Date.now() - last >= MEASUREMENT_TTL_MS
+            return !last || Date.now() - last >= this.ttlFor(p.uid)
         })
         const delay = immediate ? 0 : hasWork ? TICK_FAST_MS : TICK_IDLE_MS
         this.schedulerHandle = window.setTimeout(() => {
@@ -142,7 +179,7 @@ class PeerLatencyManager {
             if (!u?.uid || u.uid === this.viewer?.uid) return false
             if (this.measuringTargets.has(u.uid)) return false
             const last = this.lastMeasured.get(u.uid)
-            return !last || now - last >= MEASUREMENT_TTL_MS
+            return !last || now - last >= this.ttlFor(u.uid)
         })
         eligible.sort((a, b) =>
             this.computePriorityScore(a, viewerCountry) - this.computePriorityScore(b, viewerCountry)
@@ -160,7 +197,7 @@ class PeerLatencyManager {
         else if (country !== viewerCountry) score += 10
         // Boost least-recently-measured peers
         const last = this.lastMeasured.get(user.uid)
-        if (last) score += Math.max(0, MEASUREMENT_TTL_MS - (Date.now() - last)) / 1000
+        if (last) score += Math.max(0, this.ttlFor(user.uid) - (Date.now() - last)) / 1000
         return score + Math.random() * 0.01
     }
 
@@ -412,6 +449,7 @@ class PeerLatencyManager {
 
     private recordMeasurement(targetUid: string, measurement: { ping: number; isUnstable: boolean; networkType?: string }) {
         this.lastMeasured.set(targetUid, Date.now())
+        this.clearFailures(targetUid)
         if (this.onPingRecorded) {
             this.onPingRecorded(targetUid, measurement.ping, measurement.isUnstable, measurement.networkType)
             return
@@ -460,8 +498,27 @@ class PeerLatencyManager {
     }
 
     private failSession(session: MeasurementSession, reason: string) {
-        if (session.direction === 'outbound') console.warn('Latency session failed', reason)
+        if (session.direction === 'outbound') {
+            console.warn('Latency session failed', reason)
+            // A "declined" isn't a connectivity failure — the peer is just busy
+            // (in-match, or already at its inbound-session cap) and reachable fine.
+            if (reason !== 'declined') this.recordFailure(session.targetUid)
+        }
         this.cleanupSession(session)
+    }
+
+    private recordFailure(targetUid: string) {
+        const next = (this.consecutiveFailures.get(targetUid) ?? 0) + 1
+        this.consecutiveFailures.set(targetUid, next)
+        if (next === UNREACHABLE_THRESHOLD) {
+            this.onReachabilityChanged?.(targetUid, true)
+        }
+    }
+
+    private clearFailures(targetUid: string) {
+        const wasUnreachable = (this.consecutiveFailures.get(targetUid) ?? 0) >= UNREACHABLE_THRESHOLD
+        this.consecutiveFailures.delete(targetUid)
+        if (wasUnreachable) this.onReachabilityChanged?.(targetUid, false)
     }
 
     private countInboundSessions(): number {

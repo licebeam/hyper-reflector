@@ -17,7 +17,12 @@ import { UserTitle } from "./UserTitle";
 
 // ── Ping helpers ───────────────────────────────────────────────────────────────
 
-type PingResult = { ping: number | null; isUnstable?: boolean; networkType?: string };
+type PingResult = {
+  ping: number | null;
+  isUnstable?: boolean;
+  networkType?: string;
+  source?: "measured" | "estimated";
+};
 
 function toNum(v: unknown): number | null {
   const n = Number(v);
@@ -30,9 +35,9 @@ function resolvePing(
 ): PingResult {
   if (!viewer || viewer.uid === user.uid) return { ping: null };
   const vr = (viewer.lastKnownPings as any[])?.find((p) => p?.id === user.uid);
-  if (vr) return { ping: toNum(vr.ping), isUnstable: vr.isUnstable, networkType: vr.networkType };
+  if (vr) return { ping: toNum(vr.ping), isUnstable: vr.isUnstable, networkType: vr.networkType, source: vr.source };
   const ur = (user.lastKnownPings as any[])?.find((p) => p?.id === viewer.uid);
-  if (ur) return { ping: toNum(ur.ping), isUnstable: ur.isUnstable, networkType: ur.networkType };
+  if (ur) return { ping: toNum(ur.ping), isUnstable: ur.isUnstable, networkType: ur.networkType, source: ur.source };
   return { ping: null };
 }
 
@@ -58,16 +63,30 @@ type PingBarsProps = {
   ping: number | null;
   isUnstable?: boolean;
   networkType?: string;
+  source?: "measured" | "estimated";
+  measuring?: boolean;
+  unreachable?: boolean;
 };
 
-function PingBars({ ping, isUnstable, networkType }: PingBarsProps) {
+function PingBars({ ping, isUnstable, networkType, source, measuring, unreachable }: PingBarsProps) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const bars = pingBarCount(ping);
   const color = pingBarColor(bars, isUnstable);
+  const showEstimating = !!measuring || (!unreachable && ping !== null && source !== "measured");
+  const dim = showEstimating || !!unreachable;
   const pingLabel = ping === 0 ? "< 1 ms" : ping !== null ? `${Math.round(ping)} ms` : null;
+
+  const statusNote = measuring
+    ? "Estimating…"
+    : unreachable
+    ? "Can't reach — retries periodically"
+    : showEstimating
+    ? "Estimating…"
+    : null;
 
   const tooltipParts = [
     pingLabel ?? "No ping data",
+    statusNote,
     isUnstable ? "Unstable" : null,
     networkType ?? null,
   ].filter(Boolean);
@@ -75,7 +94,7 @@ function PingBars({ ping, isUnstable, networkType }: PingBarsProps) {
   return (
     <span
       className="relative inline-flex items-end gap-px cursor-default"
-      style={{ height: 11 }}
+      style={{ height: 11, opacity: dim ? 0.55 : 1 }}
       onMouseEnter={(e) => setRect(e.currentTarget.getBoundingClientRect())}
       onMouseLeave={() => setRect(null)}
     >
@@ -155,6 +174,8 @@ type RowProps = {
   challengeDisabled?: boolean;
   showStreak?: boolean;
   measuringUids?: ReadonlySet<string>;
+  unreachableUids?: ReadonlySet<string>;
+  onMeasurePing?: (uid: string) => void;
 };
 
 function PlayerRow({
@@ -166,13 +187,15 @@ function PlayerRow({
   challengeDisabled,
   showStreak,
   measuringUids,
+  unreachableUids,
+  onMeasurePing,
 }: RowProps) {
   const [hovered, setHovered] = useState(false);
   const expanded = hovered;
   const isMuted = useSettingsStore((s) => s.isUserMuted(user.uid));
   const toggleMutedUser = useSettingsStore((s) => s.toggleMutedUser);
 
-  const { ping, isUnstable, networkType } = resolvePing(user, currentUser);
+  const { ping, isUnstable, networkType, source } = resolvePing(user, currentUser);
 
   const streak = showStreak ? (user.winStreak ?? 0) : 0;
 
@@ -231,28 +254,37 @@ function PlayerRow({
             className="flex items-center gap-1.5"
             style={{ flexDirection: "row", alignItems: "flex-end" }}
           >
-            {!isSelf &&
-              (ping !== null ? (
-                <PingBars
-                  ping={ping}
-                  isUnstable={isUnstable}
-                  networkType={networkType}
-                />
-              ) : measuringUids?.has(user.uid) ? (
-                <span
-                  className="text-[10px] animate-pulse"
-                  style={{ color: "var(--v2-muted)" }}
-                >
-                  estimating
-                </span>
-              ) : (
-                <span
-                  className="text-[10px]"
-                  style={{ color: "var(--v2-muted)" }}
-                >
-                  ping —
-                </span>
-              ))}
+            {!isSelf && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMeasurePing?.(user.uid);
+                }}
+                disabled={!onMeasurePing}
+                className="flex items-center"
+                style={{ cursor: onMeasurePing ? "pointer" : "default" }}
+                title="Click to measure ping now"
+              >
+                {ping !== null || measuringUids?.has(user.uid) || unreachableUids?.has(user.uid) ? (
+                  <PingBars
+                    ping={ping}
+                    isUnstable={isUnstable}
+                    networkType={networkType}
+                    source={source}
+                    measuring={measuringUids?.has(user.uid)}
+                    unreachable={unreachableUids?.has(user.uid)}
+                  />
+                ) : (
+                  <span
+                    className="text-[10px]"
+                    style={{ color: "var(--v2-muted)" }}
+                  >
+                    ping —
+                  </span>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -458,6 +490,8 @@ type PlayerListProps = {
   onChallenge?: (uid: string) => void;
   challengeDisabled?: boolean;
   measuringUids?: ReadonlySet<string>;
+  unreachableUids?: ReadonlySet<string>;
+  onMeasurePing?: (uid: string) => void;
 };
 
 export function PlayerList({
@@ -468,6 +502,8 @@ export function PlayerList({
   onChallenge,
   challengeDisabled,
   measuringUids,
+  unreachableUids,
+  onMeasurePing,
 }: PlayerListProps) {
   const showStreak = !lobbyGame || lobbyGame === STREAK_GAME
   const available: V2User[] = [];
@@ -545,6 +581,8 @@ export function PlayerList({
               challengeDisabled={challengeDisabled}
               showStreak={showStreak}
               measuringUids={measuringUids}
+              unreachableUids={unreachableUids}
+              onMeasurePing={!isSelf ? onMeasurePing : undefined}
             />
           );
         })}

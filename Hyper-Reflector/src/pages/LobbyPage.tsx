@@ -15,6 +15,8 @@ type LobbyPageProps = {
   onDeclineChallenge?: (messageId: string) => void;
   challengeDisabled?: boolean;
   measuringUids?: ReadonlySet<string>;
+  unreachableUids?: ReadonlySet<string>;
+  onMeasurePing?: (uid: string) => void;
 };
 
 export function LobbyPage({
@@ -30,6 +32,8 @@ export function LobbyPage({
   onDeclineChallenge,
   challengeDisabled,
   measuringUids,
+  unreachableUids,
+  onMeasurePing,
 }: LobbyPageProps) {
   return (
     <div className="flex h-full overflow-hidden">
@@ -58,6 +62,8 @@ export function LobbyPage({
           onChallenge={onChallenge}
           challengeDisabled={challengeDisabled}
           measuringUids={measuringUids}
+          unreachableUids={unreachableUids}
+          onMeasurePing={onMeasurePing}
         />
       </div>
     </div>

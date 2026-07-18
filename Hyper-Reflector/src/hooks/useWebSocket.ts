@@ -105,7 +105,12 @@ function normalizeUser(data: any): V2User | null {
     accountElo: typeof data.accountElo === 'number' ? data.accountElo : 1200,
     countryCode: typeof data.countryCode === 'string' ? data.countryCode : '',
     userTitle: data.userTitle,
-    lastKnownPings: Array.isArray(data.lastKnownPings) ? data.lastKnownPings : [],
+    // The roster only ever carries the backend's geo-distance estimate — real
+    // WebRTC measurements stay local to the measuring client and never get
+    // broadcast — so anything arriving here without an explicit tag is an estimate.
+    lastKnownPings: Array.isArray(data.lastKnownPings)
+      ? data.lastKnownPings.map((p: any) => ({ ...p, source: p?.source ?? 'estimated' }))
+      : [],
     knownAliases: Array.isArray(data.knownAliases) ? data.knownAliases : [],
     userProfilePic: data.userProfilePic || '',
     gravEmail: data.gravEmail || '',
@@ -191,6 +196,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const isRankQueuedRef = useRef(false)
   const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean; networkType?: string }>>([])
   const [measuringUids, setMeasuringUids] = useState<ReadonlySet<string>>(new Set())
+  const [unreachableUids, setUnreachableUids] = useState<ReadonlySet<string>>(new Set())
   const [rankQueuePending, setRankQueuePending] = useState<RankQueuePendingData | null>(null)
   const initialPasswords = useRef(loadSavedPasswords())
   const [lobbyPasswords, setLobbyPasswords] = useState<Record<string, string>>(initialPasswords.current)
@@ -243,7 +249,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
       const myUid = userRef.current?.uid
       setSelfPings(prev => {
         const filtered = prev.filter(p => p.id !== targetUid)
-        return [...filtered, { id: targetUid, ping, isUnstable, networkType }]
+        return [...filtered, { id: targetUid, ping, isUnstable, networkType, source: 'measured' as const }]
       })
       if (myUid) {
         setAllLobbyUsers(prev => {
@@ -252,7 +258,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
             next[lid] = users.map(u => {
               if (u.uid !== myUid) return u
               const filteredPings = (u.lastKnownPings ?? []).filter(p => p.id !== targetUid)
-              return { ...u, lastKnownPings: [...filteredPings, { id: targetUid, ping, isUnstable, networkType }] }
+              return { ...u, lastKnownPings: [...filteredPings, { id: targetUid, ping, isUnstable, networkType, source: 'measured' as const }] }
             })
           }
           allLobbyUsersRef.current = next
@@ -268,9 +274,18 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
         return next
       })
     }
+    peerLatencyManager.onReachabilityChanged = (uid, unreachable) => {
+      setUnreachableUids(prev => {
+        const next = new Set(prev)
+        if (unreachable) next.add(uid)
+        else next.delete(uid)
+        return next
+      })
+    }
     return () => {
       peerLatencyManager.onPingRecorded = undefined
       peerLatencyManager.onMeasuringChanged = undefined
+      peerLatencyManager.onReachabilityChanged = undefined
     }
   }, [])
 
@@ -701,6 +716,8 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
           }
 
           case 'update-user-pinged': {
+            // This channel only ever carries the backend's geo-distance estimate —
+            // real measurements come from peerLatencyManager and never touch the socket.
             const data = payload.data
             if (!data || typeof data !== 'object') break
             if (data.isNewPing) {
@@ -708,18 +725,25 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
                 const peerId = String(data.id)
                 setSelfPings(prev => {
                   const filtered = prev.filter(p => p.id !== peerId)
-                  return [...filtered, { id: peerId, ping: data.ping ?? 0, isUnstable: Boolean(data.isUnstable) }]
+                  return [...filtered, { id: peerId, ping: data.ping ?? 0, isUnstable: Boolean(data.isUnstable), source: 'estimated' as const }]
                 })
               }
             } else if (Array.isArray(data.lastKnownPings)) {
-              setSelfPings(data.lastKnownPings)
+              // The backend silently omits any peer it can't geo-estimate this round
+              // (e.g. their geo lookup hasn't landed yet) — merge instead of replacing
+              // so a peer we already had a ping for doesn't regress to "unknown" just
+              // because this particular recomputation skipped them.
+              const freshPings = data.lastKnownPings.map((p: any) => ({ ...p, source: 'estimated' as const }))
+              const freshIds = new Set(freshPings.map((p: any) => p.id))
+              setSelfPings(prev => [...prev.filter(p => !freshIds.has(p.id)), ...freshPings])
               const myUid = userRef.current?.uid
               if (myUid) {
                 for (const [lid, users] of Object.entries(allLobbyUsersRef.current)) {
-                  if (users.some(u => u.uid === myUid)) {
-                    setLobbyUsersForId(lid, users.map(u =>
-                      u.uid === myUid ? { ...u, lastKnownPings: data.lastKnownPings } : u
-                    ))
+                  const mine = users.find(u => u.uid === myUid)
+                  if (mine) {
+                    const carriedOver = (mine.lastKnownPings ?? []).filter((p: any) => !freshIds.has(p.id))
+                    const merged = [...carriedOver, ...freshPings]
+                    setLobbyUsersForId(lid, users.map(u => u.uid === myUid ? { ...u, lastKnownPings: merged } : u))
                   }
                 }
               }
@@ -1626,6 +1650,10 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
 
   const isReconnecting = status === 'disconnected' && reconnectAttemptRef.current > 0
 
+  const measurePingNow = useCallback((uid: string) => {
+    peerLatencyManager.triggerMeasureNow(uid)
+  }, [])
+
   return {
     status,
     isReconnecting,
@@ -1660,5 +1688,7 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     lobbyJoinError,
     clearLobbyJoinError: () => setLobbyJoinError(null),
     measuringUids,
+    unreachableUids,
+    measurePingNow,
   }
 }

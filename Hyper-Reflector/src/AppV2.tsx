@@ -217,6 +217,8 @@ function AppV2Inner() {
     lobbyList,
     selfPings,
     measuringUids,
+    unreachableUids,
+    measurePingNow,
     isInMatch,
     isRankQueued,
     rankQueuePending,
@@ -514,6 +516,8 @@ function AppV2Inner() {
                   onAcceptChallenge={handleAcceptChallenge}
                   onDeclineChallenge={handleDeclineChallenge}
                   measuringUids={measuringUids}
+                  unreachableUids={unreachableUids}
+                  onMeasurePing={measurePingNow}
                 />
               )}
               {page === "home" && <HomePage currentUser={user} />}
