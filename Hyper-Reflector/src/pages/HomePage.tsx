@@ -251,7 +251,7 @@ export function HomePage({ currentUser }: HomePageProps) {
       )) {
         base[name] = {
           picks: stats?.picks || 0,
-          superChoice: stats?.superChoice,
+          superChoice: normalizeSuperChoices(stats?.superChoice),
         };
       }
     }

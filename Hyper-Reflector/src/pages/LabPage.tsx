@@ -11,6 +11,10 @@ import { GAMES } from '../games'
 
 const SFIII_ROM = 'sfiii3nr1'
 
+// Palette extractor has some negative visual side effects — hidden until fixed.
+// Flip to true to bring it back for local testing.
+const SHOW_PALETTE_EXTRACTOR = false
+
 export function LabPage() {
   const emulatorPath = useSettingsStore(s => s.emulatorPath)
   const setEmulatorPath = useSettingsStore(s => s.setEmulatorPath)
@@ -295,6 +299,7 @@ export function LabPage() {
         </div>
 
         {/* Palette extractor */}
+        {SHOW_PALETTE_EXTRACTOR && (
         <div className={sectionCls} style={sectionStyle}>
           <div className={headerCls} style={headerStyle}>
             <div className="flex items-center gap-2">
@@ -408,6 +413,7 @@ export function LabPage() {
 
           </div>
         </div>
+        )}
 
       </div>
     </div>

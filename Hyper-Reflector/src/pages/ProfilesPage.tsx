@@ -251,12 +251,12 @@ export function ProfilesPage({
   const matchesRegionFilter = useCallback(
     (entry: LeaderboardEntry, filter: RegionFilter): boolean => {
       if (filter.type === "all") return true;
-      if (filter.type === "mine") return entry.user.countryCode === currentUser.countryCode;
+      if (filter.type === "mine") return entry.user.countryCode === currentUser?.countryCode;
       if (filter.type === "other" && filter.code)
         return entry.user.countryCode?.toUpperCase() === filter.code.toUpperCase();
       return true;
     },
-    [currentUser.countryCode],
+    [currentUser?.countryCode],
   );
 
   useEffect(() => {

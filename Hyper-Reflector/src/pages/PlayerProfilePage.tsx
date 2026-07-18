@@ -82,6 +82,19 @@ type TitleOption = {
   color: string;
   title: string;
 };
+type GlobalSetMatchEntry = {
+  matchData?: { raw?: string };
+  result?: string;
+  player1Char?: string;
+  player2Char?: string;
+  player1Super?: number;
+  player2Super?: number;
+};
+type GlobalSetDetail = {
+  matches?: GlobalSetMatchEntry[];
+  player1Name?: string;
+  player2Name?: string;
+};
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -255,7 +268,7 @@ export function PlayerProfilePage({
   const [gravEmailEditing, setGravEmailEditing] = useState(false);
   const [titlePickerOpen, setTitlePickerOpen] = useState(false);
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
-  const [matchDetailCache, setMatchDetailCache] = useState<Record<string, unknown>>({});
+  const [matchDetailCache, setMatchDetailCache] = useState<Record<string, GlobalSetDetail>>({});
   const [fetchingMatchId, setFetchingMatchId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -496,7 +509,7 @@ export function PlayerProfilePage({
     try {
       const result = await (api.getGlobalSet as any)(auth, profileUid, matchId);
       if (result?.globalSet) {
-        setMatchDetailCache((prev) => ({ ...prev, [matchId]: result.globalSet }));
+        setMatchDetailCache((prev) => ({ ...prev, [matchId]: result.globalSet as GlobalSetDetail }));
       }
     } finally {
       setFetchingMatchId(null);
@@ -1141,7 +1154,7 @@ export function PlayerProfilePage({
                             </div>
                           ) : detail ? (
                             <>
-                              {Array.isArray(detail.matches) && detail.matches.map((m: any, i: number) => {
+                              {Array.isArray(detail.matches) && detail.matches.map((m: GlobalSetMatchEntry, i: number) => {
                                 let parsed: any = null;
                                 try { parsed = JSON.parse(m.matchData?.raw ?? ""); } catch { /* unparseable */ }
                                 const toArr = (v: any): number[] =>
