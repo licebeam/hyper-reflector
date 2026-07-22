@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { createUserWithEmailAndPassword } from 'firebase/auth'
+import { useTranslation } from 'react-i18next'
 import type { FirebaseError } from 'firebase/app'
 import { auth } from '../utils/firebase'
 import api from '../external-api/requests'
 import { validateName } from '../utils/validation'
+import i18n from '../i18n'
 
 type SignupPageProps = {
   onBack: () => void
@@ -11,14 +13,15 @@ type SignupPageProps = {
 
 const mapFirebaseError = (err: FirebaseError) => {
   switch (err.code) {
-    case 'auth/email-already-in-use': return 'That email is already registered. Try signing in instead.'
-    case 'auth/weak-password': return 'Password must be at least 6 characters.'
-    case 'auth/invalid-email': return 'Please provide a valid email address.'
-    default: return 'Could not create account. Please try again.'
+    case 'auth/email-already-in-use': return i18n.t('signupPage.emailAlreadyInUse')
+    case 'auth/weak-password': return i18n.t('signupPage.weakPassword')
+    case 'auth/invalid-email': return i18n.t('signupPage.invalidEmail')
+    default: return i18n.t('signupPage.genericError')
   }
 }
 
 export function SignupPage({ onBack }: SignupPageProps) {
+  const { t } = useTranslation()
   const [form, setForm] = useState({ name: '', email: '', pass: '', repass: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -29,14 +32,14 @@ export function SignupPage({ onBack }: SignupPageProps) {
     setForm(prev => ({ ...prev, [key]: value }))
 
   const handleValidateName = (value: string) => {
-    const error = validateName(value, { label: 'Display name' })
+    const error = validateName(value, { label: t('signupPage.displayName') })
     setNameWarning(error)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (form.pass !== form.repass) return setError('Passwords must match.')
-    if (!form.name.trim() || nameWarning) return setError('Please provide an appropriate display name.')
+    if (form.pass !== form.repass) return setError(t('signupPage.passwordsMustMatch'))
+    if (!form.name.trim() || nameWarning) return setError(t('signupPage.provideDisplayName'))
     setLoading(true)
     setError(null)
     const displayName = form.name.trim()
@@ -54,7 +57,7 @@ export function SignupPage({ onBack }: SignupPageProps) {
     } catch (err) {
       sessionStorage.removeItem('v2_pending_display_name')
       const fe = err as FirebaseError
-      setError('code' in fe ? mapFirebaseError(fe) : 'Something went wrong while creating your account.')
+      setError('code' in fe ? mapFirebaseError(fe) : t('signupPage.unexpectedError'))
     } finally {
       setLoading(false)
     }
@@ -82,14 +85,14 @@ export function SignupPage({ onBack }: SignupPageProps) {
           onMouseEnter={e => (e.currentTarget.style.opacity = '0.7')}
           onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
         >
-          ← Back to sign in
+          {t('signupPage.backToSignIn')}
         </button>
 
         <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--v2-accent)' }}>
-          Create account
+          {t('signupPage.title')}
         </h1>
         <p className="text-sm mb-6" style={{ color: 'var(--v2-muted)' }}>
-          Pick a display name, set your credentials, and start playing.
+          {t('signupPage.subtitle')}
         </p>
 
         {error && (
@@ -102,14 +105,14 @@ export function SignupPage({ onBack }: SignupPageProps) {
           {/* Display name */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
-              Display name <span className="text-red-400">*</span>
+              {t('signupPage.displayName')} <span className="text-red-400">*</span>
             </label>
             <input
               autoFocus
               type="text"
               value={form.name}
               maxLength={16}
-              placeholder="OrchidKid"
+              placeholder={t('signupPage.displayNamePlaceholder')}
               disabled={loading}
               onChange={e => { update('name', e.target.value); handleValidateName(e.target.value) }}
               className="rounded px-3 py-2 text-sm border outline-none transition-colors disabled:opacity-50"
@@ -118,20 +121,20 @@ export function SignupPage({ onBack }: SignupPageProps) {
               onBlur={e => (e.currentTarget.style.borderColor = nameInvalid ? '#f87171' : 'var(--v2-border)')}
             />
             <p className="text-xs" style={{ color: nameWarning ? '#f87171' : 'var(--v2-muted)' }}>
-              {nameWarning || 'What other players will see. Max 16 chars, keep it clean.'}
+              {nameWarning || t('signupPage.displayNameHint')}
             </p>
           </div>
 
           {/* Email */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
-              Email <span className="text-red-400">*</span>
+              {t('signupPage.email')} <span className="text-red-400">*</span>
             </label>
             <input
               type="email"
               value={form.email}
               maxLength={50}
-              placeholder="player@example.com"
+              placeholder={t('signupPage.emailPlaceholder')}
               disabled={loading}
               onChange={e => update('email', e.target.value)}
               className="rounded px-3 py-2 text-sm border outline-none transition-colors disabled:opacity-50"
@@ -144,7 +147,7 @@ export function SignupPage({ onBack }: SignupPageProps) {
           {/* Password */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
-              Password <span className="text-red-400">*</span>
+              {t('signupPage.password')} <span className="text-red-400">*</span>
             </label>
             <div className="relative">
               <input
@@ -168,16 +171,16 @@ export function SignupPage({ onBack }: SignupPageProps) {
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
               >
-                {showPass ? 'hide' : 'show'}
+                {showPass ? t('signupPage.hide') : t('signupPage.show')}
               </button>
             </div>
-            <p className="text-xs" style={{ color: 'var(--v2-muted)' }}>At least 6 characters.</p>
+            <p className="text-xs" style={{ color: 'var(--v2-muted)' }}>{t('signupPage.passwordHint')}</p>
           </div>
 
           {/* Confirm password */}
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
-              Confirm password <span className="text-red-400">*</span>
+              {t('signupPage.confirmPassword')} <span className="text-red-400">*</span>
             </label>
             <input
               type={showPass ? 'text' : 'password'}
@@ -201,7 +204,7 @@ export function SignupPage({ onBack }: SignupPageProps) {
             onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--v2-accent-hover)' }}
             onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
           >
-            {loading ? 'Creating account...' : 'Create account'}
+            {loading ? t('signupPage.creatingAccount') : t('signupPage.title')}
           </button>
         </form>
       </div>

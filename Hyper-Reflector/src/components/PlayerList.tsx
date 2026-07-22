@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BellOff, Coffee, Flame, Swords, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../state/store";
 
 function streakGlowStyle(streak: number): React.CSSProperties {
@@ -69,25 +70,26 @@ type PingBarsProps = {
 };
 
 function PingBars({ ping, isUnstable, networkType, source, measuring, unreachable }: PingBarsProps) {
+  const { t } = useTranslation();
   const [rect, setRect] = useState<DOMRect | null>(null);
   const bars = pingBarCount(ping);
   const color = pingBarColor(bars, isUnstable);
   const showEstimating = !!measuring || (!unreachable && ping !== null && source !== "measured");
   const dim = showEstimating || !!unreachable;
-  const pingLabel = ping === 0 ? "< 1 ms" : ping !== null ? `${Math.round(ping)} ms` : null;
+  const pingLabel = ping === 0 ? t("playerList.lessThanOneMs") : ping !== null ? t("playerList.pingMs", { ms: Math.round(ping) }) : null;
 
   const statusNote = measuring
-    ? "Estimating…"
+    ? t("playerList.estimating")
     : unreachable
-    ? "Can't reach — retries periodically"
+    ? t("playerList.cannotReach")
     : showEstimating
-    ? "Estimating…"
+    ? t("playerList.estimating")
     : null;
 
   const tooltipParts = [
-    pingLabel ?? "No ping data",
+    pingLabel ?? t("playerList.noPingData"),
     statusNote,
-    isUnstable ? "Unstable" : null,
+    isUnstable ? t("playerList.unstable") : null,
     networkType ?? null,
   ].filter(Boolean);
 
@@ -190,6 +192,7 @@ function PlayerRow({
   unreachableUids,
   onMeasurePing,
 }: RowProps) {
+  const { t } = useTranslation();
   const [hovered, setHovered] = useState(false);
   const expanded = hovered;
   const isMuted = useSettingsStore((s) => s.isUserMuted(user.uid));
@@ -227,7 +230,7 @@ function PlayerRow({
               className="text-[10px] shrink-0"
               style={{ color: "var(--v2-muted)" }}
             >
-              (you)
+              {t("playerList.you")}
             </span>
           )}
           {!isSelf && isMuted && (
@@ -235,7 +238,7 @@ function PlayerRow({
               className="flex items-center gap-0.5 text-[10px] px-1 rounded shrink-0"
               style={{ color: "var(--v2-muted)", background: "color-mix(in srgb, var(--v2-muted) 12%, transparent)" }}
             >
-              <BellOff size={9} /> Muted
+              <BellOff size={9} /> {t("playerList.muted")}
             </span>
           )}
           {user.userTitle?.title && <UserTitle title={user.userTitle} />}
@@ -244,10 +247,10 @@ function PlayerRow({
             <span
               className="flex items-center gap-0.5 text-[10px] px-1 rounded"
               style={{ color: "#fbbf24", background: "#78350f44" }}
-              title="Searching for ranked match"
+              title={t("playerList.searchingForRankedMatch")}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse inline-block" />
-              Searching
+              {t("playerList.searching")}
             </span>
           )}
           <div
@@ -264,7 +267,7 @@ function PlayerRow({
                 disabled={!onMeasurePing}
                 className="flex items-center"
                 style={{ cursor: onMeasurePing ? "pointer" : "default" }}
-                title="Click to measure ping now"
+                title={t("playerList.clickToMeasurePing")}
               >
                 {ping !== null || measuringUids?.has(user.uid) || unreachableUids?.has(user.uid) ? (
                   <PingBars
@@ -280,7 +283,7 @@ function PlayerRow({
                     className="text-[10px]"
                     style={{ color: "var(--v2-muted)" }}
                   >
-                    ping —
+                    {t("playerList.noPingDash")}
                   </span>
                 )}
               </button>
@@ -305,7 +308,7 @@ function PlayerRow({
                   className="text-[10px]"
                   style={{ color: "var(--v2-muted)" }}
                 >
-                  {user.accountElo} ELO
+                  {t("playerList.elo", { elo: user.accountElo })}
                 </span>
                 {streak > 0 && (
                   <span
@@ -313,7 +316,7 @@ function PlayerRow({
                     style={{ color: "#f97316" }}
                   >
                     <Flame size={10} strokeWidth={2.5} />
-                    {streak} streak
+                    {t("playerList.streakCount", { count: streak })}
                   </span>
                 )}
               </div>
@@ -343,13 +346,13 @@ function PlayerRow({
                       }}
                       title={
                         isMuted
-                          ? "Unmute to challenge"
+                          ? t("playerList.unmuteToChallenge")
                           : challengeDisabled
-                          ? "Cannot challenge while in a match or searching"
+                          ? t("playerList.cannotChallenge")
                           : undefined
                       }
                     >
-                      <Swords size={16} /> Challenge
+                      <Swords size={16} /> {t("playerList.challenge")}
                     </button>
                   )}
                   {onViewProfile && (
@@ -372,7 +375,7 @@ function PlayerRow({
                         (e.currentTarget.style.background = "var(--v2-accent)")
                       }
                     >
-                      <User size={16} /> Profile
+                      <User size={16} /> {t("playerList.profile")}
                     </button>
                   )}
                   <button
@@ -389,9 +392,9 @@ function PlayerRow({
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = "var(--v2-text)")}
                     onMouseLeave={(e) => (e.currentTarget.style.color = "var(--v2-muted)")}
-                    title={isMuted ? "Unmute player" : "Mute player"}
+                    title={isMuted ? t("playerList.unmutePlayer") : t("playerList.mutePlayer")}
                   >
-                    <BellOff size={16} /> {isMuted ? "Unmute" : "Mute"}
+                    <BellOff size={16} /> {isMuted ? t("playerList.unmute") : t("playerList.mute")}
                   </button>
                 </div>
               )}
@@ -406,6 +409,7 @@ function PlayerRow({
 // ── In-match pair row ──────────────────────────────────────────────────────────
 
 function MatchPairRow({ players }: { players: V2User[] }) {
+  const { t } = useTranslation();
   const [p1, p2] = players;
   return (
     <div
@@ -422,10 +426,10 @@ function MatchPairRow({ players }: { players: V2User[] }) {
             style={{ color: "var(--v2-text)" }}
             title={p1?.userName}
           >
-            {p1?.userName ?? "?"}
+            {p1?.userName ?? t("playerList.unknownPlayer")}
           </span>
         </div>
-        <span className="text-[10px] shrink-0 px-0.5" style={{ color: "var(--v2-muted)" }}>vs</span>
+        <span className="text-[10px] shrink-0 px-0.5" style={{ color: "var(--v2-muted)" }}>{t("playerList.vs")}</span>
         {/* Player 2 */}
         {p2 ? (
           <div className="flex items-center gap-1 min-w-0" style={{ maxWidth: "calc(50% - 12px)" }}>
@@ -439,7 +443,7 @@ function MatchPairRow({ players }: { players: V2User[] }) {
             </span>
           </div>
         ) : (
-          <span className="text-[10px]" style={{ color: "var(--v2-muted)" }}>???</span>
+          <span className="text-[10px]" style={{ color: "var(--v2-muted)" }}>{t("playerList.unknownOpponent")}</span>
         )}
       </div>
     </div>
@@ -449,6 +453,7 @@ function MatchPairRow({ players }: { players: V2User[] }) {
 // ── AFK row ────────────────────────────────────────────────────────────────────
 
 function AfkRow({ user }: { user: V2User }) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex items-center gap-2 px-3 py-2.5 border-b"
@@ -471,7 +476,7 @@ function AfkRow({ user }: { user: V2User }) {
             background: "color-mix(in srgb, var(--v2-muted) 12%, transparent)",
           }}
         >
-          AFK
+          {t("playerList.afk")}
         </span>
       </div>
     </div>
@@ -505,6 +510,7 @@ export function PlayerList({
   unreachableUids,
   onMeasurePing,
 }: PlayerListProps) {
+  const { t } = useTranslation();
   const showStreak = !lobbyGame || lobbyGame === STREAK_GAME
   const available: V2User[] = [];
   const inMatchRaw: V2User[] = [];
@@ -555,7 +561,7 @@ export function PlayerList({
           className="text-xs font-semibold uppercase tracking-wide"
           style={{ color: "var(--v2-muted)" }}
         >
-          Players ({available.length})
+          {t("playerList.playersCount", { count: available.length })}
         </span>
       </div>
 
@@ -565,7 +571,7 @@ export function PlayerList({
             className="text-xs text-center pt-6 px-3"
             style={{ color: "var(--v2-muted)" }}
           >
-            No players in lobby
+            {t("playerList.noPlayersInLobby")}
           </p>
         )}
         {available.map((user) => {
@@ -600,7 +606,7 @@ export function PlayerList({
               className="text-[10px] font-semibold uppercase tracking-wide"
               style={{ color: "var(--v2-muted)" }}
             >
-              In Match ({inMatchCount})
+              {t("playerList.inMatchCount", { count: inMatchCount })}
             </span>
           </div>
           <div className="overflow-y-scroll flex-1 min-h-0">
@@ -623,7 +629,7 @@ export function PlayerList({
               className="text-[10px] font-semibold uppercase tracking-wide"
               style={{ color: "var(--v2-muted)" }}
             >
-              AFK ({afk.length})
+              {t("playerList.afkCount", { count: afk.length })}
             </span>
           </div>
           <div className="overflow-y-scroll flex-1 min-h-0">

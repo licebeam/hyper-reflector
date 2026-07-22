@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Send, Swords, Check, X, Eye, EyeOff } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { V2Message, V2User } from "../types";
 import { GAMES, getGameName } from "../games";
 import { useSettingsStore } from "../state/store";
@@ -49,6 +50,7 @@ function ChallengeMessage({
   onAccept: (id: string) => void;
   onDecline: (id: string) => void;
 }) {
+  const { t } = useTranslation();
   const isRecipient = msg.challengeOpponentId === currentUserUid;
   const isResolved = !!msg.challengeStatus;
 
@@ -85,7 +87,7 @@ function ChallengeMessage({
               className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-medium transition-opacity hover:opacity-80"
               style={{ background: "#34d399", color: "#000" }}
             >
-              <Check size={11} /> Accept
+              <Check size={11} /> {t("chatPanel.accept")}
             </button>
             <button
               onClick={() => onDecline(msg.id)}
@@ -96,7 +98,7 @@ function ChallengeMessage({
                 borderColor: "var(--v2-border)",
               }}
             >
-              <X size={11} /> Decline
+              <X size={11} /> {t("chatPanel.decline")}
             </button>
           </div>
         )}
@@ -105,7 +107,7 @@ function ChallengeMessage({
             className="text-[10px] ml-2"
             style={{ color: "var(--v2-muted)" }}
           >
-            {msg.challengeStatus === "accepted" ? "Accepted" : "Declined"}
+            {msg.challengeStatus === "accepted" ? t("chatPanel.accepted") : t("chatPanel.declined")}
           </span>
         )}
       </div>
@@ -140,6 +142,7 @@ export function ChatPanel({
   onDeclineChallenge,
   onUpdateGame,
 }: ChatPanelProps) {
+  const { t } = useTranslation();
   const [input, setInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -265,7 +268,7 @@ export function ChatPanel({
                 style={{ color: 'var(--v2-muted)' }}
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
-                title={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? t('chatPanel.hidePassword') : t('chatPanel.showPassword')}
               >
                 {showPassword ? <EyeOff size={11} /> : <Eye size={11} />}
               </button>
@@ -274,7 +277,7 @@ export function ChatPanel({
         </div>
         {visibleMessages.length === 0 && (
           <p className="text-sm text-center pt-8" style={{ color: "var(--v2-muted)" }}>
-            No messages yet. Say hello!
+            {t("chatPanel.noMessages")}
           </p>
         )}
 
@@ -362,7 +365,7 @@ export function ChatPanel({
             maxLength={MAX_LENGTH}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
+            placeholder={t("chatPanel.typeMessage")}
             className="flex-1 rounded px-3 py-1.5 text-sm border outline-none transition-colors"
             style={{
               background: "var(--v2-hover)",
@@ -391,7 +394,7 @@ export function ChatPanel({
             className="text-[10px] text-right"
             style={{ color: input.length >= MAX_LENGTH ? "#f87171" : "var(--v2-muted)" }}
           >
-            {MAX_LENGTH - input.length} remaining
+            {t("chatPanel.charsRemaining", { count: MAX_LENGTH - input.length })}
           </p>
         )}
       </div>

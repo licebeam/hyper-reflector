@@ -1,5 +1,6 @@
 import { Bell, BellOff, Check, Lock, Plus, Swords, User, X } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { V2Message } from "../types";
 import {
   DndContext,
@@ -32,13 +33,6 @@ const STATUS_DOT: Record<ConnectionStatus, string> = {
   error: "bg-red-500",
 };
 
-const STATUS_LABEL: Record<ConnectionStatus, string> = {
-  connected: "Connected",
-  connecting: "Connecting...",
-  disconnected: "Disconnected",
-  error: "Error",
-};
-
 // ── Single sortable tab ───────────────────────────────────────────────────────
 
 type SortableTabProps = {
@@ -58,6 +52,7 @@ function SortableTab({
   onSelect,
   onClose,
 }: SortableTabProps) {
+  const { t } = useTranslation();
   const isDefault = lobbyId === DEFAULT_LOBBY_ID;
 
   const {
@@ -118,7 +113,7 @@ function SortableTab({
           onMouseLeave={(e) =>
             (e.currentTarget.style.color = "var(--v2-muted)")
           }
-          title={`Leave ${lobbyId}`}
+          title={t("header.leaveLobby", { lobbyId })}
         >
           <X size={10} />
         </span>
@@ -164,6 +159,7 @@ function NotificationsPanel({
   onToggleAfk,
   onClose,
 }: NotificationsPanelProps) {
+  const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -199,7 +195,7 @@ function NotificationsPanel({
           className="text-xs font-semibold"
           style={{ color: "var(--v2-text)" }}
         >
-          Notifications
+          {t("notificationsPanel.title")}
         </span>
         <div className="flex items-center gap-2">
           <button
@@ -215,9 +211,9 @@ function NotificationsPanel({
             onMouseLeave={(e) =>
               (e.currentTarget.style.color = isAfk ? "var(--v2-accent)" : "var(--v2-muted)")
             }
-            title={isAfk ? "Clear AFK" : "Set AFK"}
+            title={isAfk ? t("notificationsPanel.clearAfk") : t("notificationsPanel.setAfk")}
           >
-            AFK
+            {t("notificationsPanel.afk")}
           </button>
           <button
             onClick={onToggleMute}
@@ -229,7 +225,7 @@ function NotificationsPanel({
             onMouseLeave={(e) =>
               (e.currentTarget.style.color = "var(--v2-muted)")
             }
-            title={muted ? "Unmute notifications" : "Mute notifications"}
+            title={muted ? t("notificationsPanel.unmuteNotifications") : t("notificationsPanel.muteNotifications")}
           >
             {muted ? <BellOff size={13} /> : <Bell size={13} />}
           </button>
@@ -245,7 +241,7 @@ function NotificationsPanel({
               (e.currentTarget.style.color = "var(--v2-muted)")
             }
           >
-            Clear all
+            {t("notificationsPanel.clearAll")}
           </button>
         </div>
       </div>
@@ -257,7 +253,7 @@ function NotificationsPanel({
             className="text-xs text-center py-6"
             style={{ color: "var(--v2-muted)" }}
           >
-            No notifications
+            {t("notificationsPanel.noNotifications")}
           </p>
         ) : (
           notifications.map((msg) => (
@@ -273,7 +269,7 @@ function NotificationsPanel({
                     className="text-xs font-medium"
                     style={{ color: "var(--v2-text)" }}
                   >
-                    {msg.userName ?? "Unknown"}
+                    {msg.userName ?? t("notificationsPanel.unknownUser")}
                   </span>
                 </div>
                 <span
@@ -300,9 +296,9 @@ function NotificationsPanel({
                         : "#f87171",
                   }}
                 >
-                  {msg.challengeStatus === "accepted" ? "Accepted" : "Declined"}
+                  {msg.challengeStatus === "accepted" ? t("notificationsPanel.accepted") : t("notificationsPanel.declined")}
                   {msg.challengeResponder
-                    ? ` by ${msg.challengeResponder}`
+                    ? ` ${t("notificationsPanel.respondedBy", { name: msg.challengeResponder })}`
                     : ""}
                 </span>
               ) : (
@@ -312,7 +308,7 @@ function NotificationsPanel({
                     className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded font-medium"
                     style={{ background: "#34d399", color: "#000" }}
                   >
-                    <Check size={10} /> Accept
+                    <Check size={10} /> {t("notificationsPanel.accept")}
                   </button>
                   <button
                     onClick={() => onDecline(msg.id)}
@@ -323,7 +319,7 @@ function NotificationsPanel({
                       borderColor: "var(--v2-border)",
                     }}
                   >
-                    <X size={10} /> Decline
+                    <X size={10} /> {t("notificationsPanel.decline")}
                   </button>
                 </div>
               )}
@@ -384,6 +380,7 @@ export function Header({
   rankQueueGame,
   isInMatch,
 }: HeaderProps) {
+  const { t } = useTranslation();
   const [notifOpen, setNotifOpen] = useState(false);
   const [clearedIds, setClearedIds] = useState<Set<string>>(new Set());
   const bellRef = useRef<HTMLDivElement>(null);
@@ -481,7 +478,7 @@ export function Header({
               e.currentTarget.style.color = "var(--v2-muted)";
               e.currentTarget.style.borderColor = "var(--v2-border)";
             }}
-            title="Join another lobby"
+            title={t("header.joinAnotherLobby")}
           >
             <Plus size={12} />
           </button>
@@ -549,13 +546,13 @@ export function Header({
             onMouseLeave={(e) => {
               if (!isInMatch && !isQueued) e.currentTarget.style.background = "var(--v2-accent)";
             }}
-            title={isInMatch ? "Cannot queue while in a match" : undefined}
+            title={isInMatch ? t("header.cannotQueueInMatch") : undefined}
           >
             <Swords size={13} />
             <span className="relative inline-flex">
-              <span className="invisible">Ranked Queue</span>
+              <span className="invisible">{t("header.rankedQueue")}</span>
               <span className="absolute inset-0 flex items-center justify-center">
-                {isQueued ? "Searching..." : "Ranked Queue"}
+                {isQueued ? t("header.searching") : t("header.rankedQueue")}
               </span>
             </span>
           </button>
@@ -567,7 +564,7 @@ export function Header({
         <div className="flex items-center gap-1.5">
           <span className={`w-2 h-2 rounded-full ${STATUS_DOT[status]}`} />
           <span className="text-xs" style={{ color: "var(--v2-muted)" }}>
-            {STATUS_LABEL[status]}
+            {t(`header.status.${status}`)}
           </span>
         </div>
 
@@ -594,7 +591,7 @@ export function Header({
                     ? "var(--v2-accent)"
                     : "var(--v2-muted)")
               }
-              title="Notifications"
+              title={t("header.notifications")}
             >
               {notifMuted ? <BellOff size={15} /> : <Bell size={15} />}
               {!notifMuted && unreadCount > 0 && (
@@ -651,7 +648,7 @@ export function Header({
             }
           >
             <User size={13} />
-            Profile
+            {t("header.profile")}
           </button>
         )}
       </div>

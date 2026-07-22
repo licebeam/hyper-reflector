@@ -6,6 +6,7 @@ import {
   RefreshCcw,
   Save,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import api from "../external-api/requests";
 import { validateName } from "../utils/validation";
@@ -120,6 +121,7 @@ function normalizeSuperChoices(
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function Avatar({ user }: { user: ProfileData }) {
+  const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
   const show = !!user.userProfilePic && !failed;
   return (
@@ -135,7 +137,7 @@ function Avatar({ user }: { user: ProfileData }) {
           onError={() => setFailed(true)}
         />
       ) : (
-        (user.userName || "?").slice(0, 2).toUpperCase()
+        (user.userName || t("playerProfilePage.unknownFallback")).slice(0, 2).toUpperCase()
       )}
     </div>
   );
@@ -168,11 +170,12 @@ function CharSADonut({
   name: string;
   stats: PlayerCharacterStats;
 }) {
+  const { t } = useTranslation();
   const superChoices = normalizeSuperChoices(stats.superChoice);
   const data = [0, 1, 2].map((i) => {
     const e = superChoices[i];
     return {
-      name: `SA ${i + 1}`,
+      name: t("homePage.superArtSlot", { num: i + 1 }),
       value: (e?.wins || 0) + (e?.losses || 0),
       color: SA_COLORS[i],
     };
@@ -223,7 +226,7 @@ function CharSADonut({
         </p>
       )}
       <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
-        {stats.picks || 0} picks
+        {t("playerProfilePage.picksCount", { count: stats.picks || 0 })}
       </p>
     </div>
   );
@@ -246,6 +249,7 @@ export function PlayerProfilePage({
   onUserUpdated,
   onNavigateToProfile,
 }: PlayerProfilePageProps) {
+  const { t } = useTranslation();
   const isSelf = !!currentUser && currentUser.uid === profileUid;
   const canEdit = isSelf;
 
@@ -316,7 +320,7 @@ export function PlayerProfilePage({
           ? (userData as ProfileData).assignedFlairs!
           : [];
         const merged: TitleOption[] = [...serverTitles];
-        const seen = new Set(serverTitles.map((t) => t.title));
+        const seen = new Set(serverTitles.map((title) => title.title));
         for (const f of assignedFlairs) {
           if (!seen.has(f.title)) {
             merged.push(f);
@@ -490,7 +494,7 @@ export function PlayerProfilePage({
       onUserUpdated?.(payload as Partial<V2User>);
     } catch (err) {
       console.error("[v2] PlayerProfilePage: saveProfile failed", err);
-      setSaveError("Update failed. Please try again.");
+      setSaveError(t("playerProfilePage.updateFailed"));
     } finally {
       setSaving(false);
     }
@@ -535,7 +539,7 @@ export function PlayerProfilePage({
               (e.currentTarget.style.color = "var(--v2-muted)")
             }
           >
-            <ArrowLeft size={14} /> Back to profiles
+            <ArrowLeft size={14} /> {t("playerProfilePage.backToProfiles")}
           </button>
           <button
             onClick={() => void loadProfile()}
@@ -551,7 +555,7 @@ export function PlayerProfilePage({
               (e.currentTarget.style.background = "transparent")
             }
           >
-            <RefreshCcw size={12} /> Refresh
+            <RefreshCcw size={12} /> {t("playerProfilePage.refresh")}
           </button>
         </div>
 
@@ -592,27 +596,27 @@ export function PlayerProfilePage({
                         className="text-xs"
                         style={{ color: "var(--v2-muted)" }}
                       >
-                        (you)
+                        {t("playerProfilePage.you")}
                       </span>
                     )}
                   </div>
                   <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
-                    Joined {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : "unknown"}
+                    {t("playerProfilePage.joined", { date: profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : t("playerProfilePage.joinedUnknown") })}
                   </p>
                   <UserTitle title={profile.userTitle} size="sm" />
                   <div
                     className="flex items-center gap-3 text-xs"
                     style={{ color: "var(--v2-muted)" }}
                   >
-                    {displayElo !== null && <span>ELO {displayElo}</span>}
+                    {displayElo !== null && <span>{t("playerProfilePage.eloValue", { elo: displayElo })}</span>}
                     {(profile.winStreak ?? 0) > 0 && (
-                      <span>🔥 {profile.winStreak} win streak</span>
+                      <span>{t("playerProfilePage.winStreak", { count: profile.winStreak })}</span>
                     )}
                   </div>
                   {Array.isArray(profile.knownAliases) &&
                     profile.knownAliases.length > 0 && (
                       <p className="text-xs flex items-center gap-1.5" style={{ color: "var(--v2-muted)" }}>
-                        aka {profile.knownAliases[profile.knownAliases.length - 1]}
+                        {t("playerProfilePage.akaAlias", { alias: profile.knownAliases[profile.knownAliases.length - 1] })}
                         {profile.knownAliases.length > 1 && (
                           <span
                             className="text-xs px-1 py-0.5 rounded border"
@@ -623,7 +627,7 @@ export function PlayerProfilePage({
                             }}
                             title={profile.knownAliases.slice(0, -1).join(", ")}
                           >
-                            +{profile.knownAliases.length - 1}
+                            {t("playerProfilePage.moreCount", { count: profile.knownAliases.length - 1 })}
                           </span>
                         )}
                       </p>
@@ -638,7 +642,7 @@ export function PlayerProfilePage({
                         className="text-xs font-medium block mb-1"
                         style={{ color: "var(--v2-muted)" }}
                       >
-                        Display name
+                        {t("playerProfilePage.displayName")}
                       </label>
                       <input
                         type="text"
@@ -679,14 +683,14 @@ export function PlayerProfilePage({
                         className="text-xs font-medium block mb-1"
                         style={{ color: "var(--v2-muted)" }}
                       >
-                        Gravatar email
+                        {t("playerProfilePage.gravatarEmail")}
                       </label>
                       {gravEmailEditing ? (
                         <input
                           type="email"
                           value={gravEmailDraft}
                           onChange={(e) => setGravEmailDraft(e.target.value)}
-                          placeholder="you@example.com"
+                          placeholder={t("playerProfilePage.gravatarPlaceholder")}
                           autoFocus
                           className="w-full rounded px-3 py-1.5 text-sm border outline-none transition-colors"
                           style={{
@@ -705,9 +709,9 @@ export function PlayerProfilePage({
                           onClick={() => setGravEmailEditing(true)}
                         >
                           <span className="text-sm" style={{ color: profile?.gravEmail ? "var(--v2-text)" : "var(--v2-muted)" }}>
-                            {profile?.gravEmail ? "••••••••••••" : "Not set"}
+                            {profile?.gravEmail ? t("playerProfilePage.gravatarSet") : t("playerProfilePage.notSet")}
                           </span>
-                          <span className="text-xs shrink-0" style={{ color: "var(--v2-muted)" }}>Edit</span>
+                          <span className="text-xs shrink-0" style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.edit")}</span>
                         </div>
                       )}
                     </div>
@@ -718,7 +722,7 @@ export function PlayerProfilePage({
                           className="text-xs font-medium block mb-1"
                           style={{ color: "var(--v2-muted)" }}
                         >
-                          Title flair
+                          {t("playerProfilePage.titleFlair")}
                         </label>
                         <div className="flex items-center gap-2">
                           {pendingTitle?.title ? (
@@ -728,7 +732,7 @@ export function PlayerProfilePage({
                               className="text-xs"
                               style={{ color: "var(--v2-muted)" }}
                             >
-                              None
+                              {t("playerProfilePage.none")}
                             </span>
                           )}
                           <button
@@ -746,7 +750,7 @@ export function PlayerProfilePage({
                               (e.currentTarget.style.background = "transparent")
                             }
                           >
-                            Change
+                            {t("playerProfilePage.change")}
                           </button>
                         </div>
                         {titlePickerOpen && (
@@ -757,43 +761,43 @@ export function PlayerProfilePage({
                               borderColor: "var(--v2-border)",
                             }}
                           >
-                            {titles.map((t) => (
+                            {titles.map((titleOption) => (
                               <button
-                                key={t.title}
+                                key={titleOption.title}
                                 onClick={() => {
-                                  setPendingTitle(t);
+                                  setPendingTitle(titleOption);
                                   setTitlePickerOpen(false);
                                 }}
                                 className="w-full text-left px-2 py-1 rounded text-xs transition-colors"
                                 style={{
                                   background:
-                                    pendingTitle?.title === t.title
-                                      ? t.bgColor
+                                    pendingTitle?.title === titleOption.title
+                                      ? titleOption.bgColor
                                       : "transparent",
                                   color:
-                                    pendingTitle?.title === t.title
-                                      ? t.color
+                                    pendingTitle?.title === titleOption.title
+                                      ? titleOption.color
                                       : "var(--v2-text)",
                                   border: `1 px solid ${
-                                    pendingTitle?.title === t.title
-                                      ? t.color
+                                    pendingTitle?.title === titleOption.title
+                                      ? titleOption.color
                                       : "var(--v2-text)"
                                   }`,
                                 }}
                                 onMouseEnter={(e) => {
-                                  if (pendingTitle?.title !== t.title)
+                                  if (pendingTitle?.title !== titleOption.title)
                                     (
                                       e.currentTarget as HTMLElement
                                     ).style.background = "var(--v2-surface)";
                                 }}
                                 onMouseLeave={(e) => {
-                                  if (pendingTitle?.title !== t.title)
+                                  if (pendingTitle?.title !== titleOption.title)
                                     (
                                       e.currentTarget as HTMLElement
                                     ).style.background = "transparent";
                                 }}
                               >
-                                <UserTitle title={t} size="sm" />
+                                <UserTitle title={titleOption} size="sm" />
                               </button>
                             ))}
                           </div>
@@ -826,7 +830,7 @@ export function PlayerProfilePage({
                       }
                     >
                       <Save size={13} />
-                      {saving ? "Saving…" : "Save profile"}
+                      {saving ? t("playerProfilePage.saving") : t("playerProfilePage.saveProfile")}
                     </button>
                   </div>
                 )}
@@ -834,15 +838,15 @@ export function PlayerProfilePage({
 
               {/* Stats */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatCard label="Total games" value={winStats.totalGames} />
-                <StatCard label="Wins" value={winStats.totalWins} />
-                <StatCard label="Losses" value={winStats.totalLosses} />
-                <StatCard label="Win rate" value={`${winStats.winRate}%`} />
+                <StatCard label={t("playerProfilePage.totalGames")} value={winStats.totalGames} />
+                <StatCard label={t("playerProfilePage.wins")} value={winStats.totalWins} />
+                <StatCard label={t("playerProfilePage.losses")} value={winStats.totalLosses} />
+                <StatCard label={t("playerProfilePage.winRate")} value={`${winStats.winRate}%`} />
               </div>
             </div>
           ) : (
             <p className="text-sm py-4" style={{ color: "var(--v2-muted)" }}>
-              Profile unavailable.
+              {t("playerProfilePage.profileUnavailable")}
             </p>
           )}
         </div>
@@ -863,7 +867,7 @@ export function PlayerProfilePage({
               className="text-sm font-semibold"
               style={{ color: "var(--v2-text)" }}
             >
-              Character usage
+              {t("playerProfilePage.characterUsage")}
             </span>
             {charOpen ? (
               <ChevronUp size={14} style={{ color: "var(--v2-muted)" }} />
@@ -875,14 +879,14 @@ export function PlayerProfilePage({
             <div className="px-5 pb-5">
               {characterEntries.length === 0 ? (
                 <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
-                  No character data available yet.
+                  {t("playerProfilePage.noCharacterData")}
                 </p>
               ) : (
                 <>
                   {/* SA legend */}
                   <div className="flex gap-4 mb-4">
-                    {(["SA1", "SA2", "SA3"] as const).map((sa, i) => (
-                      <div key={sa} className="flex items-center gap-1.5">
+                    {([0, 1, 2] as const).map((i) => (
+                      <div key={i} className="flex items-center gap-1.5">
                         <span
                           className="w-2.5 h-2.5 rounded-full"
                           style={{ background: SA_COLORS[i] }}
@@ -891,7 +895,7 @@ export function PlayerProfilePage({
                           className="text-xs"
                           style={{ color: "var(--v2-muted)" }}
                         >
-                          {sa}
+                          {t("homePage.superArtSlotCompact", { num: i + 1 })}
                         </span>
                       </div>
                     ))}
@@ -924,7 +928,7 @@ export function PlayerProfilePage({
               className="flex items-center gap-2 text-sm font-semibold flex-1 text-left"
               style={{ color: "var(--v2-text)" }}
             >
-              Recent matches
+              {t("playerProfilePage.recentMatches")}
               {matchesOpen ? (
                 <ChevronUp size={14} style={{ color: "var(--v2-muted)" }} />
               ) : (
@@ -957,7 +961,7 @@ export function PlayerProfilePage({
                       "transparent")
                   }
                 >
-                  Newer
+                  {t("playerProfilePage.newer")}
                 </button>
                 <button
                   onClick={() =>
@@ -983,7 +987,7 @@ export function PlayerProfilePage({
                       "transparent")
                   }
                 >
-                  Older
+                  {t("playerProfilePage.older")}
                 </button>
               </div>
             )}
@@ -995,7 +999,7 @@ export function PlayerProfilePage({
                   className="rounded border p-2 space-y-1"
                   style={{ borderColor: "var(--v2-border)" }}
                 >
-                  <p className="text-xs font-medium" style={{ color: "var(--v2-muted)" }}>Last game — position replay</p>
+                  <p className="text-xs font-medium" style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.lastGamePositionReplay")}</p>
                   <MatchReplay frames={replayFrames} />
                 </div>
               )}
@@ -1014,14 +1018,14 @@ export function PlayerProfilePage({
                   className="text-xs py-2"
                   style={{ color: "var(--v2-muted)" }}
                 >
-                  No matches recorded yet.
+                  {t("playerProfilePage.noMatchesRecorded")}
                 </p>
               ) : (
                 matches.map((match, i) => {
                   const matchKey = match.sessionId || match.id || `${i}`;
                   const date = match.timestamp
                     ? new Date(match.timestamp).toLocaleString()
-                    : "Unknown";
+                    : t("playerProfilePage.unknownDate");
                   const isExpanded = expandedMatchId === matchKey;
                   const isFetching = fetchingMatchId === matchKey;
                   const detail = matchDetailCache[matchKey];
@@ -1053,11 +1057,11 @@ export function PlayerProfilePage({
                                 style={{ color: "var(--v2-accent)" }}
                                 onClick={(e) => { e.stopPropagation(); onNavigateToProfile(match.player1Uid!); }}
                               >
-                                {match.player1Name || "Player 1"}
+                                {match.player1Name || t("playerProfilePage.player1Fallback")}
                               </button>
                             ) : (
                               <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
-                                {match.player1Name || "Player 1"}
+                                {match.player1Name || t("playerProfilePage.player1Fallback")}
                               </p>
                             )}
                             {(() => {
@@ -1072,25 +1076,25 @@ export function PlayerProfilePage({
                               const rest = chars.slice(1);
                               return (
                                 <p className="text-xs flex items-center gap-1.5" style={{ color: "var(--v2-accent)" }}>
-                                  {first.char}{first.super != null ? ` SA${first.super + 1}` : ""}
+                                  {first.char}{first.super != null ? t("playerProfilePage.superArtSuffix", { num: first.super + 1 }) : ""}
                                   {rest.length > 0 && (
                                     <span
                                       className="text-xs px-1 py-0.5 rounded border"
                                       style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)", cursor: "default" }}
-                                      title={rest.map((c) => `${c.char}${c.super != null ? ` SA${c.super + 1}` : ""}`).join(", ")}
+                                      title={rest.map((c) => `${c.char}${c.super != null ? t("playerProfilePage.superArtSuffix", { num: c.super + 1 }) : ""}`).join(", ")}
                                     >
-                                      +{rest.length}
+                                      {t("playerProfilePage.moreCount", { count: rest.length })}
                                     </span>
                                   )}
                                 </p>
                               );
                             })()}
                             <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
-                              Wins: {match.p1Wins ?? 0}
+                              {t("playerProfilePage.winsCount", { count: match.p1Wins ?? 0 })}
                             </p>
                           </div>
                           <span className="w-8 text-center text-xs shrink-0" style={{ color: "var(--v2-muted)" }}>
-                            vs
+                            {t("playerProfilePage.vs")}
                           </span>
                           <div className="flex-1 text-right">
                             {match.player2Uid && onNavigateToProfile ? (
@@ -1099,11 +1103,11 @@ export function PlayerProfilePage({
                                 style={{ color: "var(--v2-accent)" }}
                                 onClick={(e) => { e.stopPropagation(); onNavigateToProfile(match.player2Uid!); }}
                               >
-                                {match.player2Name || "Player 2"}
+                                {match.player2Name || t("playerProfilePage.player2Fallback")}
                               </button>
                             ) : (
                               <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
-                                {match.player2Name || "Player 2"}
+                                {match.player2Name || t("playerProfilePage.player2Fallback")}
                               </p>
                             )}
                             {(() => {
@@ -1118,21 +1122,21 @@ export function PlayerProfilePage({
                               const rest = chars.slice(1);
                               return (
                                 <p className="text-xs flex items-center gap-1.5 justify-end" style={{ color: "var(--v2-accent)" }}>
-                                  {first.char}{first.super != null ? ` SA${first.super + 1}` : ""}
+                                  {first.char}{first.super != null ? t("playerProfilePage.superArtSuffix", { num: first.super + 1 }) : ""}
                                   {rest.length > 0 && (
                                     <span
                                       className="text-xs px-1 py-0.5 rounded border"
                                       style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)", cursor: "default" }}
-                                      title={rest.map((c) => `${c.char}${c.super != null ? ` SA${c.super + 1}` : ""}`).join(", ")}
+                                      title={rest.map((c) => `${c.char}${c.super != null ? t("playerProfilePage.superArtSuffix", { num: c.super + 1 }) : ""}`).join(", ")}
                                     >
-                                      +{rest.length}
+                                      {t("playerProfilePage.moreCount", { count: rest.length })}
                                     </span>
                                   )}
                                 </p>
                               );
                             })()}
                             <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
-                              Wins: {match.p2Wins ?? 0}
+                              {t("playerProfilePage.winsCount", { count: match.p2Wins ?? 0 })}
                             </p>
                           </div>
                         </div>
@@ -1143,7 +1147,7 @@ export function PlayerProfilePage({
                           style={{ borderColor: "var(--v2-border)", background: "var(--v2-hover)" }}
                         >
                           <p className="text-xs font-medium" style={{ color: "var(--v2-muted)" }}>
-                            Session {match.sessionId || "unknown"}
+                            {t("playerProfilePage.session", { id: match.sessionId || t("playerProfilePage.sessionUnknown") })}
                           </p>
                           {isFetching ? (
                             <div className="flex justify-center py-3">
@@ -1162,8 +1166,8 @@ export function PlayerProfilePage({
                                 const p1Meter = toArr(parsed?.["p1-meter-gained"]);
                                 const p2Meter = toArr(parsed?.["p2-meter-gained"]);
                                 const p1Wins = m.result === "1";
-                                const p1Super = m.player1Super != null ? ` SA${m.player1Super + 1}` : "";
-                                const p2Super = m.player2Super != null ? ` SA${m.player2Super + 1}` : "";
+                                const p1Super = m.player1Super != null ? t("playerProfilePage.superArtSuffix", { num: m.player1Super + 1 }) : "";
+                                const p2Super = m.player2Super != null ? t("playerProfilePage.superArtSuffix", { num: m.player2Super + 1 }) : "";
                                 const p1Knockdowns = parsed?.["p1-knockdowns"] ?? null;
                                 const p2Knockdowns = parsed?.["p2-knockdowns"] ?? null;
                                 const p1FastWakeups = parsed?.["p1-fast-wakeups"] ?? null;
@@ -1192,20 +1196,20 @@ export function PlayerProfilePage({
                                     style={{ borderColor: "var(--v2-border)" }}
                                   >
                                     <div className="flex items-center justify-between text-xs">
-                                      <span style={{ color: "var(--v2-muted)" }}>Game {i + 1}</span>
+                                      <span style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.gameNumber", { num: i + 1 })}</span>
                                       <div className="flex items-center gap-3">
                                         <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>
-                                          {m.player1Char || "?"}{p1Super}
+                                          {m.player1Char || t("playerProfilePage.unknownFallback")}{p1Super}
                                         </span>
-                                        <span style={{ color: "var(--v2-muted)" }}>vs</span>
+                                        <span style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.vs")}</span>
                                         <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>
-                                          {m.player2Char || "?"}{p2Super}
+                                          {m.player2Char || t("playerProfilePage.unknownFallback")}{p2Super}
                                         </span>
                                       </div>
                                     </div>
                                     {(p1Meter.length >= 2 || p2Meter.length >= 2) && (
                                       <div>
-                                        <p className="text-xs mb-0.5" style={{ color: "var(--v2-muted)" }}>Meter build</p>
+                                        <p className="text-xs mb-0.5" style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.meterBuild")}</p>
                                         <MeterChart
                                           p1Samples={p1Meter}
                                           p2Samples={p2Meter}
@@ -1215,11 +1219,11 @@ export function PlayerProfilePage({
                                         <div className="flex gap-3 mt-0.5">
                                           <span className="text-xs flex items-center gap-1">
                                             <span className="inline-block w-2 h-0.5 rounded" style={{ background: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }} />
-                                            <span style={{ color: "var(--v2-muted)" }}>{detail.player1Name || "P1"} ({parsed?.["p1-total-meter-gained"] ?? "—"})</span>
+                                            <span style={{ color: "var(--v2-muted)" }}>{detail.player1Name || t("playerProfilePage.p1Fallback")} ({parsed?.["p1-total-meter-gained"] ?? "—"})</span>
                                           </span>
                                           <span className="text-xs flex items-center gap-1">
                                             <span className="inline-block w-2 h-0.5 rounded" style={{ background: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }} />
-                                            <span style={{ color: "var(--v2-muted)" }}>{detail.player2Name || "P2"} ({parsed?.["p2-total-meter-gained"] ?? "—"})</span>
+                                            <span style={{ color: "var(--v2-muted)" }}>{detail.player2Name || t("playerProfilePage.p2Fallback")} ({parsed?.["p2-total-meter-gained"] ?? "—"})</span>
                                           </span>
                                         </div>
                                       </div>
@@ -1232,7 +1236,7 @@ export function PlayerProfilePage({
                                         {hasKdData && (
                                           <>
                                             <span style={{ color: "var(--v2-muted)" }}>
-                                              Times knocked down
+                                              {t("playerProfilePage.timesKnockedDown")}
                                             </span>
                                             <span className="text-right" style={{ color: "var(--v2-muted)" }}>
                                               <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1Knockdowns ?? "—"}</span>
@@ -1244,7 +1248,7 @@ export function PlayerProfilePage({
                                         {hasFwData && (
                                           <>
                                             <span style={{ color: "var(--v2-muted)" }}>
-                                              Quick rises
+                                              {t("playerProfilePage.quickRises")}
                                             </span>
                                             <span className="text-right" style={{ color: "var(--v2-muted)" }}>
                                               <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1FastWakeups ?? "—"}</span>
@@ -1255,7 +1259,7 @@ export function PlayerProfilePage({
                                         )}
                                         {hasParryData && (
                                           <>
-                                            <span style={{ color: "var(--v2-muted)" }}>Parries</span>
+                                            <span style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.parries")}</span>
                                             <span className="text-right" style={{ color: "var(--v2-muted)" }}>
                                               <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1Parries ?? "—"}</span>
                                               <span className="mx-1">·</span>
@@ -1265,7 +1269,7 @@ export function PlayerProfilePage({
                                         )}
                                         {hasThrowData && (
                                           <>
-                                            <span style={{ color: "var(--v2-muted)" }}>Throws</span>
+                                            <span style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.throws")}</span>
                                             <span className="text-right" style={{ color: "var(--v2-muted)" }}>
                                               <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1Throws ?? "—"}</span>
                                               <span className="mx-1">·</span>
@@ -1275,7 +1279,7 @@ export function PlayerProfilePage({
                                         )}
                                         {hasWhiffData && (
                                           <>
-                                            <span style={{ color: "var(--v2-muted)" }}>Throw whiffs</span>
+                                            <span style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.throwWhiffs")}</span>
                                             <span className="text-right" style={{ color: "var(--v2-muted)" }}>
                                               <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1ThrowWhiffs ?? "—"}</span>
                                               <span className="mx-1">·</span>
@@ -1285,7 +1289,7 @@ export function PlayerProfilePage({
                                         )}
                                         {hasTechData && (
                                           <>
-                                            <span style={{ color: "var(--v2-muted)" }}>Throw techs</span>
+                                            <span style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.throwTechs")}</span>
                                             <span className="text-right" style={{ color: "var(--v2-muted)" }}>
                                               <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1ThrowTechs ?? "—"}</span>
                                               <span className="mx-1">·</span>
@@ -1295,7 +1299,7 @@ export function PlayerProfilePage({
                                         )}
                                         {hasSuperData && (
                                           <>
-                                            <span style={{ color: "var(--v2-muted)" }}>Supers used</span>
+                                            <span style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.supersUsed")}</span>
                                             <span className="text-right" style={{ color: "var(--v2-muted)" }}>
                                               <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1SupersUsed ?? "—"}</span>
                                               <span className="mx-1">·</span>
@@ -1316,7 +1320,7 @@ export function PlayerProfilePage({
                               </pre>
                             </>
                           ) : (
-                            <p className="text-xs" style={{ color: "var(--v2-muted)" }}>No data available.</p>
+                            <p className="text-xs" style={{ color: "var(--v2-muted)" }}>{t("playerProfilePage.noDataAvailable")}</p>
                           )}
                         </div>
                       )}

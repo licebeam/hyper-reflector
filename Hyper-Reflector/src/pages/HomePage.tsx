@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { BarChart2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import api from "../external-api/requests";
 import { auth } from "../utils/firebase";
 import { useV2Theme } from "../ThemeContext";
@@ -84,16 +85,17 @@ function WinSpreadDonut({
   winCount?: Record<string, number>;
   colors: [string, string];
 }) {
+  const { t } = useTranslation();
   const data = [
-    { name: "Player 1", value: winCount?.["1"] || 0, color: colors[0] },
-    { name: "Player 2", value: winCount?.["2"] || 0, color: colors[1] },
+    { name: t("homePage.player1"), value: winCount?.["1"] || 0, color: colors[0] },
+    { name: t("homePage.player2"), value: winCount?.["2"] || 0, color: colors[1] },
   ];
   const hasData = data.some((d) => d.value > 0);
 
   if (!hasData) {
     return (
       <p className="text-sm py-4" style={{ color: "var(--v2-muted)" }}>
-        No wins recorded yet.
+        {t("homePage.noWinsRecorded")}
       </p>
     );
   }
@@ -139,11 +141,12 @@ function SuperArtDonut({
   stats: CharacterChoice;
   colors: [string, string, string];
 }) {
+  const { t } = useTranslation();
   const superChoices = normalizeSuperChoices(stats.superChoice);
   const data = [0, 1, 2].map((i) => {
     const entry = superChoices[i];
     return {
-      name: `SA ${i + 1}`,
+      name: t("homePage.superArtSlot", { num: i + 1 }),
       value: (entry?.wins || 0) + (entry?.losses || 0),
       color: colors[i],
     };
@@ -199,6 +202,7 @@ type HomePageProps = {
 };
 
 export function HomePage({ currentUser }: HomePageProps) {
+  const { t } = useTranslation();
   const { theme } = useV2Theme();
   const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -223,11 +227,11 @@ export function HomePage({ currentUser }: HomePageProps) {
         if (!mounted) return;
         setGlobalStats(result?.globalStatSet ?? null);
         if (!result?.globalStatSet)
-          setError("Global stats are not available yet.");
+          setError(t("homePage.statsNotAvailable"));
       } catch {
         if (mounted) {
           setGlobalStats(null);
-          setError("Unable to load stats. Please try again shortly.");
+          setError(t("homePage.unableToLoadStats"));
         }
       } finally {
         if (mounted) setLoading(false);
@@ -274,7 +278,7 @@ export function HomePage({ currentUser }: HomePageProps) {
     return (
       <div className="h-full flex items-center justify-center">
         <p className="text-sm" style={{ color: "var(--v2-muted)" }}>
-          Sign in to view the global stats dashboard.
+          {t("homePage.signInToView")}
         </p>
       </div>
     );
@@ -290,10 +294,10 @@ export function HomePage({ currentUser }: HomePageProps) {
             className="text-lg font-semibold"
             style={{ color: "var(--v2-text)" }}
           >
-            Global Stats
+            {t("homePage.title")}
           </h1>
           <span className="text-xs ml-1" style={{ color: "var(--v2-muted)" }}>
-            Live match tracking across the Hyper Reflector community
+            {t("homePage.subtitle")}
           </span>
         </div>
 
@@ -321,7 +325,7 @@ export function HomePage({ currentUser }: HomePageProps) {
                 }}
               />
               <p className="text-sm" style={{ color: "var(--v2-muted)" }}>
-                Crunching match data…
+                {t("homePage.crunchingData")}
               </p>
             </div>
           </div>
@@ -330,12 +334,12 @@ export function HomePage({ currentUser }: HomePageProps) {
             {/* Summary stat cards */}
             <div className="grid grid-cols-2 gap-3">
               <StatCard
-                label="Total matches"
+                label={t("homePage.totalMatches")}
                 value={(
                   globalStats?.globalNumberOfMatches || 0
                 ).toLocaleString()}
               />
-              <StatCard label="Most played" value={mostPlayed || "—"} />
+              <StatCard label={t("homePage.mostPlayed")} value={mostPlayed || "—"} />
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -351,7 +355,7 @@ export function HomePage({ currentUser }: HomePageProps) {
                   className="text-sm font-semibold mb-4"
                   style={{ color: "var(--v2-text)" }}
                 >
-                  Player win spread
+                  {t("homePage.playerWinSpread")}
                 </h2>
                 <WinSpreadDonut
                   winCount={globalStats?.globalWinCount}
@@ -360,8 +364,8 @@ export function HomePage({ currentUser }: HomePageProps) {
                 {/* Legend */}
                 <div className="flex justify-center gap-6 mt-6">
                   {[
-                    ["Player 1", accent],
-                    ["Player 2", nameOther],
+                    [t("homePage.player1"), accent],
+                    [t("homePage.player2"), nameOther],
                   ].map(([label, color]) => (
                     <div key={label} className="flex items-center gap-1.5">
                       <span
@@ -391,7 +395,7 @@ export function HomePage({ currentUser }: HomePageProps) {
                   className="text-sm font-semibold mb-4"
                   style={{ color: "var(--v2-text)" }}
                 >
-                  Character pick rates
+                  {t("homePage.characterPickRates")}
                 </h2>
                 {characterEntries.some(([, v]) => v.picks > 0) ? (
                   <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
@@ -403,9 +407,9 @@ export function HomePage({ currentUser }: HomePageProps) {
                         borderColor: "var(--v2-border)",
                       }}
                     >
-                      <span>Character</span>
-                      <span className="text-right">Matches</span>
-                      <span className="text-right">Pick %</span>
+                      <span>{t("homePage.characterColumn")}</span>
+                      <span className="text-right">{t("homePage.matchesColumn")}</span>
+                      <span className="text-right">{t("homePage.pickPercentColumn")}</span>
                     </div>
                     {characterEntries.map(([name, stats]) => {
                       const pct = ((stats?.picks || 0) / totalPicks) * 100;
@@ -449,7 +453,7 @@ export function HomePage({ currentUser }: HomePageProps) {
                   </div>
                 ) : (
                   <p className="text-sm" style={{ color: "var(--v2-muted)" }}>
-                    No pick data yet.
+                    {t("homePage.noPickDataYet")}
                   </p>
                 )}
               </div>
@@ -467,12 +471,12 @@ export function HomePage({ currentUser }: HomePageProps) {
                 className="text-sm font-semibold mb-1"
                 style={{ color: "var(--v2-text)" }}
               >
-                Super Art usage
+                {t("homePage.superArtUsage")}
               </h2>
               {/* Legend */}
               <div className="flex gap-4 mb-5">
-                {(["SA1", "SA2", "SA3"] as const).map((sa, i) => (
-                  <div key={sa} className="flex items-center gap-1.5">
+                {([0, 1, 2] as const).map((i) => (
+                  <div key={i} className="flex items-center gap-1.5">
                     <span
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ background: SA_COLORS[i] }}
@@ -481,7 +485,7 @@ export function HomePage({ currentUser }: HomePageProps) {
                       className="text-xs"
                       style={{ color: "var(--v2-muted)" }}
                     >
-                      {sa}
+                      {t("homePage.superArtSlotCompact", { num: i + 1 })}
                     </span>
                   </div>
                 ))}

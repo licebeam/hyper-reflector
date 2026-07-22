@@ -7,6 +7,7 @@ import {
   RefreshCcw,
   User,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import api from "../external-api/requests";
 import { auth } from "../utils/firebase";
 import type { V2User } from "../types";
@@ -52,6 +53,7 @@ const INIT_BOARD: LeaderboardState = {
 // ── Avatar chip ────────────────────────────────────────────────────────────────
 
 function MiniAvatar({ user }: { user: SearchUser }) {
+  const { t } = useTranslation();
   const [failed, setFailed] = useState(false);
   const show = !!user.userProfilePic && !failed;
   return (
@@ -67,7 +69,7 @@ function MiniAvatar({ user }: { user: SearchUser }) {
           onError={() => setFailed(true)}
         />
       ) : (
-        (user.userName || "?").slice(0, 2).toUpperCase()
+        (user.userName || t("profilesPage.unknownFallback")).slice(0, 2).toUpperCase()
       )}
     </div>
   );
@@ -86,6 +88,7 @@ function UserCard({
   statLine?: string;
   onView?: (uid: string) => void;
 }) {
+  const { t } = useTranslation();
   const clickable = !!user.uid && !!onView;
 
   return (
@@ -111,7 +114,7 @@ function UserCard({
             className="text-sm font-medium truncate"
             style={{ color: "var(--v2-text)" }}
           >
-            {user.userName || "Unknown player"}
+            {user.userName || t("profilesPage.unknownPlayer")}
           </span>
           <CountryFlag code={user.countryCode} />
           <UserTitle title={user.userTitle} />
@@ -134,7 +137,7 @@ function UserCard({
             (e.currentTarget.style.background = "transparent")
           }
         >
-          View <ArrowRight size={12} />
+          {t("profilesPage.view")} <ArrowRight size={12} />
         </button>
       )}
     </div>
@@ -152,6 +155,7 @@ export function ProfilesPage({
   currentUser,
   onViewProfile,
 }: ProfilesPageProps) {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [searchCursor, setSearchCursor] = useState<string | null>(null);
@@ -181,7 +185,7 @@ export function ProfilesPage({
         setSearchResults((prev) => (reset ? users : [...prev, ...users]));
         setSearchCursor(res?.nextCursor ?? null);
       } catch {
-        setSearchError("Unable to search right now. Please try again soon.");
+        setSearchError(t("profilesPage.searchError"));
       } finally {
         setSearchLoading(false);
       }
@@ -196,8 +200,8 @@ export function ProfilesPage({
       setSearchError(null);
       return;
     }
-    const t = setTimeout(() => void performSearch(trimmed, true, null), 350);
-    return () => clearTimeout(t);
+    const timeoutId = setTimeout(() => void performSearch(trimmed, true, null), 350);
+    return () => clearTimeout(timeoutId);
   }, [trimmed, performSearch]);
 
   const fetchBoard = useCallback(
@@ -274,7 +278,7 @@ export function ProfilesPage({
     return (
       <div className="h-full flex items-center justify-center">
         <p className="text-sm" style={{ color: "var(--v2-muted)" }}>
-          Sign in to browse profiles.
+          {t("profilesPage.signInToBrowse")}
         </p>
       </div>
     );
@@ -350,13 +354,13 @@ export function ProfilesPage({
                 (e.currentTarget.style.background = "transparent")
               }
             >
-              <RefreshCcw size={12} /> Refresh
+              <RefreshCcw size={12} /> {t("profilesPage.refresh")}
             </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {filterBtn("all", "All")}
-            {filterBtn("mine", "My region")}
-            {filterBtn("other", "Other region")}
+            {filterBtn("all", t("profilesPage.filterAll"))}
+            {filterBtn("mine", t("profilesPage.filterMyRegion"))}
+            {filterBtn("other", t("profilesPage.filterOtherRegion"))}
             {filter.type === "other" && (
               <CountryPicker
                 value={filter.code}
@@ -372,7 +376,7 @@ export function ProfilesPage({
               className="text-xs text-center py-4"
               style={{ color: "var(--v2-muted)" }}
             >
-              No players yet.
+              {t("profilesPage.noPlayersYet")}
             </p>
           )}
           {board.loading && board.entries.length === 0 && (
@@ -389,8 +393,8 @@ export function ProfilesPage({
           {visibleEntries.map((entry, i) => {
             const statLine =
               kind === "elo"
-                ? `ELO ${entry.stats?.accountElo ?? "—"}`
-                : `Wins ${entry.stats?.totalWins ?? 0} · Games ${entry.stats?.totalGames ?? 0}`;
+                ? t("profilesPage.eloStatLine", { elo: entry.stats?.accountElo ?? "—" })
+                : t("profilesPage.winsStatLine", { wins: entry.stats?.totalWins ?? 0, games: entry.stats?.totalGames ?? 0 });
             return (
               <UserCard
                 key={`${kind}-${entry.user.uid ?? i}`}
@@ -428,7 +432,7 @@ export function ProfilesPage({
                   "transparent")
               }
             >
-              {board.cursor ? "Load more" : "End of list"}
+              {board.cursor ? t("profilesPage.loadMore") : t("profilesPage.endOfList")}
             </button>
           )}
         </div>
@@ -446,10 +450,10 @@ export function ProfilesPage({
               className="text-lg font-semibold"
               style={{ color: "var(--v2-text)" }}
             >
-              Player profiles
+              {t("profilesPage.title")}
             </h1>
             <p className="text-xs mt-0.5" style={{ color: "var(--v2-muted)" }}>
-              Search players, browse leaderboards, or view your own profile.
+              {t("profilesPage.subtitle")}
             </p>
           </div>
           {/* TEMP DISABLE */}
@@ -489,7 +493,7 @@ export function ProfilesPage({
             />
             <input
               type="text"
-              placeholder="Search by player name…"
+              placeholder={t("profilesPage.searchPlaceholder")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-8 pr-3 py-2 rounded border text-sm outline-none transition-colors"
@@ -514,8 +518,7 @@ export function ProfilesPage({
           {trimmed && (
             <div className="flex items-center justify-between">
               <span className="text-xs" style={{ color: "var(--v2-muted)" }}>
-                {searchResults.length} result
-                {searchResults.length !== 1 ? "s" : ""}
+                {t("profilesPage.resultCount", { count: searchResults.length })}
               </span>
               <button
                 onClick={() => setSearchTerm("")}
@@ -528,7 +531,7 @@ export function ProfilesPage({
                   (e.currentTarget.style.color = "var(--v2-muted)")
                 }
               >
-                Clear
+                {t("profilesPage.clear")}
               </button>
             </div>
           )}
@@ -545,7 +548,7 @@ export function ProfilesPage({
           )}
           {!searchLoading && trimmed && searchResults.length === 0 && (
             <p className="text-xs py-2" style={{ color: "var(--v2-muted)" }}>
-              No players found for "{trimmed}".
+              {t("profilesPage.noPlayersFound", { term: trimmed })}
             </p>
           )}
           <div className="space-y-2">
@@ -555,7 +558,7 @@ export function ProfilesPage({
                 user={user}
                 statLine={
                   user.accountElo !== undefined
-                    ? `ELO ${user.accountElo}`
+                    ? t("profilesPage.eloStatLine", { elo: user.accountElo })
                     : undefined
                 }
                 onView={onViewProfile}
@@ -580,7 +583,7 @@ export function ProfilesPage({
                   "transparent")
               }
             >
-              Load more results
+              {t("profilesPage.loadMoreResults")}
             </button>
           )}
         </div>
@@ -591,20 +594,20 @@ export function ProfilesPage({
             className="text-sm font-semibold mb-3"
             style={{ color: "var(--v2-text)" }}
           >
-            Leaderboards
+            {t("profilesPage.leaderboards")}
           </h2>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {renderBoard(
               "elo",
               <Award size={15} />,
-              "Highest ELO",
-              "Top rated competitors",
+              t("profilesPage.highestElo"),
+              t("profilesPage.topRatedCompetitors"),
             )}
             {renderBoard(
               "wins",
               <Trophy size={15} />,
-              "Most wins",
-              "Players with the most recorded wins",
+              t("profilesPage.mostWins"),
+              t("profilesPage.mostRecordedWins"),
             )}
           </div>
         </div>

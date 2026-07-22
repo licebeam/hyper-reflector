@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CountryFlag } from "./CountryFlag";
 import rawCountries from "flag-icons/country.json";
 
@@ -22,8 +23,10 @@ export function CountryPicker({
   value,
   onChange,
   onClear,
-  placeholder = "Type country…",
+  placeholder,
 }: CountryPickerProps) {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t("countryPicker.typeCountry");
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,7 +71,7 @@ export function CountryPicker({
         {selectedCountry && <CountryFlag code={selectedCountry.code} />}
         <input
           type="text"
-          placeholder={placeholder}
+          placeholder={resolvedPlaceholder}
           value={displayValue}
           onFocus={() => {
             setOpen(true);
@@ -104,7 +107,7 @@ export function CountryPicker({
           <div className="max-h-44 overflow-y-auto">
             {filtered.length === 0 ? (
               <p className="px-3 py-2 text-xs" style={{ color: "var(--v2-muted)" }}>
-                No results
+                {t("countryPicker.noResults")}
               </p>
             ) : (
               filtered.map((c) => (

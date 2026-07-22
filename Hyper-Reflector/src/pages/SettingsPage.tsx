@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useTranslation } from "react-i18next";
 import {
   LogOut,
   Play,
@@ -174,6 +175,7 @@ function SoundRow({
   onPlay: () => void;
   onStop: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1.5 py-1">
       <div className="flex items-center justify-between gap-4">
@@ -195,7 +197,7 @@ function SoundRow({
             className="text-xs flex-1 font-mono truncate"
             style={{ color: "var(--v2-muted)" }}
           >
-            {path || "Default"}
+            {path || t("settingsPage.default")}
           </p>
           <button
             onClick={onPick}
@@ -212,7 +214,7 @@ function SoundRow({
               (e.currentTarget.style.color = "var(--v2-muted)")
             }
           >
-            <FolderOpen size={11} /> Browse
+            <FolderOpen size={11} /> {t("settingsPage.browse")}
           </button>
           <button
             onClick={onPlay}
@@ -228,7 +230,7 @@ function SoundRow({
             onMouseLeave={(e) =>
               (e.currentTarget.style.color = "var(--v2-muted)")
             }
-            title="Preview"
+            title={t("settingsPage.preview")}
           >
             <Play size={11} />
           </button>
@@ -246,7 +248,7 @@ function SoundRow({
             onMouseLeave={(e) =>
               (e.currentTarget.style.color = "var(--v2-muted)")
             }
-            title="Stop"
+            title={t("settingsPage.stop")}
           >
             <Square size={11} />
           </button>
@@ -259,6 +261,7 @@ function SoundRow({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function SettingsPage({ onLogout }: SettingsPageProps) {
+  const { t } = useTranslation();
   const [resetConfirm, setResetConfirm] = useState(false);
   const [romPathStatus, setRomPathStatus] = useState<
     | { kind: "success"; text: string }
@@ -399,8 +402,8 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
     <div className="h-full overflow-y-scroll">
       <div className="max-w-lg mx-auto p-6 space-y-4">
         {/* ── Gameplay ── */}
-        <Section title="Gameplay">
-          <Row label="GGPO Delay" sub="Frame delay for netplay (0 – 7)">
+        <Section title={t("settingsPage.gameplay")}>
+          <Row label={t("settingsPage.ggpoDelay")} sub={t("settingsPage.ggpoDelayHint")}>
             <select
               value={ggpoDelay}
               onChange={(e) => setGgpoDelay(e.target.value)}
@@ -417,18 +420,18 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
         </Section>
 
         {/* ── 3rd Strike ── */}
-        <Section title="3rd Strike">
+        <Section title={t("settingsPage.thirdStrike")}>
           <Row
-            label="Mute music"
-            sub="Silences in-game BGM (Street Fighter III: 3rd Strike) · Experimental, may cause desyncs"
+            label={t("settingsPage.muteMusic")}
+            sub={t("settingsPage.muteMusicHint")}
           >
             <Toggle checked={labMusicMuted} onChange={setLabMusicMuted} />
           </Row>
         </Section>
 
         {/* ── Ranked Queue ── */}
-        <Section title="Ranked Queue">
-          <Row label="Game" sub="The game you queue for in ranked search">
+        <Section title={t("settingsPage.rankedQueue")}>
+          <Row label={t("settingsPage.game")} sub={t("settingsPage.rankedQueueGameHint")}>
             <select
               value={rankQueueGame}
               onChange={(e) => setRankQueueGame(e.target.value)}
@@ -445,16 +448,16 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
         </Section>
 
         {/* ── Files ── */}
-        <Section title="Files">
+        <Section title={t("settingsPage.files")}>
           <div className="space-y-1 py-1">
             <p className="text-sm" style={{ color: "var(--v2-text)" }}>
-              ROM directory
+              {t("settingsPage.romDirectory")}
             </p>
             <p
               className="text-xs font-mono break-all"
               style={{ color: "var(--v2-muted)" }}
             >
-              {romPath || "Not set"}
+              {romPath || t("settingsPage.notSet")}
             </p>
             {romPathStatus && (
               <p
@@ -467,7 +470,7 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
                 }}
               >
                 {romPathStatus.kind === "success"
-                  ? `Updated emulator config: ${romPathStatus.text}`
+                  ? t("settingsPage.updatedEmulatorConfig", { path: romPathStatus.text })
                   : romPathStatus.text}
               </p>
             )}
@@ -482,14 +485,14 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
                 (e.currentTarget.style.color = "var(--v2-muted)")
               }
             >
-              <FolderOpen size={13} /> Browse for ROM directory…
+              <FolderOpen size={13} /> {t("settingsPage.browseRomDirectory")}
             </button>
           </div>
         </Section>
 
         {/* ── App ── */}
-        <Section title="App">
-          <Row label="Language">
+        <Section title={t("settingsPage.app")}>
+          <Row label={t("settingsPage.language")}>
             <select
               value={appLanguage}
               onChange={(e) => setAppLanguage(e.target.value)}
@@ -506,33 +509,33 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
         </Section>
 
         {/* ── Appearance ── */}
-        <Section title="Appearance">
+        <Section title={t("settingsPage.appearance")}>
           <div className="space-y-4">
             {/* Theme picker */}
             <div>
               <p className="text-sm mb-2" style={{ color: "var(--v2-text)" }}>
-                Theme
+                {t("settingsPage.theme")}
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {THEMES.map((t) => (
+                {THEMES.map((themeOption) => (
                   <button
-                    key={t.id}
-                    onClick={() => setThemeId(t.id)}
+                    key={themeOption.id}
+                    onClick={() => setThemeId(themeOption.id)}
                     className="flex flex-col items-start p-3 rounded border text-left transition-all"
                     style={{
                       borderColor:
-                        theme.id === t.id
+                        theme.id === themeOption.id
                           ? "var(--v2-accent)"
                           : "var(--v2-border)",
                       background:
-                        theme.id === t.id ? "var(--v2-hover)" : "transparent",
+                        theme.id === themeOption.id ? "var(--v2-hover)" : "transparent",
                     }}
                   >
                     <span
                       className="text-sm font-medium"
                       style={{ color: "var(--v2-text)" }}
                     >
-                      {t.name}
+                      {themeOption.name}
                     </span>
                     <div className="flex gap-1 mt-1.5">
                       {(
@@ -541,7 +544,7 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
                         <span
                           key={k}
                           className="w-3 h-3 rounded-full border border-white/10"
-                          style={{ background: t.vars[k] }}
+                          style={{ background: themeOption.vars[k] }}
                         />
                       ))}
                     </div>
@@ -559,22 +562,22 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
                 className="text-xs font-semibold uppercase tracking-wide"
                 style={{ color: "var(--v2-muted)" }}
               >
-                Chat Colors
+                {t("settingsPage.chatColors")}
               </p>
               <ColorSwatch
-                label="Chat text"
+                label={t("settingsPage.chatText")}
                 current={currentChatColor}
                 swatches={CHAT_MSG_SWATCHES}
                 onChange={(c) => setOverride("--v2-chat-msg", c)}
               />
               <ColorSwatch
-                label="My username"
+                label={t("settingsPage.myUsername")}
                 current={currentSelfColor}
                 swatches={NAME_SELF_SWATCHES}
                 onChange={(c) => setOverride("--v2-name-self", c)}
               />
               <ColorSwatch
-                label="Others' names"
+                label={t("settingsPage.othersNames")}
                 current={currentOtherColor}
                 swatches={NAME_OTHER_SWATCHES}
                 onChange={(c) => setOverride("--v2-name-other", c)}
@@ -587,13 +590,13 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
                   background: "var(--v2-hover)",
                 }}
               >
-                <span style={{ color: currentSelfColor }}>YourName</span>
+                <span style={{ color: currentSelfColor }}>{t("settingsPage.previewYourName")}</span>
                 <span style={{ color: "var(--v2-muted)" }}> 12:00 </span>
-                <span style={{ color: currentChatColor }}>Hello lobby!</span>
+                <span style={{ color: currentChatColor }}>{t("settingsPage.previewHello")}</span>
                 {"  "}
-                <span style={{ color: currentOtherColor }}>Opponent</span>
+                <span style={{ color: currentOtherColor }}>{t("settingsPage.previewOpponent")}</span>
                 <span style={{ color: "var(--v2-muted)" }}> 12:01 </span>
-                <span style={{ color: currentChatColor }}>GG!</span>
+                <span style={{ color: currentChatColor }}>{t("settingsPage.previewGG")}</span>
               </div>
             </div>
 
@@ -606,9 +609,9 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
                 className="text-xs font-semibold uppercase tracking-wide"
                 style={{ color: "var(--v2-muted)" }}
               >
-                Background
+                {t("settingsPage.background")}
               </p>
-              <Row label="Pattern overlay" sub="Tiled texture visibility">
+              <Row label={t("settingsPage.patternOverlay")} sub={t("settingsPage.patternOverlayHint")}>
                 <select
                   value={currentPatternOpacity}
                   onChange={(e) =>
@@ -617,10 +620,10 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
                   className="rounded px-3 py-1.5 text-sm border outline-none"
                   style={selectStyle}
                 >
-                  <option value="0">Off</option>
-                  <option value=".1">Subtle</option>
-                  <option value=".2">Medium</option>
-                  <option value="0.4">Strong</option>
+                  <option value="0">{t("settingsPage.patternOff")}</option>
+                  <option value=".1">{t("settingsPage.patternSubtle")}</option>
+                  <option value=".2">{t("settingsPage.patternMedium")}</option>
+                  <option value="0.4">{t("settingsPage.patternStrong")}</option>
                 </select>
               </Row>
             </div>
@@ -628,9 +631,9 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
         </Section>
 
         {/* ── Notifications ── */}
-        <Section title="Notifications">
+        <Section title={t("settingsPage.notifications")}>
           <SoundRow
-            label="Challenge received"
+            label={t("settingsPage.challengeReceived")}
             enabled={notifChallengeSound}
             path={notifChallengeSoundPath}
             onToggle={setNotifChallengeSound}
@@ -643,7 +646,7 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
             style={{ borderColor: "var(--v2-border)" }}
           />
           <SoundRow
-            label="@-mention in chat"
+            label={t("settingsPage.mentionInChat")}
             enabled={notifiAtSound}
             path={notifAtSoundPath}
             onToggle={setNotifAtSound}
@@ -656,7 +659,7 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
             style={{ borderColor: "var(--v2-border)" }}
           />
           <SoundRow
-            label="Match win"
+            label={t("settingsPage.matchWin")}
             enabled={winSound}
             path={winSoundPath}
             onToggle={setWinSound}
@@ -667,20 +670,20 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
         </Section>
 
         {/* ── Account ── */}
-        <Section title="Account">
+        <Section title={t("settingsPage.account")}>
           <button
             onClick={handleLogout}
             className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors"
           >
-            <LogOut size={14} /> Sign out
+            <LogOut size={14} /> {t("settingsPage.signOut")}
           </button>
         </Section>
 
         {/* ── Danger zone ── */}
-        <Section title="Danger Zone">
+        <Section title={t("settingsPage.dangerZone")}>
           <div className="space-y-2 py-1">
             <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
-              Reset all saved settings to their defaults. This cannot be undone.
+              {t("settingsPage.resetHint")}
             </p>
             <button
               onClick={handleReset}
@@ -695,8 +698,8 @@ export function SettingsPage({ onLogout }: SettingsPageProps) {
               }}
             >
               {resetConfirm
-                ? "Click again to confirm reset"
-                : "Reset all settings"}
+                ? t("settingsPage.resetConfirm")
+                : t("settingsPage.resetAllSettings")}
             </button>
           </div>
         </Section>

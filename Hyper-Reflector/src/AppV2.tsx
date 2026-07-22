@@ -1,5 +1,6 @@
 import "./styles.css";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import bgImage from "./assets/bgImage.svg";
 import { onAuthStateChanged } from "firebase/auth";
 import { ThemeProvider, useV2Theme } from "./ThemeContext";
@@ -190,6 +191,7 @@ function RankQueuePopup({ data, onAccept, onDecline }: RankQueuePopupProps) {
 // ── Inner app — has access to ThemeContext ────────────────────────────────────
 
 function AppV2Inner() {
+  const { t } = useTranslation();
   const { vars } = useV2Theme();
 
   const [authState, setAuthState] = useState<AuthState>("loading");
@@ -413,13 +415,13 @@ function AppV2Inner() {
               className="font-bold text-lg"
               style={{ color: "var(--v2-accent)" }}
             >
-              Hyper Reflector
+              {t("appV2.appName")}
             </p>
             <p
               className="text-sm animate-pulse"
               style={{ color: "var(--v2-muted)" }}
             >
-              Loading...
+              {t("appV2.loading")}
             </p>
           </div>
         </div>
@@ -456,8 +458,8 @@ function AppV2Inner() {
                 }}
               />
               {isReconnecting
-                ? "Disconnected — reconnecting…"
-                : "Disconnected from server"}
+                ? t("appV2.reconnecting")
+                : t("appV2.disconnected")}
             </div>
           )}
 

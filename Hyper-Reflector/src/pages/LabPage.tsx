@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { FlaskConical, FolderOpen, Play, Trash2, Palette, CheckCircle2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useSettingsStore } from '../state/store'
 import {
   ensureDefaultEmulatorPath,
@@ -16,6 +17,7 @@ const SFIII_ROM = 'sfiii3nr1'
 const SHOW_PALETTE_EXTRACTOR = false
 
 export function LabPage() {
+  const { t } = useTranslation()
   const emulatorPath = useSettingsStore(s => s.emulatorPath)
   const setEmulatorPath = useSettingsStore(s => s.setEmulatorPath)
 
@@ -69,7 +71,7 @@ export function LabPage() {
       const { emulatorPath: resolved } = useSettingsStore.getState()
 
       if (!resolved?.trim()) {
-        setError('No emulator path configured. Browse for the emulator below.')
+        setError(t('labPage.noEmulatorPath'))
         return
       }
 
@@ -96,7 +98,7 @@ export function LabPage() {
       })
       setLaunched(true)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to launch emulator.')
+      setError(err instanceof Error ? err.message : t('labPage.failedToLaunch'))
     } finally {
       setLaunching(false)
     }
@@ -107,8 +109,8 @@ export function LabPage() {
       const res = await open({
         multiple: false,
         directory: false,
-        title: 'Select emulator executable',
-        filters: [{ name: 'Executable', extensions: ['exe'] }],
+        title: t('labPage.selectEmulatorExecutable'),
+        filters: [{ name: t('labPage.executableFilter'), extensions: ['exe'] }],
       })
       if (typeof res === 'string') setEmulatorPath(res)
     } catch { /* dialog dismissed */ }
@@ -119,8 +121,8 @@ export function LabPage() {
       const res = await open({
         multiple: false,
         directory: false,
-        title: 'Select Lua training script',
-        filters: [{ name: 'Lua scripts', extensions: ['lua', 'luac'] }],
+        title: t('labPage.selectLuaScript'),
+        filters: [{ name: t('labPage.luaScriptsFilter'), extensions: ['lua', 'luac'] }],
       })
       if (typeof res === 'string') setLuaScriptForGame(labSelectedGame, res, 'custom')
     } catch { /* dialog dismissed */ }
@@ -133,8 +135,8 @@ export function LabPage() {
       const res = await open({
         multiple: false,
         directory: false,
-        title: 'Select sprite sheet PNG',
-        filters: [{ name: 'PNG images', extensions: ['png'] }],
+        title: t('labPage.selectSpriteSheet'),
+        filters: [{ name: t('labPage.pngImagesFilter'), extensions: ['png'] }],
       })
       if (typeof res !== 'string') return
       setPalPngPath(res)
@@ -182,13 +184,13 @@ export function LabPage() {
 
         <div className="flex items-center gap-2 mb-2">
           <FlaskConical size={18} style={{ color: 'var(--v2-accent)' }} />
-          <h1 className="text-lg font-semibold" style={{ color: 'var(--v2-text)' }}>Lab</h1>
+          <h1 className="text-lg font-semibold" style={{ color: 'var(--v2-text)' }}>{t('labPage.title')}</h1>
         </div>
 
         {/* Game selector */}
         <div className={sectionCls} style={sectionStyle}>
           <div className={headerCls} style={headerStyle}>
-            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Game</span>
+            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>{t('labPage.game')}</span>
           </div>
           <div className="px-4 py-4" style={bodyStyle}>
             <select
@@ -219,7 +221,7 @@ export function LabPage() {
         {/* Launch */}
         <div className={sectionCls} style={sectionStyle}>
           <div className={headerCls} style={headerStyle}>
-            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Training Mode</span>
+            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>{t('labPage.trainingMode')}</span>
           </div>
           <div className="px-4 py-4 space-y-3" style={bodyStyle}>
             <button
@@ -231,14 +233,14 @@ export function LabPage() {
               onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
             >
               <Play size={14} />
-              {launching ? 'Launching...' : 'Launch Training Mode'}
+              {launching ? t('labPage.launching') : t('labPage.launchTrainingMode')}
             </button>
 
             {error && (
               <p className="text-red-400 text-xs">{error}</p>
             )}
             {launched && !error && (
-              <p className="text-green-400 text-xs">Emulator launched successfully.</p>
+              <p className="text-green-400 text-xs">{t('labPage.launchedSuccessfully')}</p>
             )}
           </div>
         </div>
@@ -246,11 +248,11 @@ export function LabPage() {
         {/* Emulator path */}
         <div className={sectionCls} style={sectionStyle}>
           <div className={headerCls} style={headerStyle}>
-            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Emulator</span>
+            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>{t('labPage.emulator')}</span>
           </div>
           <div className="px-4 py-4 space-y-2" style={bodyStyle}>
             <p className="text-xs font-mono break-all" style={{ color: 'var(--v2-muted)' }}>
-              {emulatorPath || 'Using default bundled path'}
+              {emulatorPath || t('labPage.usingDefaultPath')}
             </p>
             <button
               onClick={pickEmulator}
@@ -260,7 +262,7 @@ export function LabPage() {
               onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
             >
               <FolderOpen size={13} />
-              Browse for emulator...
+              {t('labPage.browseForEmulator')}
             </button>
           </div>
         </div>
@@ -268,11 +270,11 @@ export function LabPage() {
         {/* Lua script — available for all games */}
         <div className={sectionCls} style={sectionStyle}>
           <div className={headerCls} style={headerStyle}>
-            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Lua Script</span>
+            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>{t('labPage.luaScript')}</span>
           </div>
           <div className="px-4 py-4 space-y-2" style={bodyStyle}>
             <p className="text-xs font-mono break-all" style={{ color: 'var(--v2-muted)' }}>
-              {displayedLuaPath || (isSfiii ? 'Default' : 'None selected')}
+              {displayedLuaPath || (isSfiii ? t('labPage.default') : t('labPage.noneSelected'))}
             </p>
             <div className="flex items-center gap-4">
               <button
@@ -283,7 +285,7 @@ export function LabPage() {
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
               >
                 <FolderOpen size={13} />
-                Browse for script...
+                {t('labPage.browseForScript')}
               </button>
               {hasCustomLua && (
                 <button
@@ -291,7 +293,7 @@ export function LabPage() {
                   className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors"
                 >
                   <Trash2 size={13} />
-                  {isSfiii ? 'Reset to default' : 'Remove script'}
+                  {isSfiii ? t('labPage.resetToDefault') : t('labPage.removeScript')}
                 </button>
               )}
             </div>
@@ -304,7 +306,7 @@ export function LabPage() {
           <div className={headerCls} style={headerStyle}>
             <div className="flex items-center gap-2">
               <Palette size={13} style={{ color: 'var(--v2-muted)' }} />
-              <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Palette Extractor</span>
+              <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>{t('labPage.paletteExtractor')}</span>
             </div>
           </div>
           <div className="px-4 py-4 space-y-3" style={bodyStyle}>
@@ -312,7 +314,7 @@ export function LabPage() {
             {/* PNG picker */}
             <div className="space-y-1">
               <p className="text-xs font-mono break-all" style={{ color: palPngPath ? 'var(--v2-text)' : 'var(--v2-muted)' }}>
-                {palPngPath || 'No file selected'}
+                {palPngPath || t('labPage.noFileSelected')}
               </p>
               <button
                 onClick={pickPalettePng}
@@ -322,14 +324,14 @@ export function LabPage() {
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
               >
                 <FolderOpen size={13} />
-                Browse for PNG...
+                {t('labPage.browseForPng')}
               </button>
             </div>
 
             {/* Color index */}
             {palPngPath && (
               <div className="flex items-center gap-3">
-                <label className="text-xs" style={{ color: 'var(--v2-muted)' }}>Color index</label>
+                <label className="text-xs" style={{ color: 'var(--v2-muted)' }}>{t('labPage.colorIndex')}</label>
                 <input
                   type="number"
                   min={0}
@@ -357,7 +359,7 @@ export function LabPage() {
                   className="rounded"
                 />
                 <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>
-                  Replicate to all slots (same colors in slot 0 &amp; 6)
+                  {t('labPage.replicateToAllSlots')}
                 </span>
               </label>
             )}
@@ -373,7 +375,7 @@ export function LabPage() {
                 onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
               >
                 <Palette size={14} />
-                {palExtracting ? 'Extracting...' : 'Extract Palette'}
+                {palExtracting ? t('labPage.extracting') : t('labPage.extractPalette')}
               </button>
             )}
 
@@ -390,7 +392,7 @@ export function LabPage() {
                   <span className="font-mono break-all">{palResult.out_path}</span>
                 </div>
                 <p className="text-xs" style={{ color: 'var(--v2-muted)' }}>
-                  {palResult.total_palette_entries} palette entries found
+                  {t('labPage.paletteEntriesFound', { count: palResult.total_palette_entries })}
                 </p>
                 <div className="flex flex-wrap gap-3">
                   {palResult.previews.map(([slot, [r, g, b]]) => (
@@ -403,7 +405,7 @@ export function LabPage() {
                         }}
                       />
                       <span className="text-xs font-mono" style={{ color: 'var(--v2-muted)' }}>
-                        slot {slot} — rgb({r},{g},{b})
+                        {t('labPage.slotRgb', { slot, r, g, b })}
                       </span>
                     </div>
                   ))}

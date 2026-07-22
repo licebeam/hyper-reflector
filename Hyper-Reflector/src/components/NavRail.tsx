@@ -7,6 +7,7 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import hrLogo from "../assets/logo.svg";
 
 export type Page =
@@ -24,6 +25,7 @@ type NavRailProps = {
 };
 
 export function NavRail({ currentPage, onNavigate }: NavRailProps) {
+  const { t } = useTranslation();
   const NavBtn = ({
     page,
     icon,
@@ -65,19 +67,19 @@ export function NavRail({ currentPage, onNavigate }: NavRailProps) {
         {__APP_VERSION__}
       </span>
       <div className="flex flex-col items-center gap-4 flex-1">
-        <NavBtn page="home" icon={<Home size={18} />} label="Home" />
-        <NavBtn page="lobby" icon={<MessageCircle size={18} />} label="Lobby" />
-        <NavBtn page="pools" icon={<Trophy size={18} />} label="Pools" />
-        <NavBtn page="profiles" icon={<Users size={18} />} label="Profiles" />
-        <NavBtn page="data" icon={<SquareLibrary size={18} />} label="Data" />
-        <NavBtn page="lab" icon={<FlaskConical size={18} />} label="Lab" />
+        <NavBtn page="home" icon={<Home size={18} />} label={t("nav.home")} />
+        <NavBtn page="lobby" icon={<MessageCircle size={18} />} label={t("nav.lobby")} />
+        <NavBtn page="pools" icon={<Trophy size={18} />} label={t("nav.pools")} />
+        <NavBtn page="profiles" icon={<Users size={18} />} label={t("nav.profiles")} />
+        <NavBtn page="data" icon={<SquareLibrary size={18} />} label={t("nav.data")} />
+        <NavBtn page="lab" icon={<FlaskConical size={18} />} label={t("nav.lab")} />
       </div>
 
       <div className="flex flex-col items-center gap-4">
         <NavBtn
           page="settings"
           icon={<Settings size={18} />}
-          label="Settings"
+          label={t("nav.settings")}
         />
       </div>
     </nav>

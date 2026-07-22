@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export type ProjectilePos = [number, number];
 
@@ -75,6 +76,7 @@ export function MatchReplay({
   p1Color = "var(--v2-accent)",
   p2Color = "var(--v2-muted)",
 }: MatchReplayProps) {
+  const { t } = useTranslation();
   const [cursor, setCursor] = useState(0);
   const [playing, setPlaying] = useState(false);
   const rafRef = useRef<number | null>(null);
@@ -180,7 +182,7 @@ export function MatchReplay({
           className="text-xs px-2 py-0.5 rounded border shrink-0"
           style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)" }}
         >
-          {playing ? "Pause" : cursor >= total - 1 ? "Replay" : "Play"}
+          {playing ? t("matchReplay.pause") : cursor >= total - 1 ? t("matchReplay.replay") : t("matchReplay.play")}
         </button>
         <input
           type="range"

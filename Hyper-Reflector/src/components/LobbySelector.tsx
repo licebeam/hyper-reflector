@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X, Users, Lock, Plus, Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { V2Lobby } from '../types'
 import { GAMES, DEFAULT_GAME_ROM, getGameName } from '../games'
 import { validateName } from '../utils/validation'
@@ -25,6 +26,7 @@ export function LobbySelector({
   joinError,
   onClearJoinError,
 }: LobbySelectorProps) {
+  const { t } = useTranslation()
   const [joinPassInputs, setJoinPassInputs] = useState<Record<string, string>>({})
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -53,11 +55,11 @@ export function LobbySelector({
 
   const handleCreate = () => {
     const name = newName.trim()
-    const nameError = validateName(name, { max: 24, label: 'Lobby name' })
+    const nameError = validateName(name, { max: 24, label: t('validation.labelLobbyName') })
     if (nameError) { setError(nameError); return }
     const ok = onCreate(name, newPass.trim(), newPass.trim() !== '', newGame)
     if (ok) onClose()
-    else setError('Could not create lobby. Make sure you are connected.')
+    else setError(t('lobbySelector.couldNotCreate'))
   }
 
   return (
@@ -84,10 +86,10 @@ export function LobbySelector({
         >
           <div>
             <h2 className="text-sm font-semibold" style={{ color: 'var(--v2-text)' }}>
-              Lobbies
+              {t('lobbySelector.title')}
             </h2>
             <p className="text-xs mt-0.5" style={{ color: 'var(--v2-muted)' }}>
-              {lobbies.length} {lobbies.length === 1 ? 'lobby' : 'lobbies'} available
+              {t('lobbySelector.lobbiesAvailable', { count: lobbies.length })}
             </p>
           </div>
           <button
@@ -106,7 +108,7 @@ export function LobbySelector({
           {lobbies.length === 0 && (
             <div className="h-full flex items-center justify-center">
               <p className="text-sm" style={{ color: 'var(--v2-muted)' }}>
-                No lobbies available yet.
+                {t('lobbySelector.noLobbiesYet')}
               </p>
             </div>
           )}
@@ -175,7 +177,7 @@ export function LobbySelector({
                       }}
                     >
                       <Check size={11} />
-                      {isActive ? 'Active' : 'Joined'}
+                      {isActive ? t('lobbySelector.active') : t('lobbySelector.joined')}
                     </div>
                   ) : (
                     <button
@@ -189,7 +191,7 @@ export function LobbySelector({
                       onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-accent-hover)')}
                       onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
                     >
-                      Join
+                      {t('lobbySelector.join')}
                     </button>
                   )}
                 </div>
@@ -203,7 +205,7 @@ export function LobbySelector({
                     <div className="flex gap-2">
                       <input
                         type="password"
-                        placeholder="Password"
+                        placeholder={t('lobbySelector.passwordPlaceholder')}
                         value={joinPassInputs[lobby.name]}
                         onChange={e => {
                           setJoinPassInputs(prev => ({ ...prev, [lobby.name]: e.target.value }))
@@ -227,7 +229,7 @@ export function LobbySelector({
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-accent-hover)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
                       >
-                        Go
+                        {t('lobbySelector.go')}
                       </button>
                     </div>
                   </div>
@@ -247,12 +249,12 @@ export function LobbySelector({
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-hover)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <Plus size={12} /> Create new lobby
+              <Plus size={12} /> {t('lobbySelector.createNewLobby')}
             </button>
           ) : (
             <div className="space-y-2">
               <p className="text-xs font-medium" style={{ color: 'var(--v2-text)' }}>
-                New lobby
+                {t('lobbySelector.newLobby')}
               </p>
 
               {error && (
@@ -264,7 +266,7 @@ export function LobbySelector({
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Lobby name"
+                  placeholder={t('lobbySelector.lobbyNamePlaceholder')}
                   value={newName}
                   maxLength={24}
                   onChange={e => { setNewName(e.target.value); setError(null) }}
@@ -280,7 +282,7 @@ export function LobbySelector({
                 />
                 <input
                   type="password"
-                  placeholder="Password (optional)"
+                  placeholder={t('lobbySelector.passwordOptionalPlaceholder')}
                   value={newPass}
                   onChange={e => setNewPass(e.target.value)}
                   className="flex-1 text-xs px-2.5 py-1.5 rounded border outline-none"
@@ -297,7 +299,7 @@ export function LobbySelector({
               {/* Game selector */}
               <div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--v2-muted)' }}>
-                  Game
+                  {t('lobbySelector.game')}
                 </label>
                 <select
                   value={newGame}
@@ -328,7 +330,7 @@ export function LobbySelector({
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-hover)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                   >
-                    Cancel
+                    {t('lobbySelector.cancel')}
                   </button>
                   <button
                     onClick={handleCreate}
@@ -337,7 +339,7 @@ export function LobbySelector({
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--v2-accent-hover)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
                   >
-                    Create
+                    {t('lobbySelector.create')}
                   </button>
                 </div>
               </div>

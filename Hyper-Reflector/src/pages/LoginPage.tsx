@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { loginEmail } from '../utils/firebase'
 import type { FirebaseError } from 'firebase/app'
 
@@ -7,6 +8,7 @@ type LoginPageProps = {
 }
 
 export function LoginPage({ onSignup }: LoginPageProps = {}) {
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -23,7 +25,7 @@ export function LoginPage({ onSignup }: LoginPageProps = {}) {
     } catch (err) {
       const fe = err as FirebaseError
       const isBadCred = ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(fe.code)
-      setError(isBadCred ? 'Incorrect email or password.' : 'Sign in failed. Please try again.')
+      setError(isBadCred ? t('loginPage.incorrectCredentials') : t('loginPage.signInFailed'))
     } finally {
       setLoading(false)
     }
@@ -36,10 +38,10 @@ export function LoginPage({ onSignup }: LoginPageProps = {}) {
         style={{ background: 'var(--v2-surface)', borderColor: 'var(--v2-border)' }}
       >
         <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--v2-accent)' }}>
-          Hyper Reflector
+          {t('appV2.appName')}
         </h1>
         <p className="text-sm mb-6" style={{ color: 'var(--v2-muted)' }}>
-          Sign in to join the lobby
+          {t('loginPage.signInSubtitle')}
         </p>
 
         {error && (
@@ -51,7 +53,7 @@ export function LoginPage({ onSignup }: LoginPageProps = {}) {
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
-              Email
+              {t('loginPage.email')}
             </label>
             <input
               autoFocus
@@ -59,7 +61,7 @@ export function LoginPage({ onSignup }: LoginPageProps = {}) {
               value={email}
               maxLength={100}
               onChange={e => setEmail(e.target.value)}
-              placeholder="hyper@reflector.com"
+              placeholder={t('loginPage.emailPlaceholder')}
               disabled={loading}
               className="rounded px-3 py-2 text-sm border outline-none transition-colors disabled:opacity-50"
               style={{ background: 'var(--v2-hover)', borderColor: 'var(--v2-border)', color: 'var(--v2-text)' }}
@@ -70,7 +72,7 @@ export function LoginPage({ onSignup }: LoginPageProps = {}) {
 
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
-              Password
+              {t('loginPage.password')}
             </label>
             <div className="relative">
               <input
@@ -94,7 +96,7 @@ export function LoginPage({ onSignup }: LoginPageProps = {}) {
                 onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
                 onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
               >
-                {showPass ? 'hide' : 'show'}
+                {showPass ? t('loginPage.hide') : t('loginPage.show')}
               </button>
             </div>
           </div>
@@ -107,7 +109,7 @@ export function LoginPage({ onSignup }: LoginPageProps = {}) {
             onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--v2-accent-hover)' }}
             onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
           >
-            {loading ? 'Signing in...' : 'Sign in'}
+            {loading ? t('loginPage.signingIn') : t('loginPage.signIn')}
           </button>
         </form>
 
@@ -120,7 +122,7 @@ export function LoginPage({ onSignup }: LoginPageProps = {}) {
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
               onClick={onSignup}
             >
-              Create account
+              {t('loginPage.createAccount')}
             </button>
           )}
           <button
@@ -130,7 +132,7 @@ export function LoginPage({ onSignup }: LoginPageProps = {}) {
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
             onClick={() => { localStorage.setItem('appVersion', 'v1'); window.location.reload() }}
           >
-            Switch to V1
+            {t('loginPage.switchToV1')}
           </button>
         </div>
       </div>

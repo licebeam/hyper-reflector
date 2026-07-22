@@ -1,4 +1,5 @@
 import { RegExpMatcher, englishDataset, englishRecommendedTransformers } from 'obscenity'
+import i18n from '../i18n'
 
 const matcher = new RegExpMatcher({
   ...englishDataset.build(),
@@ -14,12 +15,12 @@ export type NameValidationOptions = {
 const NAME_PATTERN = /^[a-zA-Z0-9 _\-]+$/
 
 export function validateName(value: string, opts: NameValidationOptions = {}): string | null {
-  const { min = 2, max = 16, label = 'Name' } = opts
+  const { min = 2, max = 16, label = i18n.t('validation.labelName') } = opts
   const trimmed = value.trim()
-  if (!trimmed) return `${label} is required.`
-  if (trimmed.length < min) return `At least ${min} characters required.`
-  if (trimmed.length > max) return `Max ${max} characters.`
-  if (!NAME_PATTERN.test(trimmed)) return 'Letters, numbers, spaces, _ and - only.'
-  if (matcher.hasMatch(trimmed)) return 'Please choose a different name.'
+  if (!trimmed) return i18n.t('validation.required', { label })
+  if (trimmed.length < min) return i18n.t('validation.minLength', { min })
+  if (trimmed.length > max) return i18n.t('validation.maxLength', { max })
+  if (!NAME_PATTERN.test(trimmed)) return i18n.t('validation.invalidChars')
+  if (matcher.hasMatch(trimmed)) return i18n.t('validation.inappropriateName')
   return null
 }
