@@ -46,6 +46,7 @@ type DefaultPaths = {
     match: string
     challenge: string
     mention: string
+    win: string
 }
 
 let cachedDefaults: DefaultPaths | null = null
@@ -71,6 +72,7 @@ async function buildDevDefaults(): Promise<DefaultPaths> {
         match: await build(DEV_SEGMENTS.match),
         challenge: await build(DEV_SEGMENTS.challenge),
         mention: await build(DEV_SEGMENTS.mention),
+        win: await build(DEV_SEGMENTS.win),
     }
 }
 
@@ -85,6 +87,7 @@ async function buildProdDefaults(): Promise<DefaultPaths> {
         match: await build(DEV_SEGMENTS.match),
         challenge: await build(DEV_SEGMENTS.challenge),
         mention: await build(DEV_SEGMENTS.mention),
+        win: await build(DEV_SEGMENTS.win),
     }
 }
 
@@ -279,7 +282,13 @@ export async function ensureDefaultMentionSound(emulatorPathSetting?: string | n
 export async function ensureDefaultWinSound(emulatorPathSetting?: string | null) {
     const { winSoundPath, setWinSoundPath } = useSettingsStore.getState()
     const defaults = await getDefaults()
-    await ensureSound(winSoundPath, setWinSoundPath, emulatorPathSetting, DEV_SEGMENTS.win, defaults.win)
+    await ensureSound(
+        winSoundPath,
+        setWinSoundPath,
+        emulatorPathSetting,
+        DEV_SEGMENTS.win,
+        defaults.win
+    )
 }
 
 export async function resolveMatchLuaPath(emulatorPathSetting?: string | null) {

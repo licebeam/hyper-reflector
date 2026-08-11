@@ -1,13 +1,9 @@
 import { invoke } from '@tauri-apps/api/core'
-//@ts-ignore // keys exists
+// @ts-ignore
 import keys from '../private/keys'
-import { toaster } from '../components/chakra/ui/toaster'
 import { useSettingsStore, useUserStore } from '../state/store'
 import { resolveMatchLuaPath } from '../utils/pathSettings'
-import {
-    MOCK_CHALLENGE_USER,
-    MOCK_CHALLENGE_USER_TWO,
-} from '../layout/helpers/mockUsers'
+import { DEFAULT_GAME_ROM } from '../games'
 
 type ProxyMatchArgs = {
     matchId: string
@@ -25,14 +21,9 @@ type MockMatchArgs = {
     playerSlot: 0 | 1
 }
 
-const MOCK_USER_MAP = new Map([
-    [MOCK_CHALLENGE_USER.uid, MOCK_CHALLENGE_USER],
-    [MOCK_CHALLENGE_USER_TWO.uid, MOCK_CHALLENGE_USER_TWO],
-])
-
 export function isMockUserId(uid?: string | null): boolean {
     if (!uid) return false
-    return uid.startsWith('mock-') || MOCK_USER_MAP.has(uid)
+    return uid.startsWith('mock-')
 }
 
 export async function startProxyMatch({
@@ -43,33 +34,28 @@ export async function startProxyMatch({
     serverPort,
     gameName,
 }: ProxyMatchArgs): Promise<void> {
-    const { emulatorPath, ggpoDelay, trainingPath } = useSettingsStore.getState()
+    const { emulatorPath, ggpoDelay, trainingPath, labMusicMuted } = useSettingsStore.getState()
     const { globalUser } = useUserStore.getState()
 
     if (!globalUser?.uid) {
-        toaster.error({
-            title: 'Unable to start match',
-            description: 'No logged in user detected.',
-        })
+        console.error('[v2] startProxyMatch: no logged in user')
         return
     }
 
     if (!emulatorPath || !emulatorPath.trim().length) {
-        toaster.error({
-            title: 'Emulator path missing',
-            description: 'Set your emulator path in settings before starting a match.',
-        })
+        console.error('[v2] startProxyMatch: emulator path not set')
         return
     }
 
     const resolvedServerHost = serverHost || keys.COTURN_IP
     const parsedServerPort = Number(serverPort ?? keys.PUNCH_PORT ?? 33334)
-    const romName =
-        typeof gameName === 'string' && gameName.trim().length ? gameName.trim() : 'sfiii3nr1'
+    const romName = typeof gameName === 'string' && gameName.trim().length ? gameName.trim() : DEFAULT_GAME_ROM
     const playerIndex = (playerSlot + 1) as 1 | 2
     const delayValue = Number.parseInt(ggpoDelay || '0', 10) || 0
 
-    const matchLuaPath = (await resolveMatchLuaPath(emulatorPath)) || trainingPath
+    const matchLuaPath = romName === DEFAULT_GAME_ROM
+        ? ((await resolveMatchLuaPath(emulatorPath)) || trainingPath)
+        : undefined
 
     const emulatorArgs = buildEmulatorArgs({
         emulatorPath,
@@ -82,38 +68,32 @@ export async function startProxyMatch({
         rom: romName,
     })
 
-    try {
-        await invoke('stop_proxy').catch(() => {})
-        await invoke('start_proxy', {
-            args: {
-                match_id: matchId,
-                my_uid: globalUser.uid,
-                peer_uid: opponentUid,
-                server_host: resolvedServerHost,
-                server_port: parsedServerPort,
-                emulator_path: emulatorPath,
-                emulator_game_port: 7000,
-                emulator_listen_port: 7001,
-                emulator_args: emulatorArgs,
-                player: playerIndex,
-                delay: delayValue,
-                user_name: globalUser.userName || globalUser.userEmail || 'Player',
-                game_name: romName,
-            },
-        })
-    } catch (error) {
-        console.error('Failed to start proxy match:', error)
-        const fallbackMessage =
-            typeof error === 'string'
-                ? error
-                : error && typeof error === 'object' && 'message' in error
-                  ? String((error as any).message)
-                  : 'Unknown error starting proxy'
-        toaster.error({
-            title: 'Failed to start match',
-            description: fallbackMessage,
-        })
+    if (matchLuaPath) {
+        await invoke('write_hyper_settings_cmd', {
+            luaPath: matchLuaPath,
+            musicVolume: labMusicMuted ? 0 : 127,
+        }).catch(() => {})
     }
+
+    await invoke('stop_proxy').catch(() => {})
+    await invoke('start_proxy', {
+        args: {
+            match_id: matchId,
+            my_uid: globalUser.uid,
+            peer_uid: opponentUid,
+            server_host: resolvedServerHost,
+            server_port: parsedServerPort,
+            emulator_path: emulatorPath,
+            emulator_game_port: 7000,
+            emulator_listen_port: 7001,
+            emulator_args: emulatorArgs,
+            player: playerIndex,
+            delay: delayValue,
+            user_name: globalUser.userName || globalUser.userEmail || 'Player',
+            game_name: romName,
+            net_delay: 'off',
+        },
+    })
 }
 
 export async function startMockMatch({
@@ -122,33 +102,25 @@ export async function startMockMatch({
     gameName,
     playerSlot,
 }: MockMatchArgs): Promise<void> {
-    const { emulatorPath, ggpoDelay, trainingPath } = useSettingsStore.getState()
+    const { emulatorPath, ggpoDelay, trainingPath, labMusicMuted } = useSettingsStore.getState()
     const { globalUser } = useUserStore.getState()
 
     if (!emulatorPath || !emulatorPath.trim().length) {
-        toaster.error({
-            title: 'Emulator path missing',
-            description: 'Set your emulator path in settings before starting a mock match.',
-        })
+        console.error('[v2] startMockMatch: emulator path not set')
         return
     }
 
     const playerName = globalUser?.userName || globalUser?.userEmail || 'Player 1'
     const opponentDisplayName = opponentName || 'Mock Opponent'
-    const romName =
-        typeof gameName === 'string' && gameName.trim().length ? gameName.trim() : 'sfiii3nr1'
+    const romName = typeof gameName === 'string' && gameName.trim().length ? gameName.trim() : DEFAULT_GAME_ROM
     const delay = Number.parseInt(ggpoDelay || '0', 10) || 0
 
-    const primaryPorts =
-        playerSlot === 0
-            ? { local: 7000, remote: 7001 }
-            : { local: 7001, remote: 7000 }
-    const opponentPorts =
-        playerSlot === 0
-            ? { local: 7001, remote: 7000 }
-            : { local: 7000, remote: 7001 }
+    const primaryPorts = playerSlot === 0 ? { local: 7000, remote: 7001 } : { local: 7001, remote: 7000 }
+    const opponentPorts = playerSlot === 0 ? { local: 7001, remote: 7000 } : { local: 7000, remote: 7001 }
 
-    const matchLuaPath = (await resolveMatchLuaPath(emulatorPath)) || trainingPath
+    const matchLuaPath = romName === DEFAULT_GAME_ROM
+        ? ((await resolveMatchLuaPath(emulatorPath)) || trainingPath)
+        : undefined
 
     const playerArgs = buildEmulatorArgs({
         emulatorPath,
@@ -161,6 +133,7 @@ export async function startMockMatch({
         rom: romName,
     })
 
+    // TODO: temp — opponent runs without Lua to test for desyncs
     const opponentArgs = buildEmulatorArgs({
         emulatorPath,
         playerIndex: (playerSlot === 0 ? 2 : 1) as 1 | 2,
@@ -168,34 +141,16 @@ export async function startMockMatch({
         remotePort: opponentPorts.remote,
         playerName: opponentDisplayName,
         delay,
-        luaPath: matchLuaPath,
+        luaPath: undefined,
         rom: romName,
     })
 
-    try {
-        await Promise.all([
-            invoke('launch_emulator', {
-                exePath: emulatorPath,
-                args: playerArgs,
-                matchId,
-            }),
-            invoke('launch_emulator', {
-                exePath: emulatorPath,
-                args: opponentArgs,
-                matchId,
-            }),
-        ])
-        toaster.success({
-            title: 'Mock match started',
-            description: 'Launched two local emulator instances.',
-        })
-    } catch (error) {
-        console.error('Failed to start mock match:', error)
-        toaster.error({
-            title: 'Failed to start mock match',
-            description: error instanceof Error ? error.message : 'Unknown error launching emulator',
-        })
-    }
+    const musicVolume = labMusicMuted ? 0 : 127
+    await invoke('kill_mock_emulators').catch(() => {})
+    await Promise.all([
+        invoke('launch_emulator', { exePath: emulatorPath, args: playerArgs, matchId, musicVolume }),
+        invoke('launch_emulator', { exePath: emulatorPath, args: opponentArgs, matchId, musicVolume }),
+    ])
 }
 
 type BuildArgsOptions = {
@@ -224,21 +179,19 @@ function buildEmulatorArgs({
 
     if (normalizedPath.endsWith('fs-fbneo.exe') || normalizedPath.endsWith('fs-fbneo')) {
         args.push('--rom', rom)
-        if (luaPath && luaPath.trim().length) {
-            args.push('--lua', luaPath)
+        if(rom ==='sfiii3nr1'){
+            if (luaPath && luaPath.trim().length) {
+                args.push('--lua', luaPath)
+            }
         }
         args.push(
             'direct',
-            '--player',
-            String(playerIndex),
-            '-n',
-            playerName,
-            '-l',
-            `127.0.0.1:${localPort}`,
-            '-r',
-            `127.0.0.1:${remotePort}`,
-            '-d',
-            String(delay)
+            '--player', String(playerIndex),
+            '-n', playerName,
+            '-l', `127.0.0.1:${localPort}`,
+            '-r', `127.0.0.1:${remotePort}`,
+            '-d', String(delay),
+            '--net-delay', String("off")
         )
         return args
     }
@@ -246,6 +199,7 @@ function buildEmulatorArgs({
     if (normalizedPath.endsWith('fcadefbneo.exe') || normalizedPath.endsWith('fcadefbneo')) {
         const connection = `quark:direct,${rom},${localPort},127.0.0.1,${remotePort},${playerIndex},${delay},0`
         args.push(connection)
+        args.push('--net-delay', "off")
         if (luaPath && luaPath.trim().length) {
             args.push('--lua', luaPath)
         }
@@ -255,20 +209,14 @@ function buildEmulatorArgs({
     if (luaPath && luaPath.trim().length) {
         args.push('--lua', luaPath)
     }
-
     args.push(
-        '--rom',
-        rom,
-        '--player',
-        String(playerIndex),
-        '-n',
-        playerName,
-        '-l',
-        `127.0.0.1:${localPort}`,
-        '-r',
-        `127.0.0.1:${remotePort}`,
-        '-d',
-        String(delay)
+        '--rom', rom,
+        '--player', String(playerIndex),
+        '-n', playerName,
+        '-l', `127.0.0.1:${localPort}`,
+        '-r', `127.0.0.1:${remotePort}`,
+        '-d', String(delay),
+        '--net-delay', String("off")
     )
 
     return args

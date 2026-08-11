@@ -1701,6 +1701,7 @@ name = "hyper-reflector"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "png",
  "rodio",
  "serde",
  "serde_json",

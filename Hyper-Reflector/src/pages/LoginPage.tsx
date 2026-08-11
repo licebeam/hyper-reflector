@@ -1,238 +1,139 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import {
-  AlertDescription,
-  AlertRoot,
-  Box,
-  Button,
-  Flex,
-  Heading,
-  Input,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
-import { Field } from "../components/chakra/ui/field";
-import { PasswordInput } from "../components/chakra/ui/password-input";
-import { onAuthStateChanged } from "firebase/auth";
-import type { FirebaseError } from "firebase/app";
-import { auth, loginEmail, loginGoogle } from "../utils/firebase";
-import api from "../external-api/requests";
-import type { TUser } from "../types/user";
-import { useUserStore } from "../state/store";
+import { useState } from 'react'
+import { loginEmail } from '../utils/firebase'
+import type { FirebaseError } from 'firebase/app'
 
-export default function LoginPage() {
-  const navigate = useNavigate();
-  const globalLoggedIn = useUserStore((s) => s.globalLoggedIn);
-  const setGlobalUser = useUserStore((s) => s.setGlobalUser);
-  const setGlobalLoggedIn = useUserStore((s) => s.setGlobalLoggedIn);
-  const [isLoading, setIsLoading] = useState(true);
-  const [sessionUser, setSessionUser] = useState<TUser | undefined>();
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [loginObject, setLoginObject] = useState<{
-    email: string;
-    password: string;
-  }>({
-    email: "",
-    password: "",
-  });
+type LoginPageProps = {
+  onSignup?: () => void
+}
 
-  const resetError = () => setAuthError(null);
+export function LoginPage({ onSignup }: LoginPageProps = {}) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const handleFailUser = (message?: string) => {
-    setSessionUser(undefined);
-    setIsLoading(false);
-    setGlobalLoggedIn(false);
-    if (message) setAuthError(message);
-  };
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (login) => {
-      if (!login) {
-        handleFailUser();
-        return;
-      }
-
-      try {
-        resetError();
-        await api.addLoggedInUser(auth);
-        await api.getLoggedInUser(login.email ?? "");
-        const user = await api.getUserByAuth(auth);
-        if (!user) throw new Error("Missing user profile");
-        setSessionUser(user);
-        setGlobalUser(user);
-        setGlobalLoggedIn(true);
-        navigate({ to: "/lobby" });
-      } catch (err) {
-        console.warn("failed to hydrate user session", err);
-        handleFailUser("Unable to finish signing you in. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    });
-
-    return () => unsub();
-  }, [navigate, setGlobalLoggedIn, setGlobalUser]);
-
-  async function loginEmailHelper() {
-    if (!loginObject.email || !loginObject.password) return;
-    setIsLoading(true);
-    resetError();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email.trim() || !password) return
+    setLoading(true)
+    setError(null)
     try {
-      await loginEmail(loginObject.email, loginObject.password);
-    } catch (e) {
-      const err = e as FirebaseError;
-      console.warn("failed to log in", err.code, err.message);
-      handleFailUser("Incorrect email or password.");
+      await loginEmail(email.trim(), password)
+    } catch (err) {
+      const fe = err as FirebaseError
+      const isBadCred = ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(fe.code)
+      setError(isBadCred ? 'Incorrect email or password.' : 'Sign in failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
-  //   async function loginGoogleHelper() {
-  //     setIsLoading(true);
-  //     resetError();
-  //     try {
-  //       await loginGoogle();
-  //     } catch (e) {
-  //       console.warn("failed to log in with google", e);
-  //       handleFailUser("Google sign-in failed.");
-  //     }
-  //   }
-
-  const isFormDisabled = isLoading || globalLoggedIn;
-
   return (
-    <Flex
-      justify="center"
-      align="center"
-      minH="calc(100vh - 160px)"
-      px={{ base: 4, md: 8 }}
-    >
-      <Box
-        w="full"
-        maxW="440px"
-        bg="gray.900"
-        borderWidth="1px"
-        borderColor="whiteAlpha.200"
-        borderRadius="2xl"
-        p={{ base: 6, md: 8 }}
-        boxShadow="2xl"
+    <div className="h-full flex items-center justify-center">
+      <div
+        className="rounded-xl p-8 w-80 shadow-xl border"
+        style={{ background: 'var(--v2-surface)', borderColor: 'var(--v2-border)' }}
       >
-        <Stack gap={6}>
-          <Stack gap={1} textAlign="center">
-            <Heading size="lg">Welcome back</Heading>
-            <Text color="whiteAlpha.700" fontSize="sm">
-              Sign in to jump into lobbies and track your matches.
-            </Text>
-            {sessionUser && (
-              <Text fontSize="sm" color="green.300">
-                Signed in as {sessionUser.userName}
-              </Text>
-            )}
-          </Stack>
+        <h1 className="text-xl font-bold mb-1" style={{ color: 'var(--v2-accent)' }}>
+          Hyper Reflector
+        </h1>
+        <p className="text-sm mb-6" style={{ color: 'var(--v2-muted)' }}>
+          Sign in to join the lobby
+        </p>
 
-          {authError ? (
-            <AlertRoot
-              status="error"
-              borderRadius="lg"
-              bg="red.900"
-              borderColor="red.500"
-            >
-              <AlertDescription>{authError}</AlertDescription>
-            </AlertRoot>
-          ) : null}
+        {error && (
+          <div className="mb-4 px-3 py-2 bg-red-900/40 border border-red-700 rounded text-red-300 text-sm">
+            {error}
+          </div>
+        )}
 
-          {!globalLoggedIn && (
-            <Stack gap={4}>
-              <Field label="Email" required>
-                <Input
-                  disabled={isFormDisabled}
-                  maxLength={50}
-                  placeholder="hyper@reflector.com"
-                  onChange={(e) =>
-                    setLoginObject((prev) => ({
-                      ...prev,
-                      email: e.target.value,
-                    }))
-                  }
-                  type="email"
-                  value={loginObject.email}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      void loginEmailHelper();
-                    }
-                  }}
-                />
-              </Field>
-              <Field label="Password" required>
-                <PasswordInput
-                  disabled={isFormDisabled}
-                  maxLength={160}
-                  placeholder="password"
-                  onChange={(e) =>
-                    setLoginObject((prev) => ({
-                      ...prev,
-                      password: e.target.value,
-                    }))
-                  }
-                  type="password"
-                  value={loginObject.password}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      void loginEmailHelper();
-                    }
-                  }}
-                />
-              </Field>
-              <Button
-                colorScheme="orange"
-                size="lg"
-                onClick={loginEmailHelper}
-                disabled={
-                  isFormDisabled ||
-                  !loginObject.email.trim() ||
-                  !loginObject.password.trim()
-                }
-                loading={isLoading}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
+              Email
+            </label>
+            <input
+              autoFocus
+              type="email"
+              value={email}
+              maxLength={100}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="hyper@reflector.com"
+              disabled={loading}
+              className="rounded px-3 py-2 text-sm border outline-none transition-colors disabled:opacity-50"
+              style={{ background: 'var(--v2-hover)', borderColor: 'var(--v2-border)', color: 'var(--v2-text)' }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium" style={{ color: 'var(--v2-muted)' }}>
+              Password
+            </label>
+            <div className="relative">
+              <input
+                type={showPass ? 'text' : 'password'}
+                value={password}
+                maxLength={160}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••"
+                disabled={loading}
+                className="w-full rounded px-3 py-2 pr-16 text-sm border outline-none transition-colors disabled:opacity-50"
+                style={{ background: 'var(--v2-hover)', borderColor: 'var(--v2-border)', color: 'var(--v2-text)' }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowPass(p => !p)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs px-1 transition-colors"
+                style={{ color: 'var(--v2-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
               >
-                Sign in
-              </Button>
-              {/* TODO we should re-introduce this later */}
-              {/* <Button
-                                variant="outline"
-                                size="lg"
-                                onClick={loginGoogleHelper}
-                                isDisabled={isFormDisabled}
-                                isLoading={isLoading && !globalLoggedIn}
-                            >
-                                Continue with Google
-                            </Button> */}
-            </Stack>
+                {showPass ? 'hide' : 'show'}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !email.trim() || !password}
+            className="mt-1 rounded py-2 font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
+            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--v2-accent-hover)' }}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
+          >
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
+
+        <div className="mt-5 pt-4 border-t flex items-center justify-between" style={{ borderColor: 'var(--v2-border)' }}>
+          {onSignup && (
+            <button
+              className="text-xs transition-colors"
+              style={{ color: 'var(--v2-accent)' }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.7')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+              onClick={onSignup}
+            >
+              Create account
+            </button>
           )}
-
-          {globalLoggedIn ? (
-            <Stack gap={4}>
-              <AlertRoot status="success" borderRadius="lg" bg="green.900">
-                <AlertDescription>
-                  You are already signed in. Head to the dashboard to get
-                  started.
-                </AlertDescription>
-              </AlertRoot>
-              <Button colorScheme="orange" onClick={() => navigate({ to: "/lobby" })}>
-                Go to dashboard
-              </Button>
-            </Stack>
-          ) : null}
-
-          <Box h="1px" bg="whiteAlpha.200" />
-          <Text fontSize="sm" color="whiteAlpha.700" textAlign="center">
-            Need an account?{" "}
-            <Link to="/create" className="[&.active]:font-semibold">
-              <Text as="span" color="orange.300" fontWeight="semibold">
-                Create one now
-              </Text>
-            </Link>
-          </Text>
-        </Stack>
-      </Box>
-    </Flex>
-  );
+          <button
+            className="text-xs transition-colors ml-auto"
+            style={{ color: 'var(--v2-muted)' }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
+            onClick={() => { localStorage.setItem('appVersion', 'v1'); window.location.reload() }}
+          >
+            Switch to V1
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }

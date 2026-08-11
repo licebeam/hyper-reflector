@@ -91,6 +91,18 @@ export async function readMatchStatsFile(): Promise<string | null> {
     }
 }
 
+export async function readPositionReplayFile(): Promise<string | null> {
+    const paths = await ensurePaths()
+    if (!paths) return null
+    const replayPath = paths.stats.replace('hyper_track_match.txt', 'hyper_position_replay.json')
+    try {
+        const contents = await invoke<string>('read_files_text', { relativePath: replayPath })
+        return contents ?? null
+    } catch {
+        return null
+    }
+}
+
 export async function clearMatchStatsFile(): Promise<void> {
     const paths = await ensurePaths()
     if (!paths) return

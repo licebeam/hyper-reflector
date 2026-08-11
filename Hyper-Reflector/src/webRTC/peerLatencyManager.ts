@@ -1,19 +1,32 @@
+// @ts-ignore
 import keys from '../private/keys'
 import { useUserStore } from '../state/store'
-import type { TUser } from '../types/user'
 import { isMockUserId } from '../match'
+
+type TUser = { uid: string; countryCode?: string; isAfk?: boolean; currentMatchId?: string; userName?: string; userEmail?: string; [key: string]: any }
 
 const ICE_SERVERS: RTCIceServer[] = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: `stun:${keys.COTURN_IP}:${keys.COTURN_PORT}` },
 ]
 
-const MAX_INBOUND_SESSIONS = 1
+const MAX_PARALLEL_OUTBOUND = 5
+const MAX_INBOUND_SESSIONS = 3
 const MEASUREMENT_TTL_MS = 2 * 60 * 1000
 const SESSION_TIMEOUT_MS = 10_000
 const PING_INTERVAL_MS = 180
-const PING_SAMPLE_TARGET = 5
+const PING_SAMPLE_TARGET = 3
 const JITTER_UNSTABLE_THRESHOLD = 6
+const TICK_FAST_MS = 1_000   // when unmeasured peers exist
+const TICK_IDLE_MS = 15_000  // once everyone is covered
+
+// A peer that fails this many outbound attempts in a row (excluding explicit
+// "busy" declines) is almost certainly behind a NAT we can't traverse without
+// a TURN relay, which we deliberately don't use (it adds too much latency to
+// be a meaningful ping reading). Back off hard instead of retrying every
+// MEASUREMENT_TTL_MS forever and looping through "estimating" endlessly.
+const UNREACHABLE_THRESHOLD = 2
+const UNREACHABLE_BACKOFF_MS = 10 * 60 * 1000
 
 type MeasurementDirection = 'outbound' | 'inbound'
 
@@ -27,8 +40,8 @@ type MeasurementSession = {
     samples: number[]
     sentCount: number
     pendingCandidates: RTCIceCandidateInit[]
-    timeoutHandle?: ReturnType<typeof setTimeout>
-    completionHandle?: ReturnType<typeof setTimeout>
+    timeoutHandle?: number
+    completionHandle?: number
     startedAt: number
 }
 
@@ -47,123 +60,180 @@ class PeerLatencyManager {
     private viewer?: TUser
     private peers: TUser[] = []
     private socket?: WebSocket
-    private outboundSession?: MeasurementSession
+    private outboundSessions = new Map<string, MeasurementSession>() // measurementId → session
+    private measuringTargets = new Set<string>()                      // targetUid → in-progress
     private sessions = new Map<string, MeasurementSession>()
     private lastMeasured = new Map<string, number>()
-    private scheduler?: ReturnType<typeof setInterval>
+    private consecutiveFailures = new Map<string, number>()
+    private schedulerHandle?: number
     private inMatch = false
 
+    /** Called when a measurement result is ready. Override to skip the v1 user store. */
+    onPingRecorded?: (targetUid: string, ping: number, isUnstable: boolean, networkType?: string) => void
+    /** Called when a peer starts or finishes being measured — drives "estimating" UI. */
+    onMeasuringChanged?: (uid: string, measuring: boolean) => void
+    /** Called when a peer crosses the unreachable threshold, or recovers from it. */
+    onReachabilityChanged?: (uid: string, unreachable: boolean) => void
+
     constructor() {
-        if (typeof window !== 'undefined') {
-            this.scheduler = window.setInterval(() => this.tick(), 10_000)
-        }
+        if (typeof window !== 'undefined') this.reschedule()
     }
 
     setViewer(viewer?: TUser | null) {
+        const hadViewer = !!this.viewer
         this.viewer = viewer || undefined
-        if (!viewer) {
-            this.resetAllSessions()
-        }
+        if (!viewer) { this.resetAllSessions(); return }
+        // First time we get a viewer, jump the scheduler instead of waiting out
+        // whatever idle backoff it was already sitting in.
+        if (!hadViewer) this.reschedule(true)
     }
 
     setPeers(peers: TUser[]) {
+        const hadPeers = this.peers.length > 0
         this.peers = Array.isArray(peers) ? peers : []
+        // Same reasoning as setViewer: don't make the first peers of a freshly
+        // joined lobby wait out an existing idle timer before getting measured.
+        if (!hadPeers && this.peers.length > 0) this.reschedule(true)
     }
 
     setInMatch(active: boolean) {
         this.inMatch = active
-        if (active) {
-            this.cancelOutboundSession()
-        }
+        if (active) this.cancelAllOutboundSessions()
     }
 
     attachSocket(socket: WebSocket | null) {
         this.socket = socket || undefined
-        if (!socket) {
-            this.resetAllSessions()
+        if (!socket) this.resetAllSessions()
+    }
+
+    /**
+     * Force an immediate, out-of-band remeasurement for a specific uid — bypasses
+     * the scheduler's slot/priority queue entirely instead of just marking the
+     * peer stale and hoping it wins the next scheduled pick. Used for explicit
+     * user actions (e.g. clicking a ping badge).
+     */
+    triggerMeasureNow(uid: string) {
+        if (!this.viewer?.uid || this.inMatch) return
+        if (this.measuringTargets.has(uid)) return
+        this.lastMeasured.delete(uid)
+        if (isMockUserId(uid)) {
+            this.simulateMockMeasurement(uid)
+        } else {
+            void this.startOutboundMeasurement(uid)
         }
     }
 
     handleSignal(payload: LatencySignalPayload): boolean {
         if (!payload?.type) return false
         switch (payload.type) {
-            case 'peer-latency-offer':
-                void this.handleInboundOffer(payload)
-                return true
-            case 'peer-latency-answer':
-                void this.handleInboundAnswer(payload)
-                return true
-            case 'peer-latency-candidate':
-                void this.handleIncomingCandidate(payload)
-                return true
-            case 'peer-latency-decline':
-                this.handleDecline(payload)
-                return true
-            default:
-                return false
+            case 'peer-latency-offer':    void this.handleInboundOffer(payload);   return true
+            case 'peer-latency-answer':   void this.handleInboundAnswer(payload);  return true
+            case 'peer-latency-candidate': void this.handleIncomingCandidate(payload); return true
+            case 'peer-latency-decline':  this.handleDecline(payload);             return true
+            default: return false
         }
+    }
+
+    // ── Scheduler ─────────────────────────────────────────────────────────────
+
+    /** Peers repeatedly failing to connect get a much longer retry interval. */
+    private ttlFor(uid: string): number {
+        return (this.consecutiveFailures.get(uid) ?? 0) >= UNREACHABLE_THRESHOLD
+            ? UNREACHABLE_BACKOFF_MS
+            : MEASUREMENT_TTL_MS
+    }
+
+    private reschedule(immediate = false) {
+        if (this.schedulerHandle) clearTimeout(this.schedulerHandle)
+        const hasWork = this.peers.some(p => {
+            if (!p?.uid || p.uid === this.viewer?.uid) return false
+            if (this.measuringTargets.has(p.uid)) return false
+            const last = this.lastMeasured.get(p.uid)
+            return !last || Date.now() - last >= this.ttlFor(p.uid)
+        })
+        const delay = immediate ? 0 : hasWork ? TICK_FAST_MS : TICK_IDLE_MS
+        this.schedulerHandle = window.setTimeout(() => {
+            this.tick()
+            this.reschedule()
+        }, delay)
     }
 
     private tick() {
-        if (this.inMatch || this.outboundSession || !this.viewer) {
-            return
+        if (!this.viewer || this.inMatch) return
+        const slots = MAX_PARALLEL_OUTBOUND - this.outboundSessions.size
+        if (slots <= 0) return
+        for (const peer of this.selectNextPeers(slots)) {
+            if (isMockUserId(peer.uid)) {
+                this.simulateMockMeasurement(peer.uid)
+            } else {
+                void this.startOutboundMeasurement(peer.uid)
+            }
         }
-        const nextPeer = this.selectNextPeer()
-        if (!nextPeer) return
-        void this.startOutboundMeasurement(nextPeer.uid)
     }
 
-    private selectNextPeer(): TUser | undefined {
-        if (!this.viewer) return undefined
+    private selectNextPeers(n: number): TUser[] {
+        if (!this.viewer) return []
         const now = Date.now()
-        const eligible = this.peers.filter((user) => {
-            if (!user?.uid || user.uid === this.viewer?.uid) return false
-            if (isMockUserId(user.uid)) return false
-            const last = this.lastMeasured.get(user.uid)
-            return !last || now - last >= MEASUREMENT_TTL_MS
-        })
-        if (!eligible.length) return undefined
         const viewerCountry = this.viewer.countryCode?.toUpperCase() || ''
-        eligible.sort((a, b) => {
-            const scoreA = this.computePriorityScore(a, viewerCountry)
-            const scoreB = this.computePriorityScore(b, viewerCountry)
-            return scoreA - scoreB
+        const eligible = this.peers.filter(u => {
+            if (!u?.uid || u.uid === this.viewer?.uid) return false
+            if (this.measuringTargets.has(u.uid)) return false
+            const last = this.lastMeasured.get(u.uid)
+            return !last || now - last >= this.ttlFor(u.uid)
         })
-        return eligible[0]
+        eligible.sort((a, b) =>
+            this.computePriorityScore(a, viewerCountry) - this.computePriorityScore(b, viewerCountry)
+        )
+        return eligible.slice(0, n)
     }
 
     private computePriorityScore(user: TUser, viewerCountry: string): number {
         let score = 0
+        const u = user as any
+        // Deprioritize AFK/in-match — still measure them, just after available players
+        if (u.isAfk || u.currentMatchId) score += 100
         const country = user.countryCode?.toUpperCase()
-        if (!country || !viewerCountry) {
-            score += 5
-        } else if (country !== viewerCountry) {
-            score += 10
-        }
+        if (!country || !viewerCountry) score += 5
+        else if (country !== viewerCountry) score += 10
+        // Boost least-recently-measured peers
         const last = this.lastMeasured.get(user.uid)
-        if (last) {
-            const age = Date.now() - last
-            score += Math.max(0, MEASUREMENT_TTL_MS - age) / 1000
-        }
+        if (last) score += Math.max(0, this.ttlFor(user.uid) - (Date.now() - last)) / 1000
         return score + Math.random() * 0.01
     }
 
+    // ── Mock simulation ───────────────────────────────────────────────────────
+
+    private simulateMockMeasurement(targetUid: string) {
+        this.measuringTargets.add(targetUid)
+        this.lastMeasured.set(targetUid, Date.now())
+        this.onMeasuringChanged?.(targetUid, true)
+        const ping = Math.round(20 + Math.random() * 180)
+        const jitter = Math.random() * 10
+        const isUnstable = jitter >= JITTER_UNSTABLE_THRESHOLD
+        const delay = 800 + Math.random() * 1800
+        window.setTimeout(() => {
+            this.measuringTargets.delete(targetUid)
+            this.lastMeasured.set(targetUid, Date.now())
+            this.onMeasuringChanged?.(targetUid, false)
+            this.onPingRecorded?.(targetUid, ping, isUnstable, undefined)
+        }, delay)
+    }
+
+    // ── Outbound measurement ──────────────────────────────────────────────────
+
     private async startOutboundMeasurement(targetUid: string) {
-        if (!this.viewer?.uid || !this.socket || this.socket.readyState !== WebSocket.OPEN) {
-            return
-        }
+        if (!this.viewer?.uid || !this.socket || this.socket.readyState !== WebSocket.OPEN) return
         const measurementId = `${this.viewer.uid}-${targetUid}-${Date.now()}`
         const session = this.createSession(measurementId, targetUid, 'outbound')
-        this.outboundSession = session
+        this.outboundSessions.set(measurementId, session)
         this.sessions.set(session.id, session)
+        this.measuringTargets.add(targetUid)
+        this.onMeasuringChanged?.(targetUid, true)
         try {
             const offer = await session.pc.createOffer()
             await session.pc.setLocalDescription(offer)
             this.sendSignal('peer-latency-offer', {
-                to: targetUid,
-                from: this.viewer.uid,
-                measurementId,
-                offer,
+                to: targetUid, from: this.viewer.uid, measurementId, offer,
             })
             session.timeoutHandle = window.setTimeout(
                 () => this.failSession(session, 'timeout'),
@@ -175,14 +245,11 @@ class PeerLatencyManager {
         }
     }
 
+    // ── Inbound handling ──────────────────────────────────────────────────────
+
     private async handleInboundOffer(payload: LatencySignalPayload) {
-        if (!this.viewer?.uid || this.inMatch) {
-            this.sendDecline(payload, 'busy')
-            return
-        }
-        if (!payload.measurementId || !payload.offer || !payload.from) {
-            return
-        }
+        if (!this.viewer?.uid || this.inMatch) { this.sendDecline(payload, 'busy'); return }
+        if (!payload.measurementId || !payload.offer || !payload.from) return
         if (this.countInboundSessions() >= MAX_INBOUND_SESSIONS) {
             this.sendDecline(payload, 'at-capacity')
             return
@@ -194,14 +261,10 @@ class PeerLatencyManager {
             const answer = await session.pc.createAnswer()
             await session.pc.setLocalDescription(answer)
             this.sendSignal('peer-latency-answer', {
-                to: payload.from,
-                from: this.viewer.uid,
-                measurementId: payload.measurementId,
-                answer,
+                to: payload.from, from: this.viewer.uid, measurementId: payload.measurementId, answer,
             })
             session.timeoutHandle = window.setTimeout(
-                () => this.failSession(session, 'timeout'),
-                SESSION_TIMEOUT_MS
+                () => this.failSession(session, 'timeout'), SESSION_TIMEOUT_MS
             )
         } catch (error) {
             console.error('Failed to answer latency offer', error)
@@ -212,10 +275,7 @@ class PeerLatencyManager {
 
     private async handleInboundAnswer(payload: LatencySignalPayload) {
         if (!payload.measurementId || !payload.answer) return
-        const session =
-            this.outboundSession && this.outboundSession.id === payload.measurementId
-                ? this.outboundSession
-                : undefined
+        const session = this.outboundSessions.get(payload.measurementId)
         if (!session) return
         try {
             await session.pc.setRemoteDescription(new RTCSessionDescription(payload.answer))
@@ -243,114 +303,65 @@ class PeerLatencyManager {
 
     private handleDecline(payload: LatencySignalPayload) {
         if (!payload.measurementId) return
-        const session =
-            this.outboundSession && this.outboundSession.id === payload.measurementId
-                ? this.outboundSession
-                : undefined
-        if (!session) return
-        this.failSession(session, 'declined')
+        const session = this.outboundSessions.get(payload.measurementId)
+        if (session) this.failSession(session, 'declined')
     }
 
     private flushPendingCandidates(session: MeasurementSession) {
-        if (!session.pc.remoteDescription) return
-        if (!session.pendingCandidates.length) return
+        if (!session.pc.remoteDescription || !session.pendingCandidates.length) return
         const queue = [...session.pendingCandidates]
         session.pendingCandidates.length = 0
-        queue.forEach(async (candidate) => {
-            try {
-                await session.pc.addIceCandidate(new RTCIceCandidate(candidate))
-            } catch (error) {
-                console.warn('Failed to flush ICE candidate', error)
-            }
+        queue.forEach(async candidate => {
+            try { await session.pc.addIceCandidate(new RTCIceCandidate(candidate)) }
+            catch (error) { console.warn('Failed to flush ICE candidate', error) }
         })
     }
 
-    private createSession(
-        id: string,
-        targetUid: string,
-        direction: MeasurementDirection
-    ): MeasurementSession {
+    // ── Session lifecycle ─────────────────────────────────────────────────────
+
+    private createSession(id: string, targetUid: string, direction: MeasurementDirection): MeasurementSession {
         const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
         const session: MeasurementSession = {
-            id,
-            targetUid,
-            direction,
-            pc,
-            awaiting: new Map(),
-            samples: [],
-            sentCount: 0,
-            pendingCandidates: [],
-            startedAt: Date.now(),
+            id, targetUid, direction, pc,
+            awaiting: new Map(), samples: [], sentCount: 0,
+            pendingCandidates: [], startedAt: Date.now(),
         }
-
-        pc.onicecandidate = (event) => {
-            if (
-                event.candidate &&
-                this.viewer?.uid &&
-                this.socket &&
-                this.socket.readyState === WebSocket.OPEN
-            ) {
+        pc.onicecandidate = event => {
+            if (event.candidate && this.viewer?.uid && this.socket?.readyState === WebSocket.OPEN) {
                 this.sendSignal('peer-latency-candidate', {
-                    to: targetUid,
-                    from: this.viewer.uid,
-                    measurementId: id,
-                    candidate: event.candidate,
+                    to: targetUid, from: this.viewer.uid, measurementId: id, candidate: event.candidate,
                 })
             }
         }
-
         pc.oniceconnectionstatechange = () => {
-            const state = pc.iceConnectionState
-            if (state === 'failed' || state === 'disconnected') {
-                this.failSession(session, 'ice-failed')
-            }
+            const s = pc.iceConnectionState
+            if (s === 'failed' || s === 'disconnected') this.failSession(session, 'ice-failed')
         }
-
         if (direction === 'outbound') {
-            const channel = pc.createDataChannel('latency-probe', { ordered: true })
-            session.channel = channel
-            this.bindChannel(session, channel)
+            const ch = pc.createDataChannel('latency-probe', { ordered: true })
+            session.channel = ch
+            this.bindChannel(session, ch)
         } else {
-            pc.ondatachannel = (event) => {
+            pc.ondatachannel = event => {
                 session.channel = event.channel
                 this.bindChannel(session, event.channel)
             }
         }
-
         return session
     }
 
     private bindChannel(session: MeasurementSession, channel: RTCDataChannel) {
-        channel.onopen = () => {
-            if (session.direction === 'outbound') {
-                this.beginPingLoop(session)
-            }
-        }
-
+        channel.onopen = () => { if (session.direction === 'outbound') this.beginPingLoop(session) }
         channel.onclose = () => {
-            if (session.direction === 'outbound') {
-                this.failSession(session, 'channel-closed')
-            } else {
-                this.cleanupSession(session)
-            }
+            if (session.direction === 'outbound') this.failSession(session, 'channel-closed')
+            else this.cleanupSession(session)
         }
-
-        channel.onmessage = (event) => {
+        channel.onmessage = event => {
             let payload: any
-            try {
-                payload = JSON.parse(event.data)
-            } catch {
-                return
-            }
+            try { payload = JSON.parse(event.data) } catch { return }
             if (!payload?.type) return
             if (payload.type === 'latency-ping') {
-                channel.send(
-                    JSON.stringify({
-                        type: 'latency-pong',
-                        seq: payload.seq,
-                        time: payload.time,
-                    })
-                )
+                channel.send(JSON.stringify({ type: 'latency-pong', seq: payload.seq, time: payload.time }))
             } else if (payload.type === 'latency-pong') {
                 this.handlePong(session, payload)
             } else if (payload.type === 'latency-complete') {
@@ -361,19 +372,11 @@ class PeerLatencyManager {
 
     private beginPingLoop(session: MeasurementSession) {
         const sendPing = () => {
-            if (!session.channel || session.channel.readyState !== 'open') {
-                return
-            }
+            if (!session.channel || session.channel.readyState !== 'open') return
             const seq = ++session.sentCount
             const timestamp = performance.now()
             session.awaiting.set(seq, timestamp)
-            session.channel.send(
-                JSON.stringify({
-                    type: 'latency-ping',
-                    seq,
-                    time: timestamp,
-                })
-            )
+            session.channel.send(JSON.stringify({ type: 'latency-ping', seq, time: timestamp }))
             if (session.sentCount < PING_SAMPLE_TARGET) {
                 setTimeout(sendPing, PING_INTERVAL_MS)
             } else {
@@ -383,7 +386,6 @@ class PeerLatencyManager {
                 )
             }
         }
-
         setTimeout(sendPing, 100)
     }
 
@@ -392,34 +394,19 @@ class PeerLatencyManager {
         const started = session.awaiting.get(payload.seq)
         if (started === undefined) return
         session.awaiting.delete(payload.seq)
-        const now = performance.now()
-        const rtt = now - started
-        if (Number.isFinite(rtt)) {
-            session.samples.push(rtt)
-        }
-        if (
-            session.direction === 'outbound' &&
-            session.samples.length >= 3 &&
-            session.awaiting.size === 0
-        ) {
+        const rtt = performance.now() - started
+        if (Number.isFinite(rtt)) session.samples.push(rtt)
+        if (session.direction === 'outbound' && session.samples.length >= 2 && session.awaiting.size === 0) {
             this.finalizeOutboundSession(session)
         }
     }
 
     private async finalizeOutboundSession(session: MeasurementSession) {
-        if (this.outboundSession?.id !== session.id) return
-        if (!session.samples.length) {
-            this.failSession(session, 'no-samples')
-            return
-        }
-        if (session.completionHandle) {
-            clearTimeout(session.completionHandle)
-            session.completionHandle = undefined
-        }
+        if (!this.outboundSessions.has(session.id)) return
+        if (!session.samples.length) { this.failSession(session, 'no-samples'); return }
+        if (session.completionHandle) { clearTimeout(session.completionHandle); session.completionHandle = undefined }
         const measurement = await this.buildMeasurement(session)
-        if (measurement) {
-            this.recordMeasurement(session.targetUid, measurement)
-        }
+        if (measurement) this.recordMeasurement(session.targetUid, measurement)
         if (session.channel?.readyState === 'open') {
             session.channel.send(JSON.stringify({ type: 'latency-complete' }))
         }
@@ -428,163 +415,130 @@ class PeerLatencyManager {
 
     private async buildMeasurement(session: MeasurementSession) {
         if (!session.samples.length) return null
-        const average =
-            session.samples.reduce((sum, value) => sum + value, 0) / session.samples.length
+        const average = session.samples.reduce((s, v) => s + v, 0) / session.samples.length
         const jitter = this.computeJitter(session.samples)
         const stats = await this.readNetworkType(session.pc)
-        const measurement = {
+        return {
             ping: Math.max(1, Math.round(average)),
             jitter: Math.round(jitter),
             isUnstable: jitter >= JITTER_UNSTABLE_THRESHOLD,
             networkType: stats?.networkType,
             measuredAt: Date.now(),
         }
-        return measurement
     }
 
     private computeJitter(samples: number[]): number {
         if (samples.length < 2) return 0
         let total = 0
-        for (let i = 1; i < samples.length; i += 1) {
-            total += Math.abs(samples[i] - samples[i - 1])
-        }
+        for (let i = 1; i < samples.length; i++) total += Math.abs(samples[i] - samples[i - 1])
         return total / (samples.length - 1)
     }
 
-    private async readNetworkType(
-        pc: RTCPeerConnection
-    ): Promise<{ networkType?: string } | undefined> {
+    private async readNetworkType(pc: RTCPeerConnection): Promise<{ networkType?: string } | undefined> {
         try {
             const stats = await pc.getStats(null)
-            let pairReport: any
-            stats.forEach((report) => {
-                if (
-                    report.type === 'candidate-pair' &&
-                    report.state === 'succeeded' &&
-                    report.nominated
-                ) {
-                    pairReport = report
-                }
-            })
-            if (!pairReport) return undefined
-            const remoteCandidate = pairReport.remoteCandidateId
-                ? stats.get(pairReport.remoteCandidateId)
-                : undefined
-            const localCandidate = pairReport.localCandidateId
-                ? stats.get(pairReport.localCandidateId)
-                : undefined
-            const networkType =
-                remoteCandidate?.networkType ||
-                localCandidate?.networkType ||
-                remoteCandidate?.candidateType ||
-                localCandidate?.candidateType
+            let pair: any
+            stats.forEach(r => { if (r.type === 'candidate-pair' && r.state === 'succeeded' && r.nominated) pair = r })
+            if (!pair) return undefined
+            const remote = pair.remoteCandidateId ? stats.get(pair.remoteCandidateId) : undefined
+            const local  = pair.localCandidateId  ? stats.get(pair.localCandidateId)  : undefined
+            const networkType = remote?.networkType || local?.networkType || remote?.candidateType || local?.candidateType
             return networkType ? { networkType } : undefined
-        } catch (error) {
-            console.warn('Failed to read network stats', error)
-            return undefined
-        }
+        } catch { return undefined }
     }
 
-    private recordMeasurement(
-        targetUid: string,
-        measurement: { ping: number; isUnstable: boolean; networkType?: string }
-    ) {
+    private recordMeasurement(targetUid: string, measurement: { ping: number; isUnstable: boolean; networkType?: string }) {
         this.lastMeasured.set(targetUid, Date.now())
-        const store = useUserStore.getState()
-        const viewer = store.globalUser
-        if (!viewer || viewer.uid !== this.viewer?.uid) {
+        this.clearFailures(targetUid)
+        if (this.onPingRecorded) {
+            this.onPingRecorded(targetUid, measurement.ping, measurement.isUnstable, measurement.networkType)
             return
         }
+        // v1 fallback: write directly to the global user store
+        const store = useUserStore.getState()
+        const viewer = store.globalUser
+        if (!viewer || viewer.uid !== this.viewer?.uid) return
         const current = Array.isArray(viewer.lastKnownPings) ? viewer.lastKnownPings : []
-        const filtered = current.filter((entry) => entry && entry.id !== targetUid)
-        const nextEntry = {
-            id: targetUid,
-            ping: measurement.ping,
-            isUnstable: measurement.isUnstable,
-            networkType: measurement.networkType,
-        }
+        const filtered = current.filter(e => e && e.id !== targetUid)
         store.setGlobalUser({
             ...viewer,
-            lastKnownPings: [...filtered, nextEntry],
+            lastKnownPings: [...filtered, {
+                id: targetUid, ping: measurement.ping,
+                isUnstable: measurement.isUnstable, networkType: measurement.networkType,
+            }],
         })
     }
 
-    private cancelOutboundSession() {
-        if (this.outboundSession) {
-            this.cleanupSession(this.outboundSession)
-        }
+    // ── Cleanup helpers ───────────────────────────────────────────────────────
+
+    private cancelAllOutboundSessions() {
+        for (const session of this.outboundSessions.values()) this.cleanupSession(session)
     }
 
     private resetAllSessions() {
-        this.sessions.forEach((session) => this.cleanupSession(session))
+        for (const session of this.sessions.values()) this.cleanupSession(session)
         this.sessions.clear()
-        this.outboundSession = undefined
+        this.outboundSessions.clear()
+        this.measuringTargets.clear()
     }
 
     private cleanupSession(session: MeasurementSession) {
-        if (session.timeoutHandle) {
-            clearTimeout(session.timeoutHandle)
-        }
-        if (session.completionHandle) {
-            clearTimeout(session.completionHandle)
-        }
+        if (session.timeoutHandle)    clearTimeout(session.timeoutHandle)
+        if (session.completionHandle) clearTimeout(session.completionHandle)
         if (session.channel && session.channel.readyState !== 'closed') {
-            try {
-                session.channel.close()
-            } catch (error) {
-                // ignore
-            }
+            try { session.channel.close() } catch {}
         }
-        try {
-            session.pc.close()
-        } catch {
-            // ignore
-        }
-        if (this.outboundSession?.id === session.id) {
-            this.outboundSession = undefined
-        }
+        try { session.pc.close() } catch {}
+        this.outboundSessions.delete(session.id)
         this.sessions.delete(session.id)
+        if (session.direction === 'outbound' && this.measuringTargets.has(session.targetUid)) {
+            this.measuringTargets.delete(session.targetUid)
+            this.onMeasuringChanged?.(session.targetUid, false)
+        }
     }
 
     private failSession(session: MeasurementSession, reason: string) {
         if (session.direction === 'outbound') {
             console.warn('Latency session failed', reason)
+            // A "declined" isn't a connectivity failure — the peer is just busy
+            // (in-match, or already at its inbound-session cap) and reachable fine.
+            if (reason !== 'declined') this.recordFailure(session.targetUid)
         }
         this.cleanupSession(session)
     }
 
+    private recordFailure(targetUid: string) {
+        const next = (this.consecutiveFailures.get(targetUid) ?? 0) + 1
+        this.consecutiveFailures.set(targetUid, next)
+        if (next === UNREACHABLE_THRESHOLD) {
+            this.onReachabilityChanged?.(targetUid, true)
+        }
+    }
+
+    private clearFailures(targetUid: string) {
+        const wasUnreachable = (this.consecutiveFailures.get(targetUid) ?? 0) >= UNREACHABLE_THRESHOLD
+        this.consecutiveFailures.delete(targetUid)
+        if (wasUnreachable) this.onReachabilityChanged?.(targetUid, false)
+    }
+
     private countInboundSessions(): number {
-        let total = 0
-        this.sessions.forEach((session) => {
-            if (session.direction === 'inbound') total += 1
-        })
-        return total
+        let n = 0
+        this.sessions.forEach(s => { if (s.direction === 'inbound') n++ })
+        return n
     }
 
     private sendSignal(
-        type:
-            | 'peer-latency-offer'
-            | 'peer-latency-answer'
-            | 'peer-latency-candidate'
-            | 'peer-latency-decline',
+        type: 'peer-latency-offer' | 'peer-latency-answer' | 'peer-latency-candidate' | 'peer-latency-decline',
         payload: Record<string, unknown>
     ) {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return
-        this.socket.send(
-            JSON.stringify({
-                type,
-                ...payload,
-            })
-        )
+        this.socket.send(JSON.stringify({ type, ...payload }))
     }
 
     private sendDecline(payload: LatencySignalPayload, reason: string) {
         if (!this.viewer?.uid || !payload.from || !payload.measurementId) return
         this.sendSignal('peer-latency-decline', {
-            to: payload.from,
-            from: this.viewer.uid,
-            measurementId: payload.measurementId,
-            reason,
+            to: payload.from, from: this.viewer.uid, measurementId: payload.measurementId, reason,
         })
     }
 }

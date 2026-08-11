@@ -1,70 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Avatar,
-  Box,
-  Button,
-  CardBody,
-  CardHeader,
-  CardRoot,
-  Flex,
-  Heading,
-  IconButton,
-  Input,
-  SimpleGrid,
-  Spinner,
-  Stack,
-  Text,
-  useDisclosure,
-  useToken,
-} from "@chakra-ui/react";
-import { useNavigate, useParams } from "@tanstack/react-router";
-import {
   ArrowLeft,
   ChevronDown,
   ChevronUp,
   RefreshCcw,
   Save,
 } from "lucide-react";
-import {
-  RegExpMatcher,
-  englishDataset,
-  englishRecommendedTransformers,
-} from "obscenity";
-import {
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip as RechartTooltip,
-} from "recharts";
-import { auth } from "../utils/firebase";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import api from "../external-api/requests";
-import { useUserStore } from "../state/store";
-import TitleBadge from "../components/TitleBadge";
-import WinStreakIndicator from "../components/WinStreakIndicator";
-import SelectableFlairButton from "../components/SelectableFlairButton";
-import type { TUser, TUserTitle } from "../types/user";
-import { toaster } from "../components/chakra/ui/toaster";
-import {
-  DrawerBody,
-  DrawerCloseTrigger,
-  DrawerContent,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerRoot,
-} from "../components/chakra/ui/drawer";
-import { requestSocketStateUpdate } from "../layout/helpers/socketBridge";
+import { validateName } from "../utils/validation";
+import { auth } from "../utils/firebase";
+import type { V2User } from "../types";
+import { CountryFlag } from "../components/CountryFlag";
+import { UserTitle } from "../components/UserTitle";
+import { MeterChart } from "../components/MeterChart";
+import { MatchReplay, type ReplayFrame } from "../components/MatchReplay";
+import { readPositionReplayFile } from "../utils/matchFiles";
 
-type SuperArtStats = {
-  wins?: number;
-  losses?: number;
-};
+// Position replay is an unfinished prototype (parsing is fragile, no UI polish) —
+// hidden until it's ready. Flip to true to bring it back for local testing.
+const SHOW_POSITION_REPLAY_PROTOTYPE = false;
 
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+type SuperArtStats = { wins?: number; losses?: number };
 type PlayerCharacterStats = {
   picks: number;
-  superChoice?: Array<SuperArtStats> | Record<string, SuperArtStats>;
+  superChoice?: SuperArtStats[] | Record<string, SuperArtStats>;
 };
-
 type PlayerStats = {
   totalWins?: number;
   totalLosses?: number;
@@ -74,141 +37,416 @@ type PlayerStats = {
   accountElo?: number;
   characters?: Record<string, PlayerCharacterStats>;
 };
-
+type MatchCharEntry = { char: string | null; super?: number | null };
 type PlayerMatch = {
   id?: string;
   sessionId?: string;
   timestamp?: number;
   player1Name?: string;
   player2Name?: string;
+  player1Uid?: string;
+  player2Uid?: string;
   p1Wins?: number;
   p2Wins?: number;
+  // legacy single-value fields (old sessions)
+  player1Char?: string;
+  player2Char?: string;
+  player1Super?: number;
+  player2Super?: number;
+  // new array fields (sessions after the update)
+  player1Chars?: MatchCharEntry[];
+  player2Chars?: MatchCharEntry[];
+};
+type ProfileData = {
+  uid?: string;
+  userName?: string;
+  accountElo?: number;
+  countryCode?: string;
+  userTitle?: { bgColor: string; border: string; color: string; title: string };
+  userProfilePic?: string;
+  knownAliases?: string[];
+  winStreak?: number;
+  longestWinStreak?: number;
+  gravEmail?: string;
+  createdAt?: number;
+  assignedFlairs?: {
+    bgColor: string;
+    border: string;
+    color: string;
+    title: string;
+  }[];
+};
+type TitleOption = {
+  bgColor: string;
+  border: string;
+  color: string;
+  title: string;
+};
+type GlobalSetMatchEntry = {
+  matchData?: { raw?: string };
+  result?: string;
+  player1Char?: string;
+  player2Char?: string;
+  player1Super?: number;
+  player2Super?: number;
+};
+type GlobalSetDetail = {
+  matches?: GlobalSetMatchEntry[];
+  player1Name?: string;
+  player2Name?: string;
 };
 
-const matcher = new RegExpMatcher({
-  ...englishDataset.build(),
-  ...englishRecommendedTransformers,
-});
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const SA_COLORS: [string, string, string] = ["#ECC94B", "#ED8936", "#4299E1"];
+
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function normalizeSuperChoices(
-  choice?: PlayerCharacterStats["superChoice"]
+  choice?: PlayerCharacterStats["superChoice"],
 ): SuperArtStats[] {
   if (!choice) return [];
   if (Array.isArray(choice)) return choice;
-  return Object.values(choice);
+  const result: SuperArtStats[] = [];
+  for (const [key, val] of Object.entries(choice)) {
+    const idx = parseInt(key, 10);
+    if (!isNaN(idx) && idx >= 0 && idx <= 2) result[idx] = val;
+  }
+  return result;
 }
 
-function CharacterSuperArtDonut({
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function Avatar({ user }: { user: ProfileData }) {
+  const [failed, setFailed] = useState(false);
+  const show = !!user.userProfilePic && !failed;
+  return (
+    <div
+      className="w-20 h-20 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-xl font-bold"
+      style={{ background: "var(--v2-accent)", color: "var(--v2-accent-fg)" }}
+    >
+      {show ? (
+        <img
+          src={user.userProfilePic}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        (user.userName || "?").slice(0, 2).toUpperCase()
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div
+      className="rounded-lg p-4 border"
+      style={{
+        background: "var(--v2-surface)",
+        borderColor: "var(--v2-border)",
+      }}
+    >
+      <p className="text-xs mb-1" style={{ color: "var(--v2-muted)" }}>
+        {label}
+      </p>
+      <p className="text-xl font-bold" style={{ color: "var(--v2-accent)" }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+
+function CharSADonut({
   name,
   stats,
-  colors,
 }: {
   name: string;
   stats: PlayerCharacterStats;
-  colors: readonly string[];
 }) {
   const superChoices = normalizeSuperChoices(stats.superChoice);
-  const saData = [0, 1, 2].map((index) => {
-    const entry = superChoices[index];
+  const data = [0, 1, 2].map((i) => {
+    const e = superChoices[i];
     return {
-      name: `SA ${index + 1}`,
-      value: (entry?.wins || 0) + (entry?.losses || 0),
-      color: colors[index] || colors[0],
+      name: `SA ${i + 1}`,
+      value: (e?.wins || 0) + (e?.losses || 0),
+      color: SA_COLORS[i],
     };
   });
-  const hasData = saData.some((entry) => entry.value > 0);
-
+  const hasData = data.some((d) => d.value > 0);
   return (
-    <Stack
-      gap={2}
-      align="center"
-      borderWidth="1px"
-      borderColor="gray.800"
-      borderRadius="lg"
-      padding="4"
+    <div
+      className="flex flex-col items-center gap-2 rounded-lg border p-4"
+      style={{
+        background: "var(--v2-surface)",
+        borderColor: "var(--v2-border)",
+      }}
     >
-      <Text fontWeight="semibold">{name}</Text>
+      <p className="text-xs font-semibold" style={{ color: "var(--v2-text)" }}>
+        {name}
+      </p>
       {hasData ? (
-        <Box w="140px" h="140px">
+        <div className="w-28 h-28">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <RechartTooltip />
+              <Tooltip
+                contentStyle={{
+                  background: "var(--v2-surface)",
+                  border: "1px solid var(--v2-border)",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                }}
+                itemStyle={{ color: "var(--v2-text)" }}
+                cursor={false}
+              />
               <Pie
-                innerRadius={40}
-                outerRadius={60}
+                innerRadius={32}
+                outerRadius={48}
                 isAnimationActive={false}
-                data={saData}
+                data={data}
                 dataKey="value"
               >
-                {saData.map((item, index) => (
-                  <Cell key={item.name} fill={colors[index] || colors[0]} />
+                {data.map((item) => (
+                  <Cell key={item.name} fill={item.color} />
                 ))}
               </Pie>
             </PieChart>
           </ResponsiveContainer>
-        </Box>
+        </div>
       ) : (
-        <Text fontSize="xs" color="gray.500">
-          No data
-        </Text>
+        <p className="text-xs py-4" style={{ color: "var(--v2-muted)" }}>
+          —
+        </p>
       )}
-      <Text fontSize="sm" color="gray.400">
-        Picks {stats.picks || 0}
-      </Text>
-    </Stack>
+      <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+        {stats.picks || 0} picks
+      </p>
+    </div>
   );
 }
 
-export default function PlayerProfilePage() {
-  const params = useParams({ from: "/profile/$userId" });
-  const requestedUserId = params?.userId;
-  const globalUser = useUserStore((s) => s.globalUser);
-  const setGlobalUser = useUserStore((s) => s.setGlobalUser);
-  const setLobbyUsers = useUserStore((s) => s.setLobbyUsers);
-  const navigate = useNavigate();
-  const profileUid = requestedUserId || globalUser?.uid || null;
-  const isSelf = Boolean(profileUid && profileUid === globalUser?.uid);
-  const superArtColors = useToken("colors", [
-    "yellow.500",
-    "orange.500",
-    "blue.500",
-  ]);
+// ── Main component ─────────────────────────────────────────────────────────────
 
-  const [profile, setProfile] = useState<TUser | null>(null);
+type PlayerProfilePageProps = {
+  profileUid: string;
+  currentUser: V2User | null;
+  onBack: () => void;
+  onUserUpdated?: (updated: Partial<V2User>) => void;
+  onNavigateToProfile?: (uid: string) => void;
+};
+
+export function PlayerProfilePage({
+  profileUid,
+  currentUser,
+  onBack,
+  onUserUpdated,
+  onNavigateToProfile,
+}: PlayerProfilePageProps) {
+  const isSelf = !!currentUser && currentUser.uid === profileUid;
+  const canEdit = isSelf;
+
+  const [profile, setProfile] = useState<ProfileData | null>(null);
   const [playerStats, setPlayerStats] = useState<PlayerStats | null>(null);
-  const [titles, setTitles] = useState<TUserTitle[]>([]);
+  const [titles, setTitles] = useState<TitleOption[]>([]);
   const [matches, setMatches] = useState<PlayerMatch[]>([]);
   const [matchCursor, setMatchCursor] = useState<{
     last?: string | null;
     first?: string | null;
-    total?: number;
   }>({});
   const [profileLoading, setProfileLoading] = useState(true);
-  const [matchesLoading, setMatchesLoading] = useState(true);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [charOpen, setCharOpen] = useState(false);
+  const [matchesOpen, setMatchesOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [nameInvalid, setNameInvalid] = useState(false);
-  const [pendingTitle, setPendingTitle] = useState<string>("");
+  const [pendingTitle, setPendingTitle] = useState<TitleOption | null>(null);
+  const [gravEmailDraft, setGravEmailDraft] = useState("");
+  const [gravEmailEditing, setGravEmailEditing] = useState(false);
+  const [titlePickerOpen, setTitlePickerOpen] = useState(false);
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [matchDetailCache, setMatchDetailCache] = useState<Record<string, GlobalSetDetail>>({});
+  const [fetchingMatchId, setFetchingMatchId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [isTitleDrawerOpen, setTitleDrawerOpen] = useState(false);
-  const charDisclosure = useDisclosure({ defaultOpen: false });
-  const matchesDisclosure = useDisclosure({ defaultOpen: false });
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [replayFrames, setReplayFrames] = useState<ReplayFrame[] | null>(null);
 
-  const normalizeUserForProfile = useCallback(
-    (user: TUser | (TUser & { winStreak?: number })) => {
-      const streak =
-        typeof (user as any).winStreak === "number"
-          ? (user as any).winStreak
-          : 0;
-      const longest =
-        typeof (user as any).longestWinStreak === "number"
-          ? (user as any).longestWinStreak
-          : undefined;
-      return { ...user, winStreak: streak, longestWinStreak: longest };
+  // ── Load profile ─────────────────────────────────────────────────────────────
+
+  const loadProfile = useCallback(async () => {
+    if (!auth.currentUser) return;
+    setProfileLoading(true);
+    setPlayerStats(null);
+    setMatches([]);
+    setMatchCursor({});
+    setGravEmailEditing(false);
+    setTitlePickerOpen(false);
+    setSaveError(null);
+    setExpandedMatchId(null);
+    setMatchDetailCache({});
+    try {
+      const [userData, statsData, titlesData] = await Promise.all([
+        api.getUserData(auth, profileUid),
+        api.getPlayerStats(auth, profileUid),
+        canEdit ? api.getAllTitles(auth, profileUid) : Promise.resolve(null),
+      ]);
+      if (userData) {
+        const p = userData as ProfileData;
+        setProfile(p);
+        setNameDraft(p.userName || "");
+        setPendingTitle(p.userTitle || null);
+        setGravEmailDraft(p.gravEmail || "");
+      }
+      if (statsData?.playerStatSet)
+        setPlayerStats(statsData.playerStatSet as PlayerStats);
+      else if (statsData) setPlayerStats(statsData as PlayerStats);
+
+      if (canEdit) {
+        const serverTitles: TitleOption[] = Array.isArray(
+          titlesData?.titleData?.titles,
+        )
+          ? (titlesData.titleData.titles as TitleOption[])
+          : [];
+        const assignedFlairs: TitleOption[] = Array.isArray(
+          (userData as ProfileData)?.assignedFlairs,
+        )
+          ? (userData as ProfileData).assignedFlairs!
+          : [];
+        const merged: TitleOption[] = [...serverTitles];
+        const seen = new Set(serverTitles.map((t) => t.title));
+        for (const f of assignedFlairs) {
+          if (!seen.has(f.title)) {
+            merged.push(f);
+            seen.add(f.title);
+          }
+        }
+        setTitles(merged);
+      }
+    } catch (err) {
+      console.error("[v2] PlayerProfilePage: loadProfile failed", err);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [profileUid, canEdit]);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  // ── Load matches ─────────────────────────────────────────────────────────────
+
+  // Cursors passed explicitly so this callback is stable and doesn't re-trigger effects
+  const fetchMatches = useCallback(
+    async (
+      direction: "initial" | "next" | "prev",
+      cursorLast: string | null | undefined,
+      cursorFirst: string | null | undefined,
+    ) => {
+      if (!auth.currentUser) return;
+      setMatchesLoading(true);
+      try {
+        const nextCursor = direction === "next" ? (cursorLast ?? null) : null;
+        const prevCursor = direction === "prev" ? (cursorFirst ?? null) : null;
+        const res = await (
+          api.getUserMatches as unknown as (
+            auth: unknown,
+            uid: string,
+            last?: string | null,
+            first?: string | null,
+          ) => Promise<any>
+        )(auth, profileUid, nextCursor, prevCursor);
+        if (res?.matches) {
+          setMatches(res.matches as PlayerMatch[]);
+          setMatchCursor({ last: res.lastVisible, first: res.firstVisible });
+        } else if (direction === "initial") {
+          setMatches([]);
+          setMatchCursor({});
+        }
+      } catch (err) {
+        console.error("[v2] PlayerProfilePage: fetchMatches failed", err);
+      } finally {
+        setMatchesLoading(false);
+      }
     },
-    []
+    [profileUid],
   );
 
-  const canEdit = isSelf && Boolean(profileUid);
+  useEffect(() => {
+    if (matchesOpen && matches.length === 0)
+      void fetchMatches("initial", null, null);
+  }, [matchesOpen, fetchMatches, matches.length]);
+
+  useEffect(() => {
+    if (!SHOW_POSITION_REPLAY_PROTOTYPE) return;
+    if (!matchesOpen || replayFrames) return;
+    void readPositionReplayFile().then((raw) => {
+      if (!raw) return;
+      try {
+        const data = JSON.parse(raw);
+        if (Array.isArray(data?.frames) && data.frames.length > 0) {
+          const rawFrames = data.frames as unknown[][];
+          const parsed: ReplayFrame[] = rawFrames.map((f) => ({
+            p1x: f[0] as number, p1y: f[1] as number,
+            p2x: f[2] as number, p2y: f[3] as number,
+            p1hp:      (f[4]  as number) ?? null,
+            p2hp:      (f[5]  as number) ?? null,
+            p1sa:      (f[6]  as number) ?? null,
+            p2sa:      (f[7]  as number) ?? null,
+            projs:     Array.isArray(f[8]) ? f[8] as [number, number][] : [],
+            p1stun:    (f[9]  as number) ?? null,
+            p2stun:    (f[10] as number) ?? null,
+            p1stunMax: (f[11] as number) ?? null,
+            p2stunMax: (f[12] as number) ?? null,
+            p1dizzy:   false,
+            p2dizzy:   false,
+            p1crouch:  (f[17] as number) === 32 || (f[17] as number) === 33,
+            p2crouch:  (f[18] as number) === 32 || (f[18] as number) === 33,
+          }));
+          // Stateful dizzy detection — mirrors effie's is_stunned logic:
+          // set when stun_activate fires (=1) or stun_timer is counting down (1-249)
+          // clear when stun_timer hits 0 or resets to >=250 and activate is not firing
+          let p1Dizzy = false, p2Dizzy = false;
+          for (let i = 0; i < rawFrames.length; i++) {
+            const f = rawFrames[i];
+            const p1Timer    = f[13] as number;
+            const p2Timer    = f[14] as number;
+            const p1Activate = f[15] as number;
+            const p2Activate = f[16] as number;
+            if (p1Activate === 1 || (p1Timer > 0 && p1Timer < 250)) p1Dizzy = true;
+            if (p2Activate === 1 || (p2Timer > 0 && p2Timer < 250)) p2Dizzy = true;
+            if (p1Dizzy && p1Activate !== 1 && (p1Timer === 0 || p1Timer >= 250)) p1Dizzy = false;
+            if (p2Dizzy && p2Activate !== 1 && (p2Timer === 0 || p2Timer >= 250)) p2Dizzy = false;
+            parsed[i].p1dizzy = p1Dizzy;
+            parsed[i].p2dizzy = p2Dizzy;
+          }
+          // Latch HP at 0 once a player is KO'd — prevents spurious reset during KO animation
+          let p1Dead = false, p2Dead = false;
+          for (const frame of parsed) {
+            if (frame.p1hp === 0) p1Dead = true;
+            if (frame.p2hp === 0) p2Dead = true;
+            if (p1Dead) frame.p1hp = 0;
+            if (p2Dead) frame.p2hp = 0;
+          }
+          setReplayFrames(parsed);
+        }
+      } catch { /* ignore malformed file */ }
+    });
+  }, [matchesOpen, replayFrames]);
+
+  // ── Name validation ───────────────────────────────────────────────────────────
+
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const error = validateName(nameDraft)
+    setNameInvalid(error !== null);
+    setNameError(error);
+  }, [nameDraft]);
+
+  // ── Derived ───────────────────────────────────────────────────────────────────
 
   const winStats = useMemo(() => {
     const totalGames = playerStats?.totalGames ?? 0;
@@ -222,611 +460,874 @@ export default function PlayerProfilePage() {
   const characterEntries = useMemo(() => {
     if (!playerStats?.characters) return [];
     return Object.entries(playerStats.characters).sort(
-      (a, b) => (b[1]?.picks || 0) - (a[1]?.picks || 0)
+      (a, b) => (b[1]?.picks || 0) - (a[1]?.picks || 0),
     );
   }, [playerStats]);
 
-  const mergeTitlePools = useCallback(
-    (base: TUserTitle[], extras?: TUserTitle[]) => {
-      if (!extras || !extras.length) return base;
-      const seen = new Set(base.map((title) => (title.title || "").trim()));
-      const filtered = extras.filter((entry) => {
-        const key = (entry.title || "").trim();
-        return key.length && !seen.has(key);
-      });
-      if (!filtered.length) return base;
-      return [...base, ...filtered];
-    },
-    []
-  );
+  const elo = playerStats?.accountElo ?? profile?.accountElo;
+  const displayElo = elo !== undefined && elo !== null ? Math.round(elo) : null;
 
-  const titleOptions = useMemo(
-    () =>
-      titles.map((title, index) => ({
-        label: title.title,
-        value: String(index),
-        data: title,
-      })),
-    [titles]
-  );
+  // ── Save ──────────────────────────────────────────────────────────────────────
 
-  const currentWinStreak = profile?.winStreak ?? 0;
-  const currentElo = playerStats?.accountElo ?? profile?.accountElo;
-  const displayElo =
-    currentElo !== undefined && currentElo !== null
-      ? Math.round(currentElo)
-      : null;
-
-  useEffect(() => {
-    if (!profileUid || !auth.currentUser) {
-      setProfile(null);
-      setPlayerStats(null);
-      setMatches([]);
-      return;
-    }
-    setProfileLoading(true);
-    let normalizedUserProfile: TUser | null = null;
-    const loadProfile = async () => {
-      try {
-        const [userData, statsData, titlesData] = await Promise.all([
-          api.getUserData(auth, profileUid),
-          api.getPlayerStats(auth, profileUid),
-          canEdit ? api.getAllTitles(auth, profileUid) : Promise.resolve(null),
-        ]);
-        if (userData) {
-          const normalizedUser = normalizeUserForProfile(userData as TUser);
-          setProfile(normalizedUser);
-          setNameDraft(normalizedUser.userName || "");
-          normalizedUserProfile = normalizedUser;
-        }
-        if (statsData?.playerStatSet) {
-          setPlayerStats(statsData.playerStatSet as PlayerStats);
-        } else if (statsData) {
-          setPlayerStats(statsData as PlayerStats);
-        }
-        const serverTitles =
-          titlesData?.titleData?.titles &&
-          Array.isArray(titlesData.titleData.titles)
-            ? (titlesData.titleData.titles as TUserTitle[])
-            : [];
-        const assignedTitles = Array.isArray(
-          normalizedUserProfile?.assignedFlairs
-        )
-          ? normalizedUserProfile.assignedFlairs
-          : [];
-        if (serverTitles.length || assignedTitles.length) {
-          setTitles(mergeTitlePools(serverTitles, assignedTitles));
-        } else {
-          setTitles([]);
-        }
-      } catch (error) {
-        console.error("Failed to load profile", error);
-        toaster.create({
-          title: "Unable to load profile",
-          description: "Please try again shortly.",
-        });
-      } finally {
-        setProfileLoading(false);
-      }
-    };
-    void loadProfile();
-  }, [profileUid, canEdit, normalizeUserForProfile, mergeTitlePools]);
-
-  const fetchMatches = useCallback(
-    async (direction: "initial" | "next" | "prev") => {
-      if (!profileUid || !auth.currentUser) return;
-      setMatchesLoading(true);
-      try {
-        const nextCursor: string | null =
-          direction === "next" ? matchCursor.last ?? null : null;
-        const prevCursor: string | null =
-          direction === "prev" ? matchCursor.first ?? null : null;
-        const response = await (
-          api.getUserMatches as unknown as (
-            auth: unknown,
-            userId: string,
-            lastMatchId?: string | null,
-            firstMatchId?: string | null
-          ) => Promise<any>
-        )(auth, profileUid, nextCursor, prevCursor);
-        if (response?.matches) {
-          setMatches(response.matches as PlayerMatch[]);
-          setMatchCursor({
-            last: response.lastVisible,
-            first: response.firstVisible,
-            total: response.totalMatches,
-          });
-        } else if (direction === "initial") {
-          setMatches([]);
-          setMatchCursor({});
-        }
-      } catch (error) {
-        console.error("Failed to load matches", error);
-        toaster.create({
-          title: "Unable to load matches",
-          description: "Try again later.",
-        });
-      } finally {
-        setMatchesLoading(false);
-      }
-    },
-    [profileUid, matchCursor.last, matchCursor.first]
-  );
-
-  useEffect(() => {
-    if (profileUid && auth.currentUser) {
-      void fetchMatches("initial");
-    }
-  }, [fetchMatches, profileUid]);
-
-  useEffect(() => {
-    if (!nameDraft.trim()) {
-      setNameInvalid(true);
-      return;
-    }
-    setNameInvalid(matcher.hasMatch(nameDraft));
-  }, [nameDraft]);
-
-  useEffect(() => {
-    if (!profile || !titles.length) return;
-    const currentTitleIndex = titles.findIndex(
-      (title) => title.title === profile.userTitle?.title
-    );
-    if (currentTitleIndex >= 0) {
-      setPendingTitle(String(currentTitleIndex));
-    } else {
-      setPendingTitle("");
-    }
-  }, [profile, titles]);
-
-  const saveProfileChanges = async () => {
+  const saveProfile = async () => {
     if (!canEdit || !profile || !auth.currentUser) return;
     const payload: Record<string, unknown> = {};
-    const trimmedName = nameDraft.trim();
-    if (!nameInvalid && trimmedName && trimmedName !== profile.userName) {
-      payload.userName = trimmedName;
-    }
-    if (pendingTitle) {
-      const selected = titleOptions.find(
-        (option) => option.value === pendingTitle
-      )?.data;
-      if (selected && selected.title !== profile.userTitle?.title) {
-        payload.userTitle = selected;
-      }
-    }
-    if (!Object.keys(payload).length) {
-      toaster.create({
-        title: "Nothing to update",
-        description: "Change your name or title before saving.",
-      });
-      return;
-    }
+    const trimName = nameDraft.trim();
+    if (!nameInvalid && trimName && trimName !== profile.userName)
+      payload.userName = trimName;
+    if (pendingTitle && pendingTitle.title !== profile.userTitle?.title)
+      payload.userTitle = pendingTitle;
+    const trimGravEmail = gravEmailDraft.trim();
+    if (gravEmailEditing && trimGravEmail !== (profile.gravEmail ?? ""))
+      payload.gravEmail = trimGravEmail;
+    if (!Object.keys(payload).length) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await api.updateUserData(auth, payload);
       setProfile((prev) => (prev ? { ...prev, ...payload } : prev));
-      if (isSelf && globalUser) {
-        const nextViewer = { ...globalUser, ...payload };
-        setGlobalUser(nextViewer);
-        const currentLobbyUsers = useUserStore.getState().lobbyUsers;
-        setLobbyUsers(
-          currentLobbyUsers.map((entry) =>
-            entry.uid === nextViewer.uid ? { ...entry, ...payload } : entry
-          )
-        );
-      }
-      if (payload.userName) {
-        requestSocketStateUpdate({ key: "userName", value: payload.userName });
-      }
-      if (payload.userTitle) {
-        requestSocketStateUpdate({
-          key: "userTitle",
-          value: payload.userTitle,
-        });
-      }
-      toaster.create({
-        title: "Profile updated",
-      });
-    } catch (error) {
-      console.error("Failed to update profile", error);
-      toaster.create({
-        title: "Update failed",
-        description: "Please try again shortly.",
-      });
+      setGravEmailEditing(false);
+      onUserUpdated?.(payload as Partial<V2User>);
+    } catch (err) {
+      console.error("[v2] PlayerProfilePage: saveProfile failed", err);
+      setSaveError("Update failed. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
-  if (!profileUid) {
-    return (
-      <Stack gap={6} padding="8">
-        <Heading size="lg">Player profile</Heading>
-        <Text color="gray.400">
-          Select a player from the search page to view their profile.
-        </Text>
-        <Button onClick={() => navigate({ to: "/profile" })}>
-          Back to profiles
-        </Button>
-      </Stack>
-    );
-  }
+  // ── Match expand ─────────────────────────────────────────────────────────────
+
+  const toggleMatchExpand = async (matchId: string) => {
+    if (expandedMatchId === matchId) {
+      setExpandedMatchId(null);
+      return;
+    }
+    setExpandedMatchId(matchId);
+    if (matchDetailCache[matchId]) return;
+    setFetchingMatchId(matchId);
+    try {
+      const result = await (api.getGlobalSet as any)(auth, profileUid, matchId);
+      if (result?.globalSet) {
+        setMatchDetailCache((prev) => ({ ...prev, [matchId]: result.globalSet as GlobalSetDetail }));
+      }
+    } finally {
+      setFetchingMatchId(null);
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────────
+
 
   return (
-    <Stack gap={8} padding={{ base: 4, md: 8 }}>
-      <Flex
-        justify="space-between"
-        align={{ base: "stretch", md: "center" }}
-        direction={{ base: "column", md: "row" }}
-        gap={4}
-      >
-        <Button variant="ghost" onClick={() => navigate({ to: "/profile" })}>
-          <Flex align="center" gap="2">
-            <ArrowLeft size={16} />
-            <span>Back to profiles</span>
-          </Flex>
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            void fetchMatches("initial");
-            if (profileUid && auth.currentUser) {
-              setProfileLoading(true);
-              void (async () => {
-                try {
-                  const userData = await api.getUserData(auth, profileUid);
-                  if (userData) {
-                    const normalizedUser = normalizeUserForProfile(
-                      userData as TUser
-                    );
-                    setProfile(normalizedUser);
-                    setNameDraft(normalizedUser.userName || "");
-                  }
-                } finally {
-                  setProfileLoading(false);
-                }
-              })();
+    <div className="h-full overflow-y-scroll">
+      <div className="max-w-3xl mx-auto p-6 space-y-5">
+        {/* Nav */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-sm transition-colors"
+            style={{ color: "var(--v2-muted)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--v2-text)")
             }
-          }}
-          disabled={!profile}
-        >
-          <Flex align="center" gap="2">
-            <RefreshCcw size={16} />
-            <span>Refresh data</span>
-          </Flex>
-        </Button>
-      </Flex>
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "var(--v2-muted)")
+            }
+          >
+            <ArrowLeft size={14} /> Back to profiles
+          </button>
+          <button
+            onClick={() => void loadProfile()}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors"
+            style={{
+              borderColor: "var(--v2-border)",
+              color: "var(--v2-muted)",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "var(--v2-hover)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "transparent")
+            }
+          >
+            <RefreshCcw size={12} /> Refresh
+          </button>
+        </div>
 
-      <CardRoot bg="gray.900" borderWidth="1px" borderColor="gray.700">
-        <CardBody>
-          {profileLoading || !profile ? (
-            <Flex justify="center" padding="8">
-              <Spinner />
-            </Flex>
-          ) : (
-            <Stack gap={6}>
-              <Flex
-                gap={6}
-                direction={{ base: "column", md: "row" }}
-                align={{ base: "flex-start", md: "center" }}
-              >
-                <Stack align="center" gap="2">
-                  <Avatar.Root size="2xl" variant="outline">
-                    <Avatar.Fallback name={profile.userName} />
-                    <Avatar.Image src={profile.userProfilePic || undefined} />
-                  </Avatar.Root>
-                  <WinStreakIndicator value={currentWinStreak} />
-                </Stack>
-                <Stack gap={2} flex="1">
-                  <Flex
-                    align={{ base: "flex-start", md: "center" }}
-                    gap="3"
-                    wrap="wrap"
+        {/* Profile card */}
+        <div
+          className="rounded-lg border p-5"
+          style={{
+            background: "var(--v2-surface)",
+            borderColor: "var(--v2-border)",
+          }}
+        >
+          {profileLoading ? (
+            <div className="flex justify-center py-10">
+              <div
+                className="w-7 h-7 rounded-full border-2 border-t-transparent animate-spin"
+                style={{
+                  borderColor: "var(--v2-accent)",
+                  borderTopColor: "transparent",
+                }}
+              />
+            </div>
+          ) : profile ? (
+            <div className="space-y-5">
+              {/* Avatar + identity */}
+              <div className="flex gap-5 flex-wrap">
+                <Avatar user={profile} />
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1
+                      className="text-xl font-bold"
+                      style={{ color: "var(--v2-text)" }}
+                    >
+                      {profile.userName}
+                    </h1>
+                    <CountryFlag code={profile.countryCode} />
+                    {isSelf && (
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--v2-muted)" }}
+                      >
+                        (you)
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+                    Joined {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString() : "unknown"}
+                  </p>
+                  <UserTitle title={profile.userTitle} size="sm" />
+                  <div
+                    className="flex items-center gap-3 text-xs"
+                    style={{ color: "var(--v2-muted)" }}
                   >
-                    <Heading size="lg">{profile.userName}</Heading>
-                    <Text fontSize="sm" color="gray.400">
-                      ELO {displayElo !== null ? displayElo : "—"}
-                    </Text>
-                  </Flex>
-                  <TitleBadge title={profile.userTitle} />
-                  {/* <Text fontSize="sm" color="gray.400">
-                    UID: {profile.uid}
-                  </Text> */}
-                  {/* <Text fontSize="sm" color="gray.400">
-                    Country: {profile.countryCode || "Unknown"}
-                  </Text> */}
-                  <div>
-                    <span
-                      //  @ts-ignore // this is needed for the country code css library.
-                      class={`fi fi-${
-                        profile.countryCode?.toLowerCase() || "xx"
-                      }`}
-                    />
+                    {displayElo !== null && <span>ELO {displayElo}</span>}
+                    {(profile.winStreak ?? 0) > 0 && (
+                      <span>🔥 {profile.winStreak} win streak</span>
+                    )}
                   </div>
                   {Array.isArray(profile.knownAliases) &&
-                  profile.knownAliases.length ? (
-                    <Text fontSize="sm" color="gray.500">
-                      Also known as:{" "}
-                      {profile.knownAliases.slice(0, 5).join(", ")}
-                    </Text>
-                  ) : null}
-                </Stack>
-                {canEdit ? (
-                  <Stack gap={4} flex="1">
-                    <Box>
-                      <Text fontSize="sm" color="gray.400" mb="1">
+                    profile.knownAliases.length > 0 && (
+                      <p className="text-xs flex items-center gap-1.5" style={{ color: "var(--v2-muted)" }}>
+                        aka {profile.knownAliases[profile.knownAliases.length - 1]}
+                        {profile.knownAliases.length > 1 && (
+                          <span
+                            className="text-xs px-1 py-0.5 rounded border"
+                            style={{
+                              borderColor: "var(--v2-border)",
+                              color: "var(--v2-muted)",
+                              cursor: "default",
+                            }}
+                            title={profile.knownAliases.slice(0, -1).join(", ")}
+                          >
+                            +{profile.knownAliases.length - 1}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                </div>
+
+                {/* Edit panel (self only) */}
+                {canEdit && (
+                  <div className="w-full sm:w-64 space-y-3 pt-1">
+                    <div>
+                      <label
+                        className="text-xs font-medium block mb-1"
+                        style={{ color: "var(--v2-muted)" }}
+                      >
                         Display name
-                      </Text>
-                      <Input
+                      </label>
+                      <input
+                        type="text"
                         value={nameDraft}
-                        onChange={(event) => setNameDraft(event.target.value)}
-                        _invalid={
-                          nameInvalid ? { borderColor: "red.500" } : undefined
+                        maxLength={16}
+                        onChange={(e) => setNameDraft(e.target.value)}
+                        className="w-full rounded px-3 py-1.5 text-sm border outline-none transition-colors"
+                        style={{
+                          background: "var(--v2-hover)",
+                          borderColor: nameInvalid
+                            ? "#f87171"
+                            : "var(--v2-border)",
+                          color: "var(--v2-text)",
+                        }}
+                        onFocus={(e) =>
+                          (e.currentTarget.style.borderColor = nameInvalid
+                            ? "#f87171"
+                            : "var(--v2-accent)")
+                        }
+                        onBlur={(e) =>
+                          (e.currentTarget.style.borderColor = nameInvalid
+                            ? "#f87171"
+                            : "var(--v2-border)")
                         }
                       />
-                      {nameInvalid ? (
-                        <Text fontSize="xs" color="red.300" mt="1">
-                          Please choose a different name.
-                        </Text>
-                      ) : null}
-                    </Box>
-                    <Box>
-                      <Text fontSize="sm" color="gray.400" mb="1">
-                        Title flair
-                      </Text>
-                      <Stack gap={2}>
-                        <TitleBadge
-                          title={
-                            titleOptions.find(
-                              (option) => option.value === pendingTitle
-                            )?.data || profile.userTitle
-                          }
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setTitleDrawerOpen(true)}
+                      {nameInvalid && nameError && (
+                        <p
+                          className="text-xs mt-0.5"
+                          style={{ color: "#f87171" }}
                         >
-                          Change title flair
-                        </Button>
-                      </Stack>
-                    </Box>
-                    <Button
-                      colorPalette="orange"
-                      onClick={saveProfileChanges}
-                      loading={saving}
+                          {nameError}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label
+                        className="text-xs font-medium block mb-1"
+                        style={{ color: "var(--v2-muted)" }}
+                      >
+                        Gravatar email
+                      </label>
+                      {gravEmailEditing ? (
+                        <input
+                          type="email"
+                          value={gravEmailDraft}
+                          onChange={(e) => setGravEmailDraft(e.target.value)}
+                          placeholder="you@example.com"
+                          autoFocus
+                          className="w-full rounded px-3 py-1.5 text-sm border outline-none transition-colors"
+                          style={{
+                            background: "var(--v2-hover)",
+                            borderColor: "var(--v2-border)",
+                            color: "var(--v2-text)",
+                          }}
+                          onFocus={(e) => (e.currentTarget.style.borderColor = "var(--v2-accent)")}
+                          onBlur={(e) => (e.currentTarget.style.borderColor = "var(--v2-border)")}
+                          onKeyDown={(e) => { if (e.key === "Escape") { setGravEmailDraft(profile?.gravEmail || ""); setGravEmailEditing(false); } }}
+                        />
+                      ) : (
+                        <div
+                          className="flex items-center justify-between gap-2 rounded px-3 py-1.5 border cursor-pointer"
+                          style={{ background: "var(--v2-hover)", borderColor: "var(--v2-border)" }}
+                          onClick={() => setGravEmailEditing(true)}
+                        >
+                          <span className="text-sm" style={{ color: profile?.gravEmail ? "var(--v2-text)" : "var(--v2-muted)" }}>
+                            {profile?.gravEmail ? "••••••••••••" : "Not set"}
+                          </span>
+                          <span className="text-xs shrink-0" style={{ color: "var(--v2-muted)" }}>Edit</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {titles.length > 0 && (
+                      <div>
+                        <label
+                          className="text-xs font-medium block mb-1"
+                          style={{ color: "var(--v2-muted)" }}
+                        >
+                          Title flair
+                        </label>
+                        <div className="flex items-center gap-2">
+                          {pendingTitle?.title ? (
+                            <UserTitle title={pendingTitle} size="sm" />
+                          ) : (
+                            <span
+                              className="text-xs"
+                              style={{ color: "var(--v2-muted)" }}
+                            >
+                              None
+                            </span>
+                          )}
+                          <button
+                            onClick={() => setTitlePickerOpen((p) => !p)}
+                            className="text-xs px-2 py-0.5 rounded border transition-colors"
+                            style={{
+                              borderColor: "var(--v2-border)",
+                              color: "var(--v2-muted)",
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background =
+                                "var(--v2-hover)")
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.background = "transparent")
+                            }
+                          >
+                            Change
+                          </button>
+                        </div>
+                        {titlePickerOpen && (
+                          <div
+                            className="mt-2 rounded border p-2 space-y-1 max-h-40 overflow-y-auto"
+                            style={{
+                              background: "var(--v2-hover)",
+                              borderColor: "var(--v2-border)",
+                            }}
+                          >
+                            {titles.map((t) => (
+                              <button
+                                key={t.title}
+                                onClick={() => {
+                                  setPendingTitle(t);
+                                  setTitlePickerOpen(false);
+                                }}
+                                className="w-full text-left px-2 py-1 rounded text-xs transition-colors"
+                                style={{
+                                  background:
+                                    pendingTitle?.title === t.title
+                                      ? t.bgColor
+                                      : "transparent",
+                                  color:
+                                    pendingTitle?.title === t.title
+                                      ? t.color
+                                      : "var(--v2-text)",
+                                  border: `1 px solid ${
+                                    pendingTitle?.title === t.title
+                                      ? t.color
+                                      : "var(--v2-text)"
+                                  }`,
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (pendingTitle?.title !== t.title)
+                                    (
+                                      e.currentTarget as HTMLElement
+                                    ).style.background = "var(--v2-surface)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (pendingTitle?.title !== t.title)
+                                    (
+                                      e.currentTarget as HTMLElement
+                                    ).style.background = "transparent";
+                                }}
+                              >
+                                <UserTitle title={t} size="sm" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {saveError && (
+                      <p className="text-xs" style={{ color: "#f87171" }}>
+                        {saveError}
+                      </p>
+                    )}
+
+                    <button
+                      onClick={() => void saveProfile()}
+                      disabled={saving || nameInvalid}
+                      className="flex items-center gap-1.5 w-full justify-center py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      style={{
+                        background: "var(--v2-accent)",
+                        color: "var(--v2-accent-fg)",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!saving)
+                          (e.currentTarget as HTMLElement).style.background =
+                            "var(--v2-accent-hover)";
+                      }}
+                      onMouseLeave={(e) =>
+                        ((e.currentTarget as HTMLElement).style.background =
+                          "var(--v2-accent)")
+                      }
                     >
-                      <Flex align="center" gap="2">
-                        <Save size={16} />
-                        <span>Save profile</span>
-                      </Flex>
-                    </Button>
-                  </Stack>
-                ) : null}
-              </Flex>
-              <SimpleGrid columns={{ base: 1, md: 4 }} gap={4}>
+                      <Save size={13} />
+                      {saving ? "Saving…" : "Save profile"}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard label="Total games" value={winStats.totalGames} />
                 <StatCard label="Wins" value={winStats.totalWins} />
                 <StatCard label="Losses" value={winStats.totalLosses} />
                 <StatCard label="Win rate" value={`${winStats.winRate}%`} />
-              </SimpleGrid>
-            </Stack>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm py-4" style={{ color: "var(--v2-muted)" }}>
+              Profile unavailable.
+            </p>
           )}
-        </CardBody>
-      </CardRoot>
+        </div>
 
-      <CardRoot bg="gray.900" borderWidth="1px" borderColor="gray.700">
-        <CardHeader>
-          <Flex justify="space-between" align="center">
-            <Heading size="md">Character usage</Heading>
-            <IconButton
-              aria-label="Toggle character usage"
-              variant="ghost"
-              color="gray.400"
-              size="sm"
-              onClick={charDisclosure.onToggle}
+        {/* Character usage */}
+        <div
+          className="rounded-lg border"
+          style={{
+            background: "var(--v2-surface)",
+            borderColor: "var(--v2-border)",
+          }}
+        >
+          <button
+            onClick={() => setCharOpen((p) => !p)}
+            className="w-full flex items-center justify-between px-5 py-3 text-left"
+          >
+            <span
+              className="text-sm font-semibold"
+              style={{ color: "var(--v2-text)" }}
             >
-              {charDisclosure.open ? (
-                <ChevronUp size={16} />
-              ) : (
-                <ChevronDown size={16} />
-              )}
-            </IconButton>
-          </Flex>
-        </CardHeader>
-        {charDisclosure.open && (
-          <CardBody>
-            {characterEntries.length === 0 ? (
-              <Text fontSize="sm" color="gray.500">
-                No character data available yet.
-              </Text>
+              Character usage
+            </span>
+            {charOpen ? (
+              <ChevronUp size={14} style={{ color: "var(--v2-muted)" }} />
             ) : (
-              <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={4}>
-                {characterEntries.map(([name, stats]) => (
-                  <CharacterSuperArtDonut
-                    key={name}
-                    name={name}
-                    stats={stats}
-                    colors={superArtColors}
-                  />
-                ))}
-              </SimpleGrid>
+              <ChevronDown size={14} style={{ color: "var(--v2-muted)" }} />
             )}
-          </CardBody>
-        )}
-      </CardRoot>
-
-      <CardRoot bg="gray.900" borderWidth="1px" borderColor="gray.700">
-        <CardHeader>
-          <Flex justify="space-between" align="center">
-            <Heading size="md">Recent matches</Heading>
-            <Flex gap={2} align="center">
-              {matchesDisclosure.open ? (
+          </button>
+          {charOpen && (
+            <div className="px-5 pb-5">
+              {characterEntries.length === 0 ? (
+                <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+                  No character data available yet.
+                </p>
+              ) : (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fetchMatches("prev")}
-                    disabled={!matchCursor.first || matchesLoading}
-                  >
-                    Newer
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => fetchMatches("next")}
-                    disabled={!matchCursor.last || matchesLoading}
-                  >
-                    Older
-                  </Button>
+                  {/* SA legend */}
+                  <div className="flex gap-4 mb-4">
+                    {(["SA1", "SA2", "SA3"] as const).map((sa, i) => (
+                      <div key={sa} className="flex items-center gap-1.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ background: SA_COLORS[i] }}
+                        />
+                        <span
+                          className="text-xs"
+                          style={{ color: "var(--v2-muted)" }}
+                        >
+                          {sa}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {characterEntries.map(([name, stats]) => (
+                      <CharSADonut key={name} name={name} stats={stats} />
+                    ))}
+                  </div>
                 </>
-              ) : null}
+              )}
+            </div>
+          )}
+        </div>
 
-              <IconButton
-                aria-label="Toggle recent matches"
-                variant="ghost"
-                size="sm"
-                color="gray.400"
-                onClick={matchesDisclosure.onToggle}
-              >
-                {matchesDisclosure.open ? (
-                  <ChevronUp size={16} />
-                ) : (
-                  <ChevronDown size={16} />
-                )}
-              </IconButton>
-            </Flex>
-          </Flex>
-        </CardHeader>
-        {matchesDisclosure.open && (
-          <CardBody>
-            {matchesLoading ? (
-              <Flex justify="center" padding="8">
-                <Spinner />
-              </Flex>
-            ) : matches.length === 0 ? (
-              <Text fontSize="sm" color="gray.500">
-                No matches recorded yet.
-              </Text>
-            ) : (
-              <Stack gap={3}>
-                {matches.map((match, index) => {
+        {/* Recent matches */}
+        <div
+          className="rounded-lg border"
+          style={{
+            background: "var(--v2-surface)",
+            borderColor: "var(--v2-border)",
+          }}
+        >
+          <div
+            className="flex items-center justify-between px-5 py-3 border-b"
+            style={{ borderColor: "var(--v2-border)" }}
+          >
+            <button
+              onClick={() => setMatchesOpen((p) => !p)}
+              className="flex items-center gap-2 text-sm font-semibold flex-1 text-left"
+              style={{ color: "var(--v2-text)" }}
+            >
+              Recent matches
+              {matchesOpen ? (
+                <ChevronUp size={14} style={{ color: "var(--v2-muted)" }} />
+              ) : (
+                <ChevronDown size={14} style={{ color: "var(--v2-muted)" }} />
+              )}
+            </button>
+            {matchesOpen && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    void fetchMatches(
+                      "prev",
+                      matchCursor.last,
+                      matchCursor.first,
+                    )
+                  }
+                  disabled={!matchCursor.first || matchesLoading}
+                  className="text-xs px-2 py-1 rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    borderColor: "var(--v2-border)",
+                    color: "var(--v2-muted)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!matchesLoading && matchCursor.first)
+                      (e.currentTarget as HTMLElement).style.background =
+                        "var(--v2-hover)";
+                  }}
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLElement).style.background =
+                      "transparent")
+                  }
+                >
+                  Newer
+                </button>
+                <button
+                  onClick={() =>
+                    void fetchMatches(
+                      "next",
+                      matchCursor.last,
+                      matchCursor.first,
+                    )
+                  }
+                  disabled={!matchCursor.last || matchesLoading}
+                  className="text-xs px-2 py-1 rounded border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    borderColor: "var(--v2-border)",
+                    color: "var(--v2-muted)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!matchesLoading && matchCursor.last)
+                      (e.currentTarget as HTMLElement).style.background =
+                        "var(--v2-hover)";
+                  }}
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLElement).style.background =
+                      "transparent")
+                  }
+                >
+                  Older
+                </button>
+              </div>
+            )}
+          </div>
+          {matchesOpen && (
+            <div className="p-4 space-y-2">
+              {SHOW_POSITION_REPLAY_PROTOTYPE && replayFrames && replayFrames.length > 0 && (
+                <div
+                  className="rounded border p-2 space-y-1"
+                  style={{ borderColor: "var(--v2-border)" }}
+                >
+                  <p className="text-xs font-medium" style={{ color: "var(--v2-muted)" }}>Last game — position replay</p>
+                  <MatchReplay frames={replayFrames} />
+                </div>
+              )}
+              {matchesLoading ? (
+                <div className="flex justify-center py-4">
+                  <div
+                    className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+                    style={{
+                      borderColor: "var(--v2-accent)",
+                      borderTopColor: "transparent",
+                    }}
+                  />
+                </div>
+              ) : matches.length === 0 ? (
+                <p
+                  className="text-xs py-2"
+                  style={{ color: "var(--v2-muted)" }}
+                >
+                  No matches recorded yet.
+                </p>
+              ) : (
+                matches.map((match, i) => {
+                  const matchKey = match.sessionId || match.id || `${i}`;
                   const date = match.timestamp
                     ? new Date(match.timestamp).toLocaleString()
-                    : "Unknown date";
+                    : "Unknown";
+                  const isExpanded = expandedMatchId === matchKey;
+                  const isFetching = fetchingMatchId === matchKey;
+                  const detail = matchDetailCache[matchKey];
                   return (
-                    <Box
-                      key={match.id ?? `${match.sessionId}-${index}`}
-                      borderWidth="1px"
-                      borderColor="gray.800"
-                      borderRadius="lg"
-                      padding="4"
+                    <div
+                      key={match.id ?? `${match.sessionId}-${i}`}
+                      className="rounded border overflow-hidden"
+                      style={{ borderColor: "var(--v2-border)" }}
                     >
-                      <Flex justify="space-between" align="center" mb="2">
-                        <Heading size="sm">
-                          Session {match.sessionId || "unknown"}
-                        </Heading>
-                        <Text fontSize="xs" color="gray.500">
-                          {date}
-                        </Text>
-                      </Flex>
-                      <Flex justify="space-between" align="center">
-                        <Stack gap={1}>
-                          <Text fontWeight="semibold">
-                            {match.player1Name || "Player 1"}
-                          </Text>
-                          <Text fontSize="xs" color="gray.500">
-                            Wins: {match.p1Wins ?? 0}
-                          </Text>
-                        </Stack>
-                        <Text fontSize="sm" color="gray.400">
-                          vs
-                        </Text>
-                        <Stack gap={1} textAlign="right">
-                          <Text fontWeight="semibold">
-                            {match.player2Name || "Player 2"}
-                          </Text>
-                          <Text fontSize="xs" color="gray.500">
-                            Wins: {match.p2Wins ?? 0}
-                          </Text>
-                        </Stack>
-                      </Flex>
-                    </Box>
+                      <button
+                        className="w-full text-left p-3 transition-colors"
+                        style={{ background: "transparent" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--v2-hover)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        onClick={() => void toggleMatchExpand(matchKey)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs" style={{ color: "var(--v2-muted)" }}>{date}</span>
+                          {isExpanded
+                            ? <ChevronUp size={12} style={{ color: "var(--v2-muted)" }} />
+                            : <ChevronDown size={12} style={{ color: "var(--v2-muted)" }} />
+                          }
+                        </div>
+                        <div className="flex items-center">
+                          <div className="flex-1">
+                            {match.player1Uid && onNavigateToProfile ? (
+                              <button
+                                className="text-sm font-semibold text-left hover:underline"
+                                style={{ color: "var(--v2-accent)" }}
+                                onClick={(e) => { e.stopPropagation(); onNavigateToProfile(match.player1Uid!); }}
+                              >
+                                {match.player1Name || "Player 1"}
+                              </button>
+                            ) : (
+                              <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
+                                {match.player1Name || "Player 1"}
+                              </p>
+                            )}
+                            {(() => {
+                              const chars = (match.player1Chars?.length
+                                ? match.player1Chars
+                                : match.player1Char
+                                  ? [{ char: match.player1Char, super: match.player1Super }]
+                                  : []
+                              ).filter((c) => c.char);
+                              if (!chars.length) return null;
+                              const first = chars[0];
+                              const rest = chars.slice(1);
+                              return (
+                                <p className="text-xs flex items-center gap-1.5" style={{ color: "var(--v2-accent)" }}>
+                                  {first.char}{first.super != null ? ` SA${first.super + 1}` : ""}
+                                  {rest.length > 0 && (
+                                    <span
+                                      className="text-xs px-1 py-0.5 rounded border"
+                                      style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)", cursor: "default" }}
+                                      title={rest.map((c) => `${c.char}${c.super != null ? ` SA${c.super + 1}` : ""}`).join(", ")}
+                                    >
+                                      +{rest.length}
+                                    </span>
+                                  )}
+                                </p>
+                              );
+                            })()}
+                            <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+                              Wins: {match.p1Wins ?? 0}
+                            </p>
+                          </div>
+                          <span className="w-8 text-center text-xs shrink-0" style={{ color: "var(--v2-muted)" }}>
+                            vs
+                          </span>
+                          <div className="flex-1 text-right">
+                            {match.player2Uid && onNavigateToProfile ? (
+                              <button
+                                className="text-sm font-semibold w-full text-right hover:underline"
+                                style={{ color: "var(--v2-accent)" }}
+                                onClick={(e) => { e.stopPropagation(); onNavigateToProfile(match.player2Uid!); }}
+                              >
+                                {match.player2Name || "Player 2"}
+                              </button>
+                            ) : (
+                              <p className="text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
+                                {match.player2Name || "Player 2"}
+                              </p>
+                            )}
+                            {(() => {
+                              const chars = (match.player2Chars?.length
+                                ? match.player2Chars
+                                : match.player2Char
+                                  ? [{ char: match.player2Char, super: match.player2Super }]
+                                  : []
+                              ).filter((c) => c.char);
+                              if (!chars.length) return null;
+                              const first = chars[0];
+                              const rest = chars.slice(1);
+                              return (
+                                <p className="text-xs flex items-center gap-1.5 justify-end" style={{ color: "var(--v2-accent)" }}>
+                                  {first.char}{first.super != null ? ` SA${first.super + 1}` : ""}
+                                  {rest.length > 0 && (
+                                    <span
+                                      className="text-xs px-1 py-0.5 rounded border"
+                                      style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)", cursor: "default" }}
+                                      title={rest.map((c) => `${c.char}${c.super != null ? ` SA${c.super + 1}` : ""}`).join(", ")}
+                                    >
+                                      +{rest.length}
+                                    </span>
+                                  )}
+                                </p>
+                              );
+                            })()}
+                            <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+                              Wins: {match.p2Wins ?? 0}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                      {isExpanded && (
+                        <div
+                          className="border-t px-3 py-3 space-y-2"
+                          style={{ borderColor: "var(--v2-border)", background: "var(--v2-hover)" }}
+                        >
+                          <p className="text-xs font-medium" style={{ color: "var(--v2-muted)" }}>
+                            Session {match.sessionId || "unknown"}
+                          </p>
+                          {isFetching ? (
+                            <div className="flex justify-center py-3">
+                              <div
+                                className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+                                style={{ borderColor: "var(--v2-accent)", borderTopColor: "transparent" }}
+                              />
+                            </div>
+                          ) : detail ? (
+                            <>
+                              {Array.isArray(detail.matches) && detail.matches.map((m: GlobalSetMatchEntry, i: number) => {
+                                let parsed: any = null;
+                                try { parsed = JSON.parse(m.matchData?.raw ?? ""); } catch { /* unparseable */ }
+                                const toArr = (v: any): number[] =>
+                                  Array.isArray(v) ? v : typeof v === "number" ? [v] : [];
+                                const p1Meter = toArr(parsed?.["p1-meter-gained"]);
+                                const p2Meter = toArr(parsed?.["p2-meter-gained"]);
+                                const p1Wins = m.result === "1";
+                                const p1Super = m.player1Super != null ? ` SA${m.player1Super + 1}` : "";
+                                const p2Super = m.player2Super != null ? ` SA${m.player2Super + 1}` : "";
+                                const p1Knockdowns = parsed?.["p1-knockdowns"] ?? null;
+                                const p2Knockdowns = parsed?.["p2-knockdowns"] ?? null;
+                                const p1FastWakeups = parsed?.["p1-fast-wakeups"] ?? null;
+                                const p2FastWakeups = parsed?.["p2-fast-wakeups"] ?? null;
+                                const p1Parries = parsed?.["p1-parries"] ?? null;
+                                const p2Parries = parsed?.["p2-parries"] ?? null;
+                                const p1Throws = parsed?.["p1-throws"] ?? null;
+                                const p2Throws = parsed?.["p2-throws"] ?? null;
+                                const p1SupersUsed = parsed?.["p1-supers-used"] ?? null;
+                                const p2SupersUsed = parsed?.["p2-supers-used"] ?? null;
+                                const p1ThrowTechs = parsed?.["p1-throw-techs"] ?? null;
+                                const p2ThrowTechs = parsed?.["p2-throw-techs"] ?? null;
+                                const p1ThrowWhiffs = parsed?.["p1-throw-whiffs"] ?? null;
+                                const p2ThrowWhiffs = parsed?.["p2-throw-whiffs"] ?? null;
+                                const hasKdData = p1Knockdowns !== null || p2Knockdowns !== null;
+                                const hasFwData = p1FastWakeups !== null || p2FastWakeups !== null;
+                                const hasParryData = p1Parries !== null || p2Parries !== null;
+                                const hasThrowData = p1Throws !== null || p2Throws !== null;
+                                const hasSuperData = p1SupersUsed !== null || p2SupersUsed !== null;
+                                const hasTechData = p1ThrowTechs !== null || p2ThrowTechs !== null;
+                                const hasWhiffData = p1ThrowWhiffs !== null || p2ThrowWhiffs !== null;
+                                return (
+                                  <div
+                                    key={i}
+                                    className="rounded border p-2 space-y-1"
+                                    style={{ borderColor: "var(--v2-border)" }}
+                                  >
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span style={{ color: "var(--v2-muted)" }}>Game {i + 1}</span>
+                                      <div className="flex items-center gap-3">
+                                        <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>
+                                          {m.player1Char || "?"}{p1Super}
+                                        </span>
+                                        <span style={{ color: "var(--v2-muted)" }}>vs</span>
+                                        <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>
+                                          {m.player2Char || "?"}{p2Super}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    {(p1Meter.length >= 2 || p2Meter.length >= 2) && (
+                                      <div>
+                                        <p className="text-xs mb-0.5" style={{ color: "var(--v2-muted)" }}>Meter build</p>
+                                        <MeterChart
+                                          p1Samples={p1Meter}
+                                          p2Samples={p2Meter}
+                                          p1Color={p1Wins ? "var(--v2-accent)" : "var(--v2-muted)"}
+                                          p2Color={!p1Wins ? "var(--v2-accent)" : "var(--v2-muted)"}
+                                        />
+                                        <div className="flex gap-3 mt-0.5">
+                                          <span className="text-xs flex items-center gap-1">
+                                            <span className="inline-block w-2 h-0.5 rounded" style={{ background: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }} />
+                                            <span style={{ color: "var(--v2-muted)" }}>{detail.player1Name || "P1"} ({parsed?.["p1-total-meter-gained"] ?? "—"})</span>
+                                          </span>
+                                          <span className="text-xs flex items-center gap-1">
+                                            <span className="inline-block w-2 h-0.5 rounded" style={{ background: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }} />
+                                            <span style={{ color: "var(--v2-muted)" }}>{detail.player2Name || "P2"} ({parsed?.["p2-total-meter-gained"] ?? "—"})</span>
+                                          </span>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {(hasKdData || hasFwData) && (
+                                      <div
+                                        className="grid grid-cols-2 gap-x-4 gap-y-0.5 pt-1 mt-1 border-t text-xs"
+                                        style={{ borderColor: "var(--v2-border)" }}
+                                      >
+                                        {hasKdData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>
+                                              Times knocked down
+                                            </span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1Knockdowns ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2Knockdowns ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasFwData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>
+                                              Quick rises
+                                            </span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1FastWakeups ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2FastWakeups ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasParryData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Parries</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1Parries ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2Parries ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasThrowData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Throws</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1Throws ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2Throws ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasWhiffData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Throw whiffs</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1ThrowWhiffs ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2ThrowWhiffs ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasTechData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Throw techs</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1ThrowTechs ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2ThrowTechs ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                        {hasSuperData && (
+                                          <>
+                                            <span style={{ color: "var(--v2-muted)" }}>Supers used</span>
+                                            <span className="text-right" style={{ color: "var(--v2-muted)" }}>
+                                              <span style={{ color: p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p1SupersUsed ?? "—"}</span>
+                                              <span className="mx-1">·</span>
+                                              <span style={{ color: !p1Wins ? "var(--v2-accent)" : "var(--v2-muted)" }}>{p2SupersUsed ?? "—"}</span>
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                              <pre
+                                className="text-xs overflow-auto max-h-64 whitespace-pre-wrap break-all"
+                                style={{ color: "var(--v2-text)" }}
+                              >
+                                {JSON.stringify(detail, null, 2)}
+                              </pre>
+                            </>
+                          ) : (
+                            <p className="text-xs" style={{ color: "var(--v2-muted)" }}>No data available.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   );
-                })}
-              </Stack>
-            )}
-          </CardBody>
-        )}
-      </CardRoot>
-
-      <DrawerRoot
-        open={isTitleDrawerOpen}
-        onOpenChange={(detail) => setTitleDrawerOpen(detail.open)}
-      >
-        <DrawerContent maxW="md">
-          <DrawerCloseTrigger />
-          <DrawerHeader>
-            <Stack gap={1}>
-              <Heading size="md">Choose your title flair</Heading>
-              <Text fontSize="sm" color="gray.400">
-                Select a flair to preview it. Remember to save your profile to
-                apply changes.
-              </Text>
-            </Stack>
-          </DrawerHeader>
-          <DrawerBody>
-            {titleOptions.length ? (
-              <Stack gap={3}>
-                {titleOptions.map((option) => {
-                  const isSelected = pendingTitle === option.value;
-                  return (
-                    <SelectableFlairButton
-                      key={option.value}
-                      flair={option.data}
-                      label={option.data?.title}
-                      isActive={isSelected}
-                      onClick={() => setPendingTitle(option.value)}
-                    />
-                  );
-                })}
-              </Stack>
-            ) : (
-              <Text fontSize="sm" color="gray.500">
-                No titles available yet.
-              </Text>
-            )}
-          </DrawerBody>
-          <DrawerFooter justifyContent="flex-end" gap="3">
-            <Button variant="ghost" onClick={() => setTitleDrawerOpen(false)}>
-              Close
-            </Button>
-            <Button
-              colorPalette="orange"
-              onClick={() => setTitleDrawerOpen(false)}
-            >
-              Use selected flair
-            </Button>
-          </DrawerFooter>
-        </DrawerContent>
-      </DrawerRoot>
-    </Stack>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="gray.800"
-      borderRadius="lg"
-      padding="4"
-      bg="gray.900"
-    >
-      <Text fontSize="sm" color="gray.500">
-        {label}
-      </Text>
-      <Heading size="md">{value}</Heading>
-    </Box>
+                })
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

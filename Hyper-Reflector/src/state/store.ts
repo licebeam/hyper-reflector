@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import type { TUser } from '../types/user'
-import type { MatchSummary } from '../types/match'
+
+type TUser = Record<string, any>
+type MatchSummary = Record<string, any>
 
 export const DEFAULT_LOBBY_ID = 'Hyper Reflector'
 
@@ -10,6 +11,7 @@ export type LobbySummary = {
     users: number
     pass?: string
     isPrivate?: boolean
+    gameName?: string
 }
 
 const MAX_CHAT_MESSAGES = 50
@@ -33,15 +35,20 @@ type SettingsState = {
     setWinSoundPath: (path: string) => void
     notificationsMuted: boolean
     setNotificationsMuted: (on: boolean) => void
-    darkMode: boolean
-    setDarkMode: (on: boolean) => void
-    theme: { colorPalette: string, name: string }
-    setTheme: (t: { colorPalette: string, name: string }) => void
     emulatorPath: string
     setEmulatorPath: (path: string) => void
     trainingPath: string
     trainingPathSource: TrainingPathSource
     setTrainingPath: (path: string, source?: TrainingPathSource) => void
+    // Per-game Lua script paths for the Lab page
+    luaScripts: Record<string, string>
+    luaScriptSources: Record<string, TrainingPathSource>
+    setLuaScriptForGame: (rom: string, path: string, source?: TrainingPathSource) => void
+    // Last selected game in Lab page
+    labSelectedGame: string
+    setLabSelectedGame: (rom: string) => void
+    labMusicMuted: boolean
+    setLabMusicMuted: (muted: boolean) => void
     appLanguage: string
     setAppLanguage: (code: string) => void
     mutedUsers: string[]
@@ -49,6 +56,10 @@ type SettingsState = {
     isUserMuted: (uid: string) => boolean
     romPath: string
     setRomPath: (path: string) => void
+    rankQueueGame: string
+    setRankQueueGame: (rom: string) => void
+    isAfkPref: boolean
+    setIsAfkPref: (v: boolean) => void
 }
 
 type SignalStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -156,13 +167,20 @@ export const useSettingsStore = create<SettingsState>()(
             setNotificationsMuted: (on) => set({ notificationsMuted: on }),
             emulatorPath: '',
             setEmulatorPath: (path) => set({ emulatorPath: path }),
-            darkMode: true,
-            setDarkMode: (on) => set({ darkMode: on }),
-            theme: { colorPalette: 'orange', name: 'Orange Soda' },
-            setTheme: (t) => set({ theme: t }),
             trainingPath: '',
             trainingPathSource: 'auto',
             setTrainingPath: (path, source = 'auto') => set({ trainingPath: path, trainingPathSource: source }),
+            luaScripts: {},
+            luaScriptSources: {},
+            setLuaScriptForGame: (rom, path, source = 'auto') =>
+                set((s) => ({
+                    luaScripts: { ...s.luaScripts, [rom]: path },
+                    luaScriptSources: { ...s.luaScriptSources, [rom]: source },
+                })),
+            labSelectedGame: 'sfiii3nr1',
+            setLabSelectedGame: (rom) => set({ labSelectedGame: rom }),
+            labMusicMuted: false,
+            setLabMusicMuted: (muted) => set({ labMusicMuted: muted }),
             appLanguage: 'en',
             setAppLanguage: (code) => set({ appLanguage: code }),
             mutedUsers: [],
@@ -182,13 +200,18 @@ export const useSettingsStore = create<SettingsState>()(
             },
             romPath: '',
             setRomPath: (path) => set({ romPath: path }),
+            rankQueueGame: 'sfiii3nr1',
+            setRankQueueGame: (rom) => set({ rankQueueGame: rom }),
+            isAfkPref: false,
+            setIsAfkPref: (v) => set({ isAfkPref: v }),
         }),
         {
             name: 'settings',
             storage: createJSONStorage(() => localStorage),
-            // optional: only persist selected fields
-            // partialize: (s) => ({ theme: s.theme }),
+            merge: (persistedState, currentState) => ({
+                ...currentState,
+                ...(persistedState as Partial<SettingsState> | undefined),
+            }),
         }
     )
 )
-

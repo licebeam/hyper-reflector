@@ -1,547 +1,706 @@
-import { useNavigate } from '@tanstack/react-router'
-import { useTranslation } from 'react-i18next'
+// TODO: add ranked queue settings, IE: region or ping / elo limits for fine grain control
+import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
-    Stack,
-    Button,
-    Switch,
-    Card,
-    Select,
-    Portal,
-    createListCollection,
-    Box,
-    IconButton,
-    Text,
-} from '@chakra-ui/react'
-import { logout } from '../utils/firebase'
-import { useColorMode } from '../components/chakra/ui/color-mode'
-import { open } from '@tauri-apps/plugin-dialog'
-import { invoke } from '@tauri-apps/api/core'
-import { useSettingsStore } from '../state/store'
-import { Check, Moon, Play, Square, Sun, Volume2, VolumeX, X, LogOut } from 'lucide-react'
-import { toaster } from '../components/chakra/ui/toaster'
-import { useTauriSoundPlayer } from '../utils/useTauriSoundPlayer'
-import { applyRomPath, formatRomPathDisplay } from '../utils/romPaths'
+  LogOut,
+  Play,
+  Square,
+  FolderOpen,
+  Volume2,
+  VolumeOff,
+} from "lucide-react";
+import { logout } from "../utils/firebase";
+import { useSettingsStore } from "../state/store";
+import { useV2Theme } from "../ThemeContext";
+import { applyRomPath, formatRomPathDisplay } from "../utils/romPaths";
+import {
+  THEMES,
+  CHAT_MSG_SWATCHES,
+  NAME_SELF_SWATCHES,
+  NAME_OTHER_SWATCHES,
+} from "../theme";
+import { GAMES } from "../games";
 
-const MARGIN_SECTION = '12px'
+type SettingsPageProps = {
+  onLogout: () => void;
+};
 
-export default function SettingsPage() {
-    const { i18n, t } = useTranslation()
-    const navigate = useNavigate()
-    const { toggleColorMode } = useColorMode()
-    const ggpoDelay = useSettingsStore((s) => s.ggpoDelay)
-    const setGgpoDelay = useSettingsStore((s) => s.setGgpoDelay)
-    const notifChallengeSound = useSettingsStore((s) => s.notifChallengeSound)
-    const setNotifChallengeSound = useSettingsStore((s) => s.setNotifChallengeSound)
-    const notifChallengeSoundPath = useSettingsStore((s) => s.notifChallengeSoundPath)
-    const setNotifChallengeSoundPath = useSettingsStore((s) => s.setNotifChallengeSoundPath)
-    const notifiAtSound = useSettingsStore((s) => s.notifiAtSound)
-    const setNotifAtSound = useSettingsStore((s) => s.setNotifAtSound)
-    const notifAtSoundPath = useSettingsStore((s) => s.notifAtSoundPath)
-    const setNotifAtSoundPath = useSettingsStore((s) => s.setNotifAtSoundPath)
-    const winSound = useSettingsStore((s) => s.winSound)
-    const setWinSound = useSettingsStore((s) => s.setWinSound)
-    const winSoundPath = useSettingsStore((s) => s.winSoundPath)
-    const setWinSoundPath = useSettingsStore((s) => s.setWinSoundPath)
-    const darkMode = useSettingsStore((s) => s.darkMode)
-    const setDarkMode = useSettingsStore((s) => s.setDarkMode)
-    const theme = useSettingsStore((s) => s.theme)
-    const setTheme = useSettingsStore((s) => s.setTheme)
-    const setEmulatorPath = useSettingsStore((s) => s.setEmulatorPath)
-    const emulatorPath = useSettingsStore((s) => s.emulatorPath)
-    const setAppLanguage = useSettingsStore((s) => s.setAppLanguage)
-    const appLanguage = useSettingsStore((s) => s.appLanguage)
-    const romPath = useSettingsStore((s) => s.romPath)
-    const setRomPath = useSettingsStore((s) => s.setRomPath)
-    const { playSound: playSoundFile } = useTauriSoundPlayer()
+const DELAYS = ["0", "1", "2", "3", "4", "5", "6", "7"];
+const LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "ja", label: "日本語" },
+];
 
-    const themes = createListCollection({
-        items: [
-            {
-                label: 'Orange Soda',
-                value: 'Orange Soda',
-                data: { colorPalette: 'orange', name: 'Orange Soda' },
-            },
-            {
-                label: 'Grape Soda',
-                value: 'Grape Soda',
-                data: { colorPalette: 'purple', name: 'Grape Soda' },
-            },
-        ],
-    })
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
-    const delays = createListCollection({
-        items: [
-            { label: '0', value: '0' },
-            { label: '1', value: '1' },
-            { label: '2', value: '2' },
-            { label: '3', value: '3' },
-            { label: '4', value: '4' },
-            { label: '5', value: '5' },
-            { label: '6', value: '6' },
-            { label: '7', value: '7' },
-        ],
-    })
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className="rounded-lg overflow-hidden border"
+      style={{ borderColor: "var(--v2-border)" }}
+    >
+      <div
+        className="px-4 py-3 border-b"
+        style={{
+          borderColor: "var(--v2-border)",
+          background: "var(--v2-surface)",
+        }}
+      >
+        <h2
+          className="text-xs font-semibold uppercase tracking-wide"
+          style={{ color: "var(--v2-muted)" }}
+        >
+          {title}
+        </h2>
+      </div>
+      <div
+        className="px-4 py-3 space-y-3"
+        style={{ background: "var(--v2-surface)" }}
+      >
+        {children}
+      </div>
+    </section>
+  );
+}
 
-    const languages = createListCollection({
-        items: [
-            { label: t('Settings.Language.en'), value: 'en' },
-            { label: t('Settings.Language.ja'), value: 'ja' },
-        ],
-    })
+function Row({
+  label,
+  sub,
+  children,
+}: {
+  label: string;
+  sub?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-1">
+      <div>
+        <p className="text-sm" style={{ color: "var(--v2-text)" }}>
+          {label}
+        </p>
+        {sub && (
+          <p className="text-xs mt-0.5" style={{ color: "var(--v2-muted)" }}>
+            {sub}
+          </p>
+        )}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
 
-    const pickSoundFile = async (type: string) => {
-        try {
-            const res = await open({
-                multiple: false,
-                directory: false,
-                title: 'Select a sound file to use',
-                filters: [{ name: 'Audio', extensions: ['mp3', 'wav'] }],
-            })
-            if (type === 'challenge') {
-                if (typeof res === 'string') {
-                    setNotifChallengeSoundPath(res)
-                }
+function Toggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <button
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="relative w-10 h-5 rounded-full transition-colors shrink-0"
+      style={{ background: checked ? "var(--v2-accent)" : "var(--v2-hover)" }}
+    >
+      <span
+        className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+        style={{ transform: checked ? "translateX(20px)" : "translateX(0)" }}
+      />
+    </button>
+  );
+}
+
+function ColorSwatch({
+  label,
+  current,
+  swatches,
+  onChange,
+}: {
+  label: string;
+  current: string;
+  swatches: string[];
+  onChange: (color: string) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-1">
+      <span className="text-sm" style={{ color: "var(--v2-text)" }}>
+        {label}
+      </span>
+      <div className="flex items-center gap-1.5">
+        {swatches.map((color) => (
+          <button
+            key={color}
+            title={color}
+            onClick={() => onChange(color)}
+            className="w-5 h-5 rounded-full transition-transform hover:scale-110"
+            style={{
+              backgroundColor: color,
+              outline:
+                current.toLowerCase() === color.toLowerCase()
+                  ? "2px solid white"
+                  : "2px solid transparent",
+              outlineOffset: "1px",
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SoundRow({
+  label,
+  enabled,
+  path,
+  onToggle,
+  onPick,
+  onPlay,
+  onStop,
+}: {
+  label: string;
+  enabled: boolean;
+  path: string;
+  onToggle: (v: boolean) => void;
+  onPick: () => void;
+  onPlay: () => void;
+  onStop: () => void;
+}) {
+  return (
+    <div className="space-y-1.5 py-1">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          {enabled ? (
+            <Volume2 size={14} style={{ color: "var(--v2-accent)" }} />
+          ) : (
+            <VolumeOff size={14} style={{ color: "var(--v2-muted)" }} />
+          )}
+          <p className="text-sm" style={{ color: "var(--v2-text)" }}>
+            {label}
+          </p>
+        </div>
+        <Toggle checked={enabled} onChange={onToggle} />
+      </div>
+      {enabled && (
+        <div className="flex items-center gap-2 pl-5">
+          <p
+            className="text-xs flex-1 font-mono truncate"
+            style={{ color: "var(--v2-muted)" }}
+          >
+            {path || "Default"}
+          </p>
+          <button
+            onClick={onPick}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors"
+            style={{
+              borderColor: "var(--v2-border)",
+              color: "var(--v2-muted)",
+              background: "var(--v2-hover)",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--v2-text)")
             }
-            if (type === 'at') {
-                if (typeof res === 'string') setNotifAtSoundPath(res)
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "var(--v2-muted)")
             }
-            if (type === 'win') {
-                if (typeof res === 'string') setWinSoundPath(res)
+          >
+            <FolderOpen size={11} /> Browse
+          </button>
+          <button
+            onClick={onPlay}
+            className="p-1.5 rounded border transition-colors"
+            style={{
+              borderColor: "var(--v2-border)",
+              color: "var(--v2-muted)",
+              background: "var(--v2-hover)",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--v2-text)")
             }
-        } catch (err: any) {
-            toaster.error({
-                title: 'Error Opening Dialog',
-                description: err,
-            })
-        }
-    }
-
-    const pickExe = async () => {
-        try {
-            const res = await open({
-                multiple: false,
-                directory: false,
-                title: 'Select Emulator Executable',
-                filters: [{ name: 'Executables', extensions: ['exe'] }],
-            })
-            if (typeof res === 'string') setEmulatorPath(res)
-        } catch (err: any) {
-            toaster.error({
-                title: 'Error Opening Dialog',
-                description: err,
-            })
-        }
-    }
-
-    const handleResetAllSettings = async () => {
-        try {
-            const storeWithPersist = useSettingsStore as typeof useSettingsStore & {
-                persist?: {
-                    clearStorage?: () => Promise<void> | void
-                }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "var(--v2-muted)")
             }
-            await storeWithPersist.persist?.clearStorage?.()
-            window.location.reload()
-        } catch (error) {
-            toaster.error({
-                title: 'Failed to reset settings',
-                description:
-                    error instanceof Error ? error.message : 'Unknown error clearing saved settings.',
-            })
-        }
-    }
-
-    const playSound = async (type: string) => {
-        if (type === 'challenge') {
-            await playSoundFile(notifChallengeSoundPath)
-        }
-        if (type === 'at') {
-            await playSoundFile(notifAtSoundPath)
-        }
-        if (type === 'win') {
-            await playSoundFile(winSoundPath)
-        }
-    }
-
-    const pickRomDirectory = async () => {
-        try {
-            const res = await open({
-                multiple: false,
-                directory: true,
-                title: 'Select ROM Directory',
-            })
-            if (typeof res === 'string') {
-                const sanitized = formatRomPathDisplay(res)
-                await applyRomPath(sanitized)
-                setRomPath(sanitized)
-                toaster.success({
-                    title: 'ROM path updated',
-                    description: sanitized,
-                })
+            title="Preview"
+          >
+            <Play size={11} />
+          </button>
+          <button
+            onClick={onStop}
+            className="p-1.5 rounded border transition-colors"
+            style={{
+              borderColor: "var(--v2-border)",
+              color: "var(--v2-muted)",
+              background: "var(--v2-hover)",
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--v2-text)")
             }
-        } catch (err: any) {
-            toaster.error({
-                title: 'Failed to update ROM path',
-                description: err instanceof Error ? err.message : String(err),
-            })
-        }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "var(--v2-muted)")
+            }
+            title="Stop"
+          >
+            <Square size={11} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
+
+export function SettingsPage({ onLogout }: SettingsPageProps) {
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const [romPathStatus, setRomPathStatus] = useState<
+    | { kind: "success"; text: string }
+    | { kind: "error"; text: string }
+    | null
+  >(null);
+
+  // ── Store reads ──────────────────────────────────────────────────────────────
+  const ggpoDelay = useSettingsStore((s) => s.ggpoDelay);
+  const setGgpoDelay = useSettingsStore((s) => s.setGgpoDelay);
+  const appLanguage = useSettingsStore((s) => s.appLanguage);
+  const setAppLanguage = useSettingsStore((s) => s.setAppLanguage);
+  const romPath = useSettingsStore((s) => s.romPath);
+  const setRomPath = useSettingsStore((s) => s.setRomPath);
+  const notifChallengeSound = useSettingsStore((s) => s.notifChallengeSound);
+  const setNotifChallengeSound = useSettingsStore(
+    (s) => s.setNotifChallengeSound,
+  );
+  const notifChallengeSoundPath = useSettingsStore(
+    (s) => s.notifChallengeSoundPath,
+  );
+  const setNotifChallengeSoundPath = useSettingsStore(
+    (s) => s.setNotifChallengeSoundPath,
+  );
+  const notifiAtSound = useSettingsStore((s) => s.notifiAtSound);
+  const setNotifAtSound = useSettingsStore((s) => s.setNotifAtSound);
+  const notifAtSoundPath = useSettingsStore((s) => s.notifAtSoundPath);
+  const setNotifAtSoundPath = useSettingsStore((s) => s.setNotifAtSoundPath);
+  const winSound = useSettingsStore((s) => s.winSound);
+  const setWinSound = useSettingsStore((s) => s.setWinSound);
+  const winSoundPath = useSettingsStore((s) => s.winSoundPath);
+  const setWinSoundPath = useSettingsStore((s) => s.setWinSoundPath);
+  const rankQueueGame = useSettingsStore((s) => s.rankQueueGame);
+  const setRankQueueGame = useSettingsStore((s) => s.setRankQueueGame);
+  const labMusicMuted = useSettingsStore((s) => s.labMusicMuted);
+  const setLabMusicMuted = useSettingsStore((s) => s.setLabMusicMuted);
+
+  const { theme, overrides, setThemeId, setOverride } = useV2Theme();
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  const handleLogout = async () => {
+    await logout();
+    onLogout();
+  };
+
+  const pickSound = async (set: (p: string) => void) => {
+    try {
+      const res = await open({
+        multiple: false,
+        directory: false,
+        title: "Select a sound file",
+        filters: [{ name: "Audio", extensions: ["mp3", "wav"] }],
+      });
+      if (typeof res === "string") set(res);
+    } catch {
+      /* dismissed */
+    }
+  };
+
+  const pickRom = async () => {
+    setRomPathStatus(null);
+    let res: unknown;
+    try {
+      res = await open({
+        multiple: false,
+        directory: true,
+        title: "Select ROM directory",
+      });
+    } catch {
+      return;
     }
 
-    const pauseSound = async () => {
-        await invoke('stop_sound')
-    }
+    if (typeof res !== "string") return;
 
-    const changeRoute = (route: string) => {
-        navigate({ to: route })
+    const sanitized = formatRomPathDisplay(res);
+    try {
+      await applyRomPath(sanitized);
+      setRomPath(sanitized);
+      setRomPathStatus({ kind: "success", text: sanitized });
+    } catch (err) {
+      setRomPathStatus({
+        kind: "error",
+        text: err instanceof Error ? err.message : String(err),
+      });
     }
+  };
 
-    async function logoutHelper() {
-        logout()
-        changeRoute('/')
+  const playSound = async (path: string) => {
+    if (!path) return;
+    try {
+      await invoke("play_sound", { path });
+    } catch {
+      /* no-op */
     }
+  };
 
-    return (
-        <Stack>
-            <Card.Root flex={'1'} overflow="hidden">
-                <Card.Body gap="2">
-                    <Card.Title>{t('Settings.GGPO.title')}</Card.Title>
-                    <Card.Description>{t('Settings.GGPO.desc')}</Card.Description>
-                    <Select.Root
-                        colorPalette={theme.colorPalette}
-                        marginTop={MARGIN_SECTION}
-                        maxW="1/2"
-                        key={'test'}
-                        variant={'outline'}
-                        collection={delays}
-                        value={[ggpoDelay]}
-                        onValueChange={(e) => setGgpoDelay(e.value[0])}
+  const stopSound = async () => {
+    try {
+      await invoke("stop_sound");
+    } catch {
+      /* no-op */
+    }
+  };
+
+  const handleReset = async () => {
+    if (!resetConfirm) {
+      setResetConfirm(true);
+      return;
+    }
+    try {
+      const store = useSettingsStore as typeof useSettingsStore & {
+        persist?: { clearStorage?: () => void };
+      };
+      await store.persist?.clearStorage?.();
+      window.location.reload();
+    } catch {
+      window.location.reload();
+    }
+  };
+
+  // ── Theme color reads ────────────────────────────────────────────────────────
+  const currentChatColor =
+    overrides["--v2-chat-msg"] ?? theme.vars["--v2-chat-msg"];
+  const currentSelfColor =
+    overrides["--v2-name-self"] ?? theme.vars["--v2-name-self"];
+  const currentOtherColor =
+    overrides["--v2-name-other"] ?? theme.vars["--v2-name-other"];
+  const currentPatternOpacity =
+    overrides["--v2-pattern-opacity"] ?? theme.vars["--v2-pattern-opacity"];
+
+  const selectStyle = {
+    background: "var(--v2-hover)",
+    borderColor: "var(--v2-border)",
+    color: "var(--v2-text)",
+  };
+
+  return (
+    <div className="h-full overflow-y-scroll">
+      <div className="max-w-lg mx-auto p-6 space-y-4">
+        {/* ── Gameplay ── */}
+        <Section title="Gameplay">
+          <Row label="GGPO Delay" sub="Frame delay for netplay (0 – 7)">
+            <select
+              value={ggpoDelay}
+              onChange={(e) => setGgpoDelay(e.target.value)}
+              className="rounded px-3 py-1.5 text-sm border outline-none"
+              style={selectStyle}
+            >
+              {DELAYS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </Row>
+        </Section>
+
+        {/* ── 3rd Strike ── */}
+        <Section title="3rd Strike">
+          <Row
+            label="Mute music"
+            sub="Silences in-game BGM (Street Fighter III: 3rd Strike) · Experimental, may cause desyncs"
+          >
+            <Toggle checked={labMusicMuted} onChange={setLabMusicMuted} />
+          </Row>
+        </Section>
+
+        {/* ── Ranked Queue ── */}
+        <Section title="Ranked Queue">
+          <Row label="Game" sub="The game you queue for in ranked search">
+            <select
+              value={rankQueueGame}
+              onChange={(e) => setRankQueueGame(e.target.value)}
+              className="rounded px-3 py-1.5 text-sm border outline-none"
+              style={selectStyle}
+            >
+              {GAMES.map((g) => (
+                <option key={g.rom} value={g.rom}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </Row>
+        </Section>
+
+        {/* ── Files ── */}
+        <Section title="Files">
+          <div className="space-y-1 py-1">
+            <p className="text-sm" style={{ color: "var(--v2-text)" }}>
+              ROM directory
+            </p>
+            <p
+              className="text-xs font-mono break-all"
+              style={{ color: "var(--v2-muted)" }}
+            >
+              {romPath || "Not set"}
+            </p>
+            {romPathStatus && (
+              <p
+                className="text-[11px] break-words"
+                style={{
+                  color:
+                    romPathStatus.kind === "success"
+                      ? "var(--v2-accent)"
+                      : "#f87171",
+                }}
+              >
+                {romPathStatus.kind === "success"
+                  ? `Updated emulator config: ${romPathStatus.text}`
+                  : romPathStatus.text}
+              </p>
+            )}
+            <button
+              onClick={pickRom}
+              className="flex items-center gap-1.5 text-xs mt-1 transition-colors"
+              style={{ color: "var(--v2-muted)" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.color = "var(--v2-text)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = "var(--v2-muted)")
+              }
+            >
+              <FolderOpen size={13} /> Browse for ROM directory…
+            </button>
+          </div>
+        </Section>
+
+        {/* ── App ── */}
+        <Section title="App">
+          <Row label="Language">
+            <select
+              value={appLanguage}
+              onChange={(e) => setAppLanguage(e.target.value)}
+              className="rounded px-3 py-1.5 text-sm border outline-none"
+              style={selectStyle}
+            >
+              {LANGUAGES.map((l) => (
+                <option key={l.value} value={l.value}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </Row>
+        </Section>
+
+        {/* ── Appearance ── */}
+        <Section title="Appearance">
+          <div className="space-y-4">
+            {/* Theme picker */}
+            <div>
+              <p className="text-sm mb-2" style={{ color: "var(--v2-text)" }}>
+                Theme
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setThemeId(t.id)}
+                    className="flex flex-col items-start p-3 rounded border text-left transition-all"
+                    style={{
+                      borderColor:
+                        theme.id === t.id
+                          ? "var(--v2-accent)"
+                          : "var(--v2-border)",
+                      background:
+                        theme.id === t.id ? "var(--v2-hover)" : "transparent",
+                    }}
+                  >
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: "var(--v2-text)" }}
                     >
-                        <Select.HiddenSelect />
-                        <Select.Label>{t('Settings.GGPO.label')}</Select.Label>
-                        <Select.Control>
-                            <Select.Trigger>
-                                <Select.ValueText placeholder={t('Settings.GGPO.placeholder')} />
-                            </Select.Trigger>
-                            <Select.IndicatorGroup>
-                                <Select.Indicator />
-                            </Select.IndicatorGroup>
-                        </Select.Control>
-                        <Portal>
-                            <Select.Positioner>
-                                <Select.Content>
-                                    {delays.items.map((d) => (
-                                        <Select.Item item={d} key={d.value}>
-                                            {d.label}
-                                            <Select.ItemIndicator />
-                                        </Select.Item>
-                                    ))}
-                                </Select.Content>
-                            </Select.Positioner>
-                        </Portal>
-                    </Select.Root>
-                </Card.Body>
-            </Card.Root>
-            <Card.Root flex={'1'} overflow="hidden">
-                <Card.Body gap="2">
-                    <Card.Title>{t('Settings.Language.title')}</Card.Title>
-                    <Select.Root
-                        colorPalette={theme.colorPalette}
-                        marginTop={MARGIN_SECTION}
-                        maxW="1/2"
-                        key={'test'}
-                        variant={'outline'}
-                        collection={languages}
-                        value={[appLanguage]}
-                        onValueChange={(e) => {
-                            setAppLanguage(e.value[0])
-                            i18n.changeLanguage(e.value[0])
-                        }}
-                    >
-                        <Select.HiddenSelect />
-                        <Select.Control>
-                            <Select.Trigger>
-                                <Select.ValueText
-                                    placeholder={t('Settings.Language.placeholder')}
-                                />
-                            </Select.Trigger>
-                            <Select.IndicatorGroup>
-                                <Select.Indicator />
-                            </Select.IndicatorGroup>
-                        </Select.Control>
-                        <Portal>
-                            <Select.Positioner>
-                                <Select.Content>
-                                    {languages.items.map((d) => (
-                                        <Select.Item item={d} key={d.value}>
-                                            {d.label}
-                                            <Select.ItemIndicator />
-                                        </Select.Item>
-                                    ))}
-                                </Select.Content>
-                            </Select.Positioner>
-                        </Portal>
-                    </Select.Root>
-                </Card.Body>
-            </Card.Root>
-            <Card.Root flex={'1'} overflow="hidden">
-                <Card.Body gap="2">
-                    <Card.Title>{t('Settings.Notification.title')}</Card.Title>
-                    <Card.Description>{t('Settings.Notification.desc')}</Card.Description>
-                    <Switch.Root
-                        colorPalette={theme.colorPalette}
-                        marginTop={MARGIN_SECTION}
-                        size="lg"
-                        checked={notifChallengeSound}
-                        onCheckedChange={(e) => setNotifChallengeSound(e.checked)}
-                    >
-                        <Switch.HiddenInput />
-                        <Switch.Control>
-                            <Switch.Thumb>
-                                <Switch.ThumbIndicator fallback={<X color="black" />}>
-                                    <Check />
-                                </Switch.ThumbIndicator>
-                            </Switch.Thumb>
-                        </Switch.Control>
-                        {notifChallengeSound ? <Volume2 /> : <VolumeX />}
-                        <Switch.Label>{t('Settings.Notification.challengeSound')}</Switch.Label>
-                    </Switch.Root>
-                    <Stack>
-                        <Text textStyle="xs">{notifChallengeSoundPath}</Text>
-                        <Box gap="2" display={'flex'}>
-                            <Button
-                                colorPalette={theme.colorPalette}
-                                maxW="1/2"
-                                onClick={() => pickSoundFile('challenge')}
-                            >
-                                {t('Settings.Notification.setCustomChallenge')}
-                            </Button>
-                            <IconButton
-                                colorPalette={theme.colorPalette}
-                                colorScheme="blue"
-                                onClick={() => {
-                                    playSound('challenge')
-                                }}
-                            >
-                                <Play />
-                            </IconButton>
-                            <IconButton
-                                colorPalette={theme.colorPalette}
-                                colorScheme="blue"
-                                onClick={() => {
-                                    pauseSound()
-                                }}
-                            >
-                                <Square />
-                            </IconButton>
-                        </Box>
-                    </Stack>
-                    <Switch.Root
-                        colorPalette={theme.colorPalette}
-                        marginTop={MARGIN_SECTION}
-                        size="lg"
-                        checked={notifiAtSound}
-                        onCheckedChange={(e) => setNotifAtSound(e.checked)}
-                    >
-                        <Switch.HiddenInput />
-                        <Switch.Control>
-                            <Switch.Thumb>
-                                <Switch.ThumbIndicator fallback={<X color="black" />}>
-                                    <Check />
-                                </Switch.ThumbIndicator>
-                            </Switch.Thumb>
-                        </Switch.Control>
-                        {notifiAtSound ? <Volume2 /> : <VolumeX />}
-                        <Switch.Label>{t('Settings.Notification.messageSound')}</Switch.Label>
-                    </Switch.Root>
-                    <Stack>
-                        <Text textStyle="xs">{notifAtSoundPath}</Text>
-                        <Box gap="2" display={'flex'}>
-                            <Button
-                                colorPalette={theme.colorPalette}
-                                maxW="1/2"
-                                onClick={() => pickSoundFile('at')}
-                            >
-                                {t('Settings.Notification.setCustomMessage')}
-                            </Button>
-                            <IconButton
-                                colorPalette={theme.colorPalette}
-                                colorScheme="blue"
-                                onClick={() => {
-                                    playSound('at')
-                                }}
-                            >
-                                <Play />
-                            </IconButton>
-                            <IconButton
-                                colorPalette={theme.colorPalette}
-                                colorScheme="blue"
-                                onClick={() => {
-                                    pauseSound()
-                                }}
-                            >
-                                <Square />
-                            </IconButton>
-                        </Box>
-                    </Stack>
-                    <Switch.Root
-                        colorPalette={theme.colorPalette}
-                        marginTop={MARGIN_SECTION}
-                        size="lg"
-                        checked={winSound}
-                        onCheckedChange={(e) => setWinSound(e.checked)}
-                    >
-                        <Switch.HiddenInput />
-                        <Switch.Control>
-                            <Switch.Thumb>
-                                <Switch.ThumbIndicator fallback={<X color="black" />}>
-                                    <Check />
-                                </Switch.ThumbIndicator>
-                            </Switch.Thumb>
-                        </Switch.Control>
-                        {winSound ? <Volume2 /> : <VolumeX />}
-                        <Switch.Label>{t('Settings.Notification.winSound')}</Switch.Label>
-                    </Switch.Root>
-                    <Stack>
-                        <Text textStyle="xs">{winSoundPath}</Text>
-                        <Box gap="2" display="flex">
-                            <Button
-                                colorPalette={theme.colorPalette}
-                                maxW="1/2"
-                                onClick={() => pickSoundFile('win')}
-                            >
-                                {t('Settings.Notification.setCustomWin')}
-                            </Button>
-                            <IconButton
-                                colorPalette={theme.colorPalette}
-                                colorScheme="blue"
-                                onClick={() => playSound('win')}
-                            >
-                                <Play />
-                            </IconButton>
-                            <IconButton
-                                colorPalette={theme.colorPalette}
-                                colorScheme="blue"
-                                onClick={() => pauseSound()}
-                            >
-                                <Square />
-                            </IconButton>
-                        </Box>
-                    </Stack>
-                </Card.Body>
-            </Card.Root>
-            <Card.Root overflow="hidden" flex={'1'}>
-                <Card.Body gap="2">
-                    <Card.Title>{t('Settings.Theme.title')}</Card.Title>
-                    <Card.Description>{t('Settings.Theme.desc')}</Card.Description>
-                    <Switch.Root
-                        colorPalette={theme.colorPalette}
-                        marginTop={MARGIN_SECTION}
-                        maxW="1/2"
-                        size="lg"
-                        checked={darkMode}
-                        onCheckedChange={(e) => {
-                            setDarkMode(e.checked)
-                            // This delay prevents a weird animation issue
-                            setTimeout(() => {
-                                toggleColorMode()
-                            }, 100)
-                        }}
-                    >
-                        <Switch.HiddenInput />
-                        <Switch.Control>
-                            <Switch.Thumb>
-                                <Switch.ThumbIndicator fallback={<Moon color="black" />}>
-                                    <Sun />
-                                </Switch.ThumbIndicator>
-                            </Switch.Thumb>
-                        </Switch.Control>
-                        <Switch.Label>{t('Settings.Theme.darkMode')}</Switch.Label>
-                    </Switch.Root>
-                    <Select.Root
-                        colorPalette={theme.colorPalette}
-                        marginTop={MARGIN_SECTION}
-                        maxW="1/2"
-                        key={'test'}
-                        variant={'outline'}
-                        collection={themes}
-                        value={[theme.name]}
-                        onValueChange={(e) => {
-                            setTheme(e.items[0].data)
-                        }}
-                    >
-                        <Select.HiddenSelect />
-                        <Select.Label>{t('Settings.Theme.select')}</Select.Label>
-                        <Select.Control>
-                            <Select.Trigger>
-                                <Select.ValueText placeholder={t('Settings.Theme.select')} />
-                            </Select.Trigger>
-                            <Select.IndicatorGroup>
-                                <Select.Indicator />
-                            </Select.IndicatorGroup>
-                        </Select.Control>
-                        <Portal>
-                            <Select.Positioner>
-                                <Select.Content>
-                                    {themes.items.map((t) => (
-                                        <Select.Item item={t} key={t.value}>
-                                            {t.label}
-                                            <Select.ItemIndicator />
-                                        </Select.Item>
-                                    ))}
-                                </Select.Content>
-                            </Select.Positioner>
-                        </Portal>
-                    </Select.Root>
-                </Card.Body>
-            </Card.Root>
-            <Card.Root overflow="hidden" flex={'1'}>
-                <Card.Body gap="2">
-                    <Card.Title>{t('Settings.Emu.title')}</Card.Title>
-                    <Card.Description>{t('Settings.Emu.desc')}</Card.Description>
-                    <Text textStyle="xs">{emulatorPath}</Text>
-                    <Button
-                        colorPalette={'red'}
-                        marginTop={MARGIN_SECTION}
-                        maxW="1/2"
-                        onClick={pickExe}
-                    >
-                        {t('Settings.Emu.setEmuPath')}
-                    </Button>
-                    <Text textStyle="xs">{romPath}</Text>
-                    <Button
-                        colorPalette={theme.colorPalette}
-                        marginTop={MARGIN_SECTION}
-                        maxW="1/2"
-                        onClick={pickRomDirectory}
-                    >
-                        {t('Settings.Emu.setRomPath')}
-                    </Button>
-                </Card.Body>
-            </Card.Root>
-            <Card.Root overflow="hidden" flex={'1'}>
-                <Card.Body gap="2">
-                    <Card.Title>{t('Settings.Danger.title')}</Card.Title>
-                    <Card.Description></Card.Description>
-                    <Button
-                        colorPalette={'red'}
-                        marginTop={MARGIN_SECTION}
-                        maxW="1/2"
-                        onClick={handleResetAllSettings}
-                    >
-                        {t('Settings.Danger.reset')}
-                    </Button>
-                    <Text textStyle="xs">{t('Settings.Danger.logOut')}</Text>
-                    <IconButton
-                        colorPalette={'red'}
-                        width={'40px'}
-                        height={'40px'}
-                        onClick={logoutHelper}
-                        aria-label={t('Settings.Danger.logOut')}
-                    >
-                        <LogOut />
-                    </IconButton>
-                </Card.Body>
-            </Card.Root>
-        </Stack>
-    )
+                      {t.name}
+                    </span>
+                    <div className="flex gap-1 mt-1.5">
+                      {(
+                        ["--v2-bg", "--v2-accent", "--v2-name-self"] as const
+                      ).map((k) => (
+                        <span
+                          key={k}
+                          className="w-3 h-3 rounded-full border border-white/10"
+                          style={{ background: t.vars[k] }}
+                        />
+                      ))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Chat color overrides */}
+            <div
+              className="pt-3 border-t space-y-3"
+              style={{ borderColor: "var(--v2-border)" }}
+            >
+              <p
+                className="text-xs font-semibold uppercase tracking-wide"
+                style={{ color: "var(--v2-muted)" }}
+              >
+                Chat Colors
+              </p>
+              <ColorSwatch
+                label="Chat text"
+                current={currentChatColor}
+                swatches={CHAT_MSG_SWATCHES}
+                onChange={(c) => setOverride("--v2-chat-msg", c)}
+              />
+              <ColorSwatch
+                label="My username"
+                current={currentSelfColor}
+                swatches={NAME_SELF_SWATCHES}
+                onChange={(c) => setOverride("--v2-name-self", c)}
+              />
+              <ColorSwatch
+                label="Others' names"
+                current={currentOtherColor}
+                swatches={NAME_OTHER_SWATCHES}
+                onChange={(c) => setOverride("--v2-name-other", c)}
+              />
+              {/* Chat preview */}
+              <div
+                className="text-xs rounded px-3 py-2 border"
+                style={{
+                  borderColor: "var(--v2-border)",
+                  background: "var(--v2-hover)",
+                }}
+              >
+                <span style={{ color: currentSelfColor }}>YourName</span>
+                <span style={{ color: "var(--v2-muted)" }}> 12:00 </span>
+                <span style={{ color: currentChatColor }}>Hello lobby!</span>
+                {"  "}
+                <span style={{ color: currentOtherColor }}>Opponent</span>
+                <span style={{ color: "var(--v2-muted)" }}> 12:01 </span>
+                <span style={{ color: currentChatColor }}>GG!</span>
+              </div>
+            </div>
+
+            {/* Background options */}
+            <div
+              className="pt-3 border-t space-y-3"
+              style={{ borderColor: "var(--v2-border)" }}
+            >
+              <p
+                className="text-xs font-semibold uppercase tracking-wide"
+                style={{ color: "var(--v2-muted)" }}
+              >
+                Background
+              </p>
+              <Row label="Pattern overlay" sub="Tiled texture visibility">
+                <select
+                  value={currentPatternOpacity}
+                  onChange={(e) =>
+                    setOverride("--v2-pattern-opacity", e.target.value)
+                  }
+                  className="rounded px-3 py-1.5 text-sm border outline-none"
+                  style={selectStyle}
+                >
+                  <option value="0">Off</option>
+                  <option value=".1">Subtle</option>
+                  <option value=".2">Medium</option>
+                  <option value="0.4">Strong</option>
+                </select>
+              </Row>
+            </div>
+          </div>
+        </Section>
+
+        {/* ── Notifications ── */}
+        <Section title="Notifications">
+          <SoundRow
+            label="Challenge received"
+            enabled={notifChallengeSound}
+            path={notifChallengeSoundPath}
+            onToggle={setNotifChallengeSound}
+            onPick={() => pickSound(setNotifChallengeSoundPath)}
+            onPlay={() => playSound(notifChallengeSoundPath)}
+            onStop={stopSound}
+          />
+          <div
+            className="border-t"
+            style={{ borderColor: "var(--v2-border)" }}
+          />
+          <SoundRow
+            label="@-mention in chat"
+            enabled={notifiAtSound}
+            path={notifAtSoundPath}
+            onToggle={setNotifAtSound}
+            onPick={() => pickSound(setNotifAtSoundPath)}
+            onPlay={() => playSound(notifAtSoundPath)}
+            onStop={stopSound}
+          />
+          <div
+            className="border-t"
+            style={{ borderColor: "var(--v2-border)" }}
+          />
+          <SoundRow
+            label="Match win"
+            enabled={winSound}
+            path={winSoundPath}
+            onToggle={setWinSound}
+            onPick={() => pickSound(setWinSoundPath)}
+            onPlay={() => playSound(winSoundPath)}
+            onStop={stopSound}
+          />
+        </Section>
+
+        {/* ── Account ── */}
+        <Section title="Account">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors"
+          >
+            <LogOut size={14} /> Sign out
+          </button>
+        </Section>
+
+        {/* ── Danger zone ── */}
+        <Section title="Danger Zone">
+          <div className="space-y-2 py-1">
+            <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+              Reset all saved settings to their defaults. This cannot be undone.
+            </p>
+            <button
+              onClick={handleReset}
+              onBlur={() => setResetConfirm(false)}
+              className="text-sm px-3 py-1.5 rounded border transition-colors"
+              style={{
+                borderColor: resetConfirm ? "#ef4444" : "var(--v2-border)",
+                color: resetConfirm ? "#ef4444" : "var(--v2-muted)",
+                background: resetConfirm
+                  ? "rgba(239,68,68,0.1)"
+                  : "var(--v2-hover)",
+              }}
+            >
+              {resetConfirm
+                ? "Click again to confirm reset"
+                : "Reset all settings"}
+            </button>
+          </div>
+        </Section>
+      </div>
+    </div>
+  );
 }

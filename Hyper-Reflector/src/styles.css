@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+/* ── Scrollbars: thin + themed ───────────────────────────────────────────────── */
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--v2-border, #333) transparent;
+}
+
+/* Chromium / WebKit */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--v2-border, #333);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--v2-muted, #555);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ── Ranked queue animations ─────────────────────────────────────────────────── */
+@keyframes rank-queue-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+@keyframes rank-queue-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 6px 1px color-mix(in srgb, var(--v2-accent) 70%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 18px 6px color-mix(in srgb, var(--v2-accent) 65%, transparent),
+      0 0 36px 14px color-mix(in srgb, var(--v2-accent) 25%, transparent);
+  }
+}
+
+.rank-queue-searching {
+  background: linear-gradient(
+    105deg,
+    var(--v2-accent) 0%,
+    var(--v2-accent) 30%,
+    color-mix(in srgb, var(--v2-accent) 45%, white) 50%,
+    var(--v2-accent) 70%,
+    var(--v2-accent) 100%
+  ) !important;
+  background-size: 300% 100% !important;
+  animation: rank-queue-shimmer 1.4s linear infinite, rank-queue-glow 1.2s ease-in-out infinite;
+}
+
+/* ── Lobby tab unread notification ───────────────────────────────────────────── */
+@keyframes tab-wiggle {
+  0%, 72%, 100% { transform: translateX(0); }
+  74%  { transform: translateX(-3px); }
+  78%  { transform: translateX(3px); }
+  82%  { transform: translateX(-2px); }
+  86%  { transform: translateX(2px); }
+  90%  { transform: translateX(-1px); }
+  94%  { transform: translateX(1px); }
+}
+
+@keyframes tab-glow-pulse {
+  0%, 100% { box-shadow: 0 0 4px 0 color-mix(in srgb, var(--v2-accent) 25%, transparent); }
+  50%       { box-shadow: 0 0 12px 4px color-mix(in srgb, var(--v2-accent) 55%, transparent); }
+}
+
+.tab-unread {
+  animation: tab-wiggle 3.5s ease-in-out infinite, tab-glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes rank-popup-in {
+  from { opacity: 0; transform: scale(0.94) translateY(-8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.rank-popup-enter {
+  animation: rank-popup-in 0.18s ease-out forwards;
+}
+
+/* ── Cursor: pointer on all interactive elements ────────────────────────────── */
+button:not([disabled]),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+/* ── Animated pattern overlay ────────────────────────────────────────────────── */
+@keyframes v2-bg-scroll {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: -800px 800px;
+  }
+}
+
+.v2-animated-bg {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Accent spotlights — behind all content, degrade gracefully if color-mix unsupported */
+.v2-animated-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(
+      ellipse 80% 55% at 50% -5%,
+      color-mix(
+          in srgb,
+          var(--v2-accent) var(--v2-spotlight-intensity, 22%),
+          transparent
+        )
+        0%,
+      transparent 100%
+    ),
+    radial-gradient(
+      ellipse 50% 40% at -5% 105%,
+      color-mix(
+          in srgb,
+          var(--v2-accent) var(--v2-spotlight-secondary, 9%),
+          transparent
+        )
+        0%,
+      transparent 70%
+    );
+}
+
+/* Pattern tiled above spotlights, still behind all content */
+.v2-animated-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--v2-bg-image);
+  background-size: 720px auto;
+  background-repeat: repeat;
+  background-position: 0 0;
+  opacity: var(--v2-pattern-opacity, 1);
+  filter: var(--v2-pattern-filter, none);
+  mix-blend-mode: var(--v2-pattern-blend, normal);
+  animation: v2-bg-scroll 30s linear infinite;
+  pointer-events: none;
+  z-index: -1;
+}

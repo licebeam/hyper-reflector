@@ -1,380 +1,505 @@
-import { useEffect, useMemo, useState } from 'react'
-import {
-    AlertDescription,
-    AlertRoot,
-    Box,
-    CardBody,
-    CardRoot,
-    Heading,
-    SimpleGrid,
-    Spinner,
-    Stack,
-    Text,
-    useToken,
-} from '@chakra-ui/react'
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
-import api from '../external-api/requests'
-import { auth } from '../utils/firebase'
-import { useUserStore } from '../state/store'
+import { useEffect, useMemo, useState } from "react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
+import { BarChart2 } from "lucide-react";
+import api from "../external-api/requests";
+import { auth } from "../utils/firebase";
+import { useV2Theme } from "../ThemeContext";
+import type { V2User } from "../types";
 
-type SuperArtStats = { wins?: number; losses?: number }
+// ── Types ──────────────────────────────────────────────────────────────────────
 
+type SuperArtStats = { wins?: number; losses?: number };
 type CharacterChoice = {
-    picks: number
-    superChoice?: Array<SuperArtStats> | Record<string, SuperArtStats>
-}
-
+  picks: number;
+  superChoice?: SuperArtStats[] | Record<string, SuperArtStats>;
+};
 type GlobalStats = {
-    globalNumberOfMatches?: number
-    globalWinCount?: Record<string, number>
-    globalCharacterChoice?: Record<string, CharacterChoice>
-}
+  globalNumberOfMatches?: number;
+  globalWinCount?: Record<string, number>;
+  globalCharacterChoice?: Record<string, CharacterChoice>;
+};
 
-type GlobalStatsResponse = {
-    globalStatSet?: GlobalStats
-}
+// ── Constants ──────────────────────────────────────────────────────────────────
 
-const PICK_BAR_COLORS = {
-    bar: '#fb923c',
-    background: 'rgba(255,255,255,0.08)',
-}
+// Fixed in-game Super Art colors — match v1 (Chakra yellow.500 / orange.500 / blue.500)
+const SA_COLORS: [string, string, string] = ["#ECC94B", "#ED8936", "#4299E1"];
 
 const CHARACTER_ROSTER = [
-    'Alex',
-    'Ryu',
-    'Yun',
-    'Dudley',
-    'Necro',
-    'Hugo',
-    'Ibuki',
-    'Elena',
-    'Oro',
-    'Yang',
-    'Ken',
-    'Sean',
-    'Urien',
-    'Gouki',
-    'Chun-Li',
-    'Makoto',
-    'Q',
-    'Twelve',
-    'Remy',
-]
+  "Alex",
+  "Ryu",
+  "Yun",
+  "Dudley",
+  "Necro",
+  "Hugo",
+  "Ibuki",
+  "Elena",
+  "Oro",
+  "Yang",
+  "Ken",
+  "Sean",
+  "Urien",
+  "Gouki",
+  "Chun-Li",
+  "Makoto",
+  "Q",
+  "Twelve",
+  "Remy",
+];
 
-function normalizeSuperChoices(choice?: CharacterChoice['superChoice']): SuperArtStats[] {
-    if (!choice) return []
-    if (Array.isArray(choice)) return choice
-    return Object.values(choice)
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function normalizeSuperChoices(
+  choice?: CharacterChoice["superChoice"],
+): SuperArtStats[] {
+  if (!choice) return [];
+  if (Array.isArray(choice)) return choice;
+  return Object.values(choice);
 }
 
-function CharacterSuperArtDonut({
-    name,
-    stats,
-    colors,
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div
+      className="rounded-lg p-4 border"
+      style={{
+        background: "var(--v2-surface)",
+        borderColor: "var(--v2-border)",
+      }}
+    >
+      <p className="text-xs mb-1" style={{ color: "var(--v2-muted)" }}>
+        {label}
+      </p>
+      <p className="text-2xl font-bold" style={{ color: "var(--v2-accent)" }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function WinSpreadDonut({
+  winCount,
+  colors,
 }: {
-    name: string
-    stats: CharacterChoice
-    colors: readonly string[]
+  winCount?: Record<string, number>;
+  colors: [string, string];
 }) {
-    const superChoices = normalizeSuperChoices(stats.superChoice)
-    const saData = [0, 1, 2].map((index) => {
-        const entry = superChoices[index]
-        const value = (entry?.wins || 0) + (entry?.losses || 0)
-        return {
-            name: `SA ${index + 1}`,
-            value,
-            color: colors[index] || colors[colors.length - 1] || '#fbbf24',
-        }
-    })
+  const data = [
+    { name: "Player 1", value: winCount?.["1"] || 0, color: colors[0] },
+    { name: "Player 2", value: winCount?.["2"] || 0, color: colors[1] },
+  ];
+  const hasData = data.some((d) => d.value > 0);
 
-    const hasAnyValue = saData.some((entry) => entry.value > 0)
-
+  if (!hasData) {
     return (
-        <Stack gap={2} align="center">
-            <Text fontWeight="semibold" fontSize="sm">
-                {name}
-            </Text>
-            {hasAnyValue ? (
-                <Box w="120px" h="120px">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Tooltip cursor={false} />
-                            <Pie
-                                innerRadius={40}
-                                outerRadius={55}
-                                isAnimationActive={false}
-                                data={saData}
-                                dataKey="value"
-                            >
-                                {saData.map((item, index) => (
-                                    <Cell key={item.name} fill={colors[index] || colors[0]} />
-                                ))}
-                            </Pie>
-                        </PieChart>
-                    </ResponsiveContainer>
-                </Box>
-            ) : (
-                <Text fontSize="xs" color="whiteAlpha.600">
-                    No data
-                </Text>
-            )}
-        </Stack>
-    )
+      <p className="text-sm py-4" style={{ color: "var(--v2-muted)" }}>
+        No wins recorded yet.
+      </p>
+    );
+  }
+
+  return (
+    <div className="w-64 h-64 mx-auto">
+      <ResponsiveContainer width="100%" height="110%">
+        <PieChart>
+          <Tooltip
+            contentStyle={{
+              background: "var(--v2-surface)",
+              border: "1px solid var(--v2-border)",
+              borderRadius: "6px",
+            }}
+            itemStyle={{ color: "var(--v2-text)" }}
+            cursor={false}
+          />
+          <Pie
+            innerRadius={75}
+            outerRadius={105}
+            isAnimationActive={false}
+            data={data}
+            dataKey="value"
+            label={({ name, value }) => `${name}: ${value.toLocaleString()}`}
+            labelLine={{ strokeWidth: 1, stroke: "var(--v2-muted)" }}
+          >
+            {data.map((item) => (
+              <Cell key={item.name} fill={item.color} />
+            ))}
+          </Pie>
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
-function PlayerWinRateDonut({ winCount }: { winCount?: Record<string, number> }) {
-    if (!winCount) {
-        return <Text color="whiteAlpha.700">Play a few matches to populate this chart.</Text>
-    }
-    const data = [
-        { name: 'Player 1', value: winCount['1'] || 0, color: '#fb923c' },
-        { name: 'Player 2', value: winCount['2'] || 0, color: '#38bdf8' },
-    ]
+function SuperArtDonut({
+  name,
+  stats,
+  colors,
+}: {
+  name: string;
+  stats: CharacterChoice;
+  colors: [string, string, string];
+}) {
+  const superChoices = normalizeSuperChoices(stats.superChoice);
+  const data = [0, 1, 2].map((i) => {
+    const entry = superChoices[i];
+    return {
+      name: `SA ${i + 1}`,
+      value: (entry?.wins || 0) + (entry?.losses || 0),
+      color: colors[i],
+    };
+  });
+  const hasData = data.some((d) => d.value > 0);
 
-    const hasAnyValue = data.some((entry) => entry.value > 0)
-    if (!hasAnyValue) {
-        return <Text color="whiteAlpha.700">No wins recorded yet.</Text>
-    }
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <p className="text-xs font-semibold" style={{ color: "var(--v2-text)" }}>
+        {name}
+      </p>
+      {hasData ? (
+        <div className="w-24 h-24">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Tooltip
+                contentStyle={{
+                  background: "var(--v2-surface)",
+                  border: "1px solid var(--v2-border)",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                }}
+                itemStyle={{ color: "var(--v2-text)" }}
+                cursor={false}
+              />
+              <Pie
+                innerRadius={30}
+                outerRadius={44}
+                isAnimationActive={false}
+                data={data}
+                dataKey="value"
+              >
+                {data.map((item) => (
+                  <Cell key={item.name} fill={item.color} />
+                ))}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <p className="text-xs py-2" style={{ color: "var(--v2-muted)" }}>
+          —
+        </p>
+      )}
+    </div>
+  );
+}
 
+// ── Main component ─────────────────────────────────────────────────────────────
+
+type HomePageProps = {
+  currentUser: V2User | null;
+};
+
+export function HomePage({ currentUser }: HomePageProps) {
+  const { theme } = useV2Theme();
+  const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const accent = theme.vars["--v2-accent"];
+  const nameOther = theme.vars["--v2-name-other"];
+
+  useEffect(() => {
+    if (!currentUser?.uid) {
+      setGlobalStats(null);
+      return;
+    }
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+    (async () => {
+      try {
+        const result = (await api.getGlobalStats(auth, currentUser.uid)) as
+          | { globalStatSet?: GlobalStats }
+          | undefined;
+        if (!mounted) return;
+        setGlobalStats(result?.globalStatSet ?? null);
+        if (!result?.globalStatSet)
+          setError("Global stats are not available yet.");
+      } catch {
+        if (mounted) {
+          setGlobalStats(null);
+          setError("Unable to load stats. Please try again shortly.");
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser?.uid]);
+
+  const rosterStats = useMemo(() => {
+    const base = Object.fromEntries(
+      CHARACTER_ROSTER.map((n) => [
+        n,
+        { picks: 0, superChoice: [] as SuperArtStats[] },
+      ]),
+    );
+    if (globalStats?.globalCharacterChoice) {
+      for (const [name, stats] of Object.entries(
+        globalStats.globalCharacterChoice,
+      )) {
+        base[name] = {
+          picks: stats?.picks || 0,
+          superChoice: normalizeSuperChoices(stats?.superChoice),
+        };
+      }
+    }
+    return base as Record<string, CharacterChoice>;
+  }, [globalStats?.globalCharacterChoice]);
+
+  const characterEntries = useMemo(
+    () =>
+      Object.entries(rosterStats).sort(
+        (a, b) => (b[1]?.picks || 0) - (a[1]?.picks || 0),
+      ),
+    [rosterStats],
+  );
+
+  const totalPicks =
+    characterEntries.reduce((s, [, v]) => s + (v?.picks || 0), 0) || 1;
+  const mostPlayed = characterEntries[0]?.[0];
+
+  if (!currentUser) {
     return (
-        <Box w="260px" h="280px" mx="auto">
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Tooltip cursor={false} />
-                    <Pie
-                        innerRadius={80}
-                        outerRadius={110}
-                        isAnimationActive={false}
-                        data={data}
-                        dataKey="value"
-                        labelLine={{ strokeWidth: 1 }}
-                        label={({ name: labelName, value }) =>
-                            `${labelName}: ${value.toLocaleString()}`
-                        }
+      <div className="h-full flex items-center justify-center">
+        <p className="text-sm" style={{ color: "var(--v2-muted)" }}>
+          Sign in to view the global stats dashboard.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full overflow-y-scroll">
+      <div className="max-w-5xl mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-2">
+          <BarChart2 size={18} style={{ color: "var(--v2-accent)" }} />
+          <h1
+            className="text-lg font-semibold"
+            style={{ color: "var(--v2-text)" }}
+          >
+            Global Stats
+          </h1>
+          <span className="text-xs ml-1" style={{ color: "var(--v2-muted)" }}>
+            Live match tracking across the Hyper Reflector community
+          </span>
+        </div>
+
+        {error && (
+          <div
+            className="px-4 py-3 rounded-lg border text-sm"
+            style={{
+              borderColor: 'var(--v2-border)',
+              background: 'color-mix(in srgb, var(--v2-accent) 8%, var(--v2-surface))',
+              color: 'var(--v2-muted)',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="text-center space-y-2">
+              <div
+                className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin mx-auto"
+                style={{
+                  borderColor: "var(--v2-accent)",
+                  borderTopColor: "transparent",
+                }}
+              />
+              <p className="text-sm" style={{ color: "var(--v2-muted)" }}>
+                Crunching match data…
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Summary stat cards */}
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard
+                label="Total matches"
+                value={(
+                  globalStats?.globalNumberOfMatches || 0
+                ).toLocaleString()}
+              />
+              <StatCard label="Most played" value={mostPlayed || "—"} />
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {/* Win spread */}
+              <div
+                className="rounded-lg border p-5"
+                style={{
+                  background: "var(--v2-surface)",
+                  borderColor: "var(--v2-border)",
+                }}
+              >
+                <h2
+                  className="text-sm font-semibold mb-4"
+                  style={{ color: "var(--v2-text)" }}
+                >
+                  Player win spread
+                </h2>
+                <WinSpreadDonut
+                  winCount={globalStats?.globalWinCount}
+                  colors={[accent, nameOther]}
+                />
+                {/* Legend */}
+                <div className="flex justify-center gap-6 mt-6">
+                  {[
+                    ["Player 1", accent],
+                    ["Player 2", nameOther],
+                  ].map(([label, color]) => (
+                    <div key={label} className="flex items-center gap-1.5">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ background: color }}
+                      />
+                      <span
+                        className="text-xs"
+                        style={{ color: "var(--v2-muted)" }}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Character pick rates */}
+              <div
+                className="rounded-lg border p-5"
+                style={{
+                  background: "var(--v2-surface)",
+                  borderColor: "var(--v2-border)",
+                }}
+              >
+                <h2
+                  className="text-sm font-semibold mb-4"
+                  style={{ color: "var(--v2-text)" }}
+                >
+                  Character pick rates
+                </h2>
+                {characterEntries.some(([, v]) => v.picks > 0) ? (
+                  <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                    {/* Column headers */}
+                    <div
+                      className="grid grid-cols-[1fr_56px_52px] text-xs pb-1 border-b"
+                      style={{
+                        color: "var(--v2-muted)",
+                        borderColor: "var(--v2-border)",
+                      }}
                     >
-                        {data.map((item) => (
-                            <Cell key={item.name} fill={item.color} strokeWidth={2} />
-                        ))}
-                    </Pie>
-                </PieChart>
-            </ResponsiveContainer>
-        </Box>
-    )
-}
+                      <span>Character</span>
+                      <span className="text-right">Matches</span>
+                      <span className="text-right">Pick %</span>
+                    </div>
+                    {characterEntries.map(([name, stats]) => {
+                      const pct = ((stats?.picks || 0) / totalPicks) * 100;
+                      return (
+                        <div
+                          key={name}
+                          className="grid grid-cols-[1fr_56px_52px] items-center gap-2"
+                        >
+                          <div>
+                            <p
+                              className="text-xs font-medium mb-0.5"
+                              style={{ color: "var(--v2-text)" }}
+                            >
+                              {name}
+                            </p>
+                            <div
+                              className="h-1.5 rounded-full overflow-hidden"
+                              style={{ background: "var(--v2-hover)" }}
+                            >
+                              <div
+                                className="h-full rounded-full"
+                                style={{ width: `${pct}%`, background: accent }}
+                              />
+                            </div>
+                          </div>
+                          <p
+                            className="text-xs text-right"
+                            style={{ color: "var(--v2-muted)" }}
+                          >
+                            {(stats?.picks || 0).toLocaleString()}
+                          </p>
+                          <p
+                            className="text-xs text-right"
+                            style={{ color: "var(--v2-muted)" }}
+                          >
+                            {pct.toFixed(1)}%
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm" style={{ color: "var(--v2-muted)" }}>
+                    No pick data yet.
+                  </p>
+                )}
+              </div>
+            </div>
 
-export default function HomePage() {
-    const globalUser = useUserStore((s) => s.globalUser)
-    const [globalStats, setGlobalStats] = useState<GlobalStats | null>(null)
-    const [isLoading, setIsLoading] = useState(false)
-    const [errorMessage, setErrorMessage] = useState<string | null>(null)
-    const superArtColors = useToken('colors', ['yellow.500', 'orange.500', 'blue.500'])
-
-    useEffect(() => {
-        if (!globalUser?.uid) {
-            setGlobalStats(null)
-            return
-        }
-        let isMounted = true
-        setIsLoading(true)
-        setErrorMessage(null)
-        ;(async () => {
-            try {
-                const result = (await api.getGlobalStats(auth, globalUser.uid)) as
-                    | GlobalStatsResponse
-                    | undefined
-                if (!isMounted) return
-                if (result?.globalStatSet) {
-                    setGlobalStats(result.globalStatSet)
-                } else {
-                    setGlobalStats(null)
-                    setErrorMessage('Global stats are not available yet.')
-                }
-            } catch (err) {
-                console.warn('failed to load global stats', err)
-                if (isMounted) {
-                    setGlobalStats(null)
-                    setErrorMessage('Unable to load stats. Please try again shortly.')
-                }
-            } finally {
-                if (isMounted) setIsLoading(false)
-            }
-        })()
-        return () => {
-            isMounted = false
-        }
-    }, [globalUser?.uid])
-
-    const rosterStats = useMemo(() => {
-        const baseline = CHARACTER_ROSTER.reduce<Record<string, CharacterChoice>>((acc, name) => {
-            acc[name] = { picks: 0, superChoice: [] }
-            return acc
-        }, {})
-        if (globalStats?.globalCharacterChoice) {
-            for (const [name, stats] of Object.entries(globalStats.globalCharacterChoice)) {
-                baseline[name] = {
-                    picks: stats?.picks || 0,
-                    superChoice: stats?.superChoice,
-                }
-            }
-        }
-        return baseline
-    }, [globalStats?.globalCharacterChoice])
-
-    const characterEntries = useMemo(
-        () => Object.entries(rosterStats).sort((a, b) => (b[1]?.picks || 0) - (a[1]?.picks || 0)),
-        [rosterStats]
-    )
-
-    const barListData = characterEntries.map(([name, stats]) => ({
-        name,
-        value: stats?.picks || 0,
-    }))
-    const totalPicks = barListData.reduce((sum, entry) => sum + entry.value, 0) || 1
-
-    const mostPlayedCharacter = characterEntries[0]?.[0]
-    const characterDonuts = characterEntries
-
-    if (!globalUser) {
-        return (
-            <AlertRoot status="warning" borderRadius="lg" bg="yellow.900" mt={8}>
-                <AlertDescription>
-                    Sign in to view the live global stats dashboard.
-                </AlertDescription>
-            </AlertRoot>
-        )
-    }
-
-    return (
-        <Stack gap={8} py={4}>
-            <Stack gap={2}>
-                <Heading size="lg">Global stats</Heading>
-                <Text color="whiteAlpha.700">
-                    Live match tracking across the Hyper Reflector community.
-                </Text>
-            </Stack>
-
-            {errorMessage ? (
-                <AlertRoot status="error" borderRadius="lg" bg="red.900">
-                    <AlertDescription>{errorMessage}</AlertDescription>
-                </AlertRoot>
-            ) : null}
-
-            {isLoading ? (
-                <Stack align="center" py={20}>
-                    <Spinner size="xl" color="orange.300" />
-                    <Text color="whiteAlpha.700">Crunching the latest match data…</Text>
-                </Stack>
-            ) : (
-                <SimpleGrid columns={{ base: 1, xl: 2 }} gap={8}>
-                    <CardRoot bg="gray.900" borderColor="whiteAlpha.200" borderWidth="1px">
-                        <CardBody>
-                            <Stack gap={6}>
-                                <Stack gap={1}>
-                                    <Text fontSize="sm" color="whiteAlpha.600">
-                                        Total matches recorded
-                                    </Text>
-                                    <Heading size="lg">
-                                        {globalStats?.globalNumberOfMatches?.toLocaleString() || 0}
-                                    </Heading>
-                                </Stack>
-                                <Box h="1px" bg="whiteAlpha.200" />
-                                <Stack gap={1}>
-                                    <Text fontSize="sm" color="whiteAlpha.600">
-                                        Most played character
-                                    </Text>
-                                    <Text fontSize="lg" fontWeight="semibold">
-                                        {mostPlayedCharacter || 'TBD'}
-                                    </Text>
-                                </Stack>
-                                <Box h="1px" bg="whiteAlpha.200" />
-                                <Stack gap={4}>
-                                    <Text fontWeight="semibold">Player win spread</Text>
-                                    <PlayerWinRateDonut winCount={globalStats?.globalWinCount} />
-                                </Stack>
-                            </Stack>
-                        </CardBody>
-                    </CardRoot>
-
-                    <CardRoot bg="gray.900" borderColor="whiteAlpha.200" borderWidth="1px">
-                        <CardBody>
-                            <Stack gap={6}>
-                                <Stack gap={1}>
-                                    <Heading size="md">Character pick rates</Heading>
-                                    <Text color="whiteAlpha.700" fontSize="sm">
-                                        Ranking of every character since the last reset.
-                                    </Text>
-                                </Stack>
-                                {barListData.length ? (
-                                    <Stack gap={3}>
-                                        <Stack direction="row" fontSize="xs" color="whiteAlpha.600">
-                                            <Box flex="1">Character</Box>
-                                            <Box w="70px" textAlign="right">
-                                                Matches
-                                            </Box>
-                                            <Box w="60px" textAlign="right">
-                                                Pick %
-                                            </Box>
-                                        </Stack>
-                                        {barListData.map((entry) => {
-                                            const percent = (entry.value / totalPicks) * 100
-                                            return (
-                                                <Stack key={entry.name} gap={1}>
-                                                    <Stack direction="row" align="center" gap={3}>
-                                                        <Stack flex="1">
-                                                            <Text fontWeight="semibold">
-                                                                {entry.name}
-                                                            </Text>
-                                                            <Box
-                                                                position="relative"
-                                                                bg={PICK_BAR_COLORS.background}
-                                                                borderRadius="full"
-                                                                h="6px"
-                                                            >
-                                                                <Box
-                                                                    position="absolute"
-                                                                    left="0"
-                                                                    top="0"
-                                                                    bottom="0"
-                                                                    borderRadius="full"
-                                                                    width={`${percent}%`}
-                                                                    bg={PICK_BAR_COLORS.bar}
-                                                                />
-                                                            </Box>
-                                                        </Stack>
-                                                        <Text w="70px" textAlign="right">
-                                                            {entry.value.toLocaleString()}
-                                                        </Text>
-                                                        <Text w="60px" textAlign="right">
-                                                            {percent.toFixed(1)}%
-                                                        </Text>
-                                                    </Stack>
-                                                </Stack>
-                                            )
-                                        })}
-                                    </Stack>
-                                ) : (
-                                    <Text color="whiteAlpha.600">
-                                        We do not have enough data to show pick rates yet.
-                                    </Text>
-                                )}
-
-                                {characterDonuts.length ? (
-                                    <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} gap={6}>
-                                        {characterDonuts.map(([name, stats]) => (
-                                            <CharacterSuperArtDonut
-                                                key={name}
-                                                name={name}
-                                                stats={stats}
-                                                colors={superArtColors}
-                                            />
-                                        ))}
-                                    </SimpleGrid>
-                                ) : null}
-                            </Stack>
-                        </CardBody>
-                    </CardRoot>
-                </SimpleGrid>
-            )}
-        </Stack>
-    )
+            {/* Super Art donuts */}
+            <div
+              className="rounded-lg border p-5"
+              style={{
+                background: "var(--v2-surface)",
+                borderColor: "var(--v2-border)",
+              }}
+            >
+              <h2
+                className="text-sm font-semibold mb-1"
+                style={{ color: "var(--v2-text)" }}
+              >
+                Super Art usage
+              </h2>
+              {/* Legend */}
+              <div className="flex gap-4 mb-5">
+                {(["SA1", "SA2", "SA3"] as const).map((sa, i) => (
+                  <div key={sa} className="flex items-center gap-1.5">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ background: SA_COLORS[i] }}
+                    />
+                    <span
+                      className="text-xs"
+                      style={{ color: "var(--v2-muted)" }}
+                    >
+                      {sa}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-4">
+                {characterEntries.map(([name, stats]) => (
+                  <SuperArtDonut
+                    key={name}
+                    name={name}
+                    stats={stats}
+                    colors={SA_COLORS}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

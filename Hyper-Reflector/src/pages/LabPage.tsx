@@ -1,108 +1,421 @@
+import { useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { Box, Button, Card, IconButton, Text } from '@chakra-ui/react'
 import { open } from '@tauri-apps/plugin-dialog'
-import { toaster } from '../components/chakra/ui/toaster'
+import { FlaskConical, FolderOpen, Play, Trash2, Palette, CheckCircle2 } from 'lucide-react'
 import { useSettingsStore } from '../state/store'
-import { Trash2 } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
 import {
-    ensureDefaultEmulatorPath,
-    ensureDefaultTrainingPath,
+  ensureDefaultEmulatorPath,
+  ensureDefaultTrainingPath,
 } from '../utils/pathSettings'
+import { GAMES } from '../games'
 
-export default function LabPage() {
-    const { t } = useTranslation()
-    const theme = useSettingsStore((s) => s.theme)
-    const setTrainingPath = useSettingsStore((s) => s.setTrainingPath)
-    const trainingPath = useSettingsStore((s) => s.trainingPath)
+const SFIII_ROM = 'sfiii3nr1'
 
-    async function handleStartTraining() {
-        try {
-            await ensureDefaultEmulatorPath()
-            const { emulatorPath: ensuredEmulatorPath } = useSettingsStore.getState()
+// Palette extractor has some negative visual side effects — hidden until fixed.
+// Flip to true to bring it back for local testing.
+const SHOW_PALETTE_EXTRACTOR = false
 
-            if (!ensuredEmulatorPath || !ensuredEmulatorPath.trim().length) {
-                toaster.error({
-                    title: t('Lab.errorPath'),
-                    description: 'Set or bundle an emulator before starting training.',
-                })
-                return
-            }
+export function LabPage() {
+  const emulatorPath = useSettingsStore(s => s.emulatorPath)
+  const setEmulatorPath = useSettingsStore(s => s.setEmulatorPath)
 
-            await ensureDefaultTrainingPath(ensuredEmulatorPath)
-            const { trainingPath: ensuredTrainingPath } = useSettingsStore.getState()
+  // Legacy sfiii3nr1 auto-resolved path (still used as the default fallback)
+  const trainingPath = useSettingsStore(s => s.trainingPath)
 
-            const args = ['--rom', 'sfiii3nr1']
-            if (ensuredTrainingPath && ensuredTrainingPath.trim().length) {
-                args.push('--lua', ensuredTrainingPath)
-            }
+  // Per-game custom Lua paths
+  const luaScripts = useSettingsStore(s => s.luaScripts)
+  const luaScriptSources = useSettingsStore(s => s.luaScriptSources)
+  const setLuaScriptForGame = useSettingsStore(s => s.setLuaScriptForGame)
 
-            await invoke('start_training_mode', {
-                useSidecar: false,
-                exePath: ensuredEmulatorPath,
-                args,
-            })
-        } catch (error) {
-            console.error('Failed to start training mode:', error)
-            toaster.error({
-                title: 'Failed to start training',
-                description:
-                    error instanceof Error ? error.message : 'Unknown error launching emulator',
-            })
+  // Selected game — persisted across sessions
+  const labSelectedGame = useSettingsStore(s => s.labSelectedGame)
+  const setLabSelectedGame = useSettingsStore(s => s.setLabSelectedGame)
+
+  const labMusicMuted = useSettingsStore(s => s.labMusicMuted)
+
+  const [launching, setLaunching] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [launched, setLaunched] = useState(false)
+
+  // Palette extractor state
+  const [palPngPath, setPalPngPath] = useState<string>('')
+  const [palColorIndex, setPalColorIndex] = useState<number>(0)
+  const [palReplicate, setPalReplicate] = useState<boolean>(true)
+  const [palExtracting, setPalExtracting] = useState(false)
+  const [palResult, setPalResult] = useState<{
+    out_path: string
+    previews: [number, [number, number, number]][]
+    total_palette_entries: number
+  } | null>(null)
+  const [palError, setPalError] = useState<string | null>(null)
+
+  const isSfiii = labSelectedGame === SFIII_ROM
+  const customLuaPath = luaScripts[labSelectedGame] ?? ''
+  const luaSource = luaScriptSources[labSelectedGame] ?? 'auto'
+  // Displayed path: custom if set; for sfiii fall back to auto-resolved default
+  const displayedLuaPath = luaSource === 'custom' && customLuaPath
+    ? customLuaPath
+    : isSfiii
+    ? trainingPath
+    : ''
+  const hasCustomLua = luaSource === 'custom' && !!customLuaPath
+
+  const handleLaunch = async () => {
+    setLaunching(true)
+    setError(null)
+    setLaunched(false)
+    try {
+      await ensureDefaultEmulatorPath()
+      const { emulatorPath: resolved } = useSettingsStore.getState()
+
+      if (!resolved?.trim()) {
+        setError('No emulator path configured. Browse for the emulator below.')
+        return
+      }
+
+      const args = ['--rom', labSelectedGame]
+
+      if (hasCustomLua) {
+        // Any game: user picked a custom Lua script
+        args.push('--lua', customLuaPath)
+      } else if (isSfiii) {
+        // sfiii3nr1 with no custom: fall back to auto-resolved default training script
+        await ensureDefaultTrainingPath(resolved)
+        const { trainingPath: resolvedTraining } = useSettingsStore.getState()
+        if (resolvedTraining?.trim()) {
+          args.push('--lua', resolvedTraining)
         }
-    }
+      }
+      // Other games with no custom script: no --lua argument
 
-    const pickLua = async () => {
-        try {
-            const res = await open({
-                multiple: false,
-                directory: false,
-                title: t('Lab.dialogLua'),
-                filters: [{ name: 'Lua scripts', extensions: ['lua', 'luac'] }],
-            })
-            console.log('res', res)
-            if (typeof res === 'string') setTrainingPath(res, 'custom')
-        } catch (err: any) {
-            toaster.error({
-                title: t('Lab.errorPath'),
-                description: err,
-            })
-        }
+      await invoke('start_training_mode', {
+        useSidecar: false,
+        exePath: resolved,
+        args,
+        musicVolume: labMusicMuted ? 0 : 127,
+      })
+      setLaunched(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to launch emulator.')
+    } finally {
+      setLaunching(false)
     }
+  }
 
-    return (
-        <div>
-            <Card.Root overflow="hidden" flex={'1'}>
-                <Card.Body gap="2">
-                    <Card.Title>{t('Lab.title')}</Card.Title>
-                    <Button
-                        colorPalette={theme.colorPalette}
-                        maxW="1/2"
-                        onClick={handleStartTraining}
-                    >
-                        {t('Lab.start')}
-                    </Button>
-                    <Text textStyle="xs">
-                        {t('Lab.currentPath')} {trainingPath || 'Default'}
-                    </Text>
-                    <Box display="flex" gap="2">
-                        <Button colorPalette={theme.colorPalette} maxW="1/2" onClick={pickLua}>
-                            {t('Lab.setLua')}
-                        </Button>
-                        {trainingPath && (
-                            <IconButton
-                                colorPalette={'red'}
-                                colorScheme="blue"
-                                onClick={() => {
-                                    setTrainingPath('', 'auto')
-                                }}
-                            >
-                                <Trash2 />
-                            </IconButton>
-                        )}
-                    </Box>
-                </Card.Body>
-            </Card.Root>
+  const pickEmulator = async () => {
+    try {
+      const res = await open({
+        multiple: false,
+        directory: false,
+        title: 'Select emulator executable',
+        filters: [{ name: 'Executable', extensions: ['exe'] }],
+      })
+      if (typeof res === 'string') setEmulatorPath(res)
+    } catch { /* dialog dismissed */ }
+  }
+
+  const pickLua = async () => {
+    try {
+      const res = await open({
+        multiple: false,
+        directory: false,
+        title: 'Select Lua training script',
+        filters: [{ name: 'Lua scripts', extensions: ['lua', 'luac'] }],
+      })
+      if (typeof res === 'string') setLuaScriptForGame(labSelectedGame, res, 'custom')
+    } catch { /* dialog dismissed */ }
+  }
+
+  const resetLua = () => setLuaScriptForGame(labSelectedGame, '', 'auto')
+
+  const pickPalettePng = async () => {
+    try {
+      const res = await open({
+        multiple: false,
+        directory: false,
+        title: 'Select sprite sheet PNG',
+        filters: [{ name: 'PNG images', extensions: ['png'] }],
+      })
+      if (typeof res !== 'string') return
+      setPalPngPath(res)
+      setPalResult(null)
+      setPalError(null)
+      // Auto-detect color index from filename (e.g. color1.png → 1)
+      const match = res.match(/color(\d+)\.png$/i)
+      if (match) setPalColorIndex(parseInt(match[1], 10))
+    } catch { /* dismissed */ }
+  }
+
+  const handleExtract = async () => {
+    if (!palPngPath) return
+    setPalExtracting(true)
+    setPalResult(null)
+    setPalError(null)
+    try {
+      const result = await invoke<{
+        out_path: string
+        previews: [number, [number, number, number]][]
+        total_palette_entries: number
+      }>('extract_palette_to_json', {
+        pngPath: palPngPath,
+        colorIndex: palColorIndex,
+        replicate: palReplicate,
+      })
+      setPalResult(result)
+    } catch (err) {
+      setPalError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPalExtracting(false)
+    }
+  }
+
+  const sectionCls = 'rounded-lg overflow-hidden border'
+  const sectionStyle = { borderColor: 'var(--v2-border)' }
+  const headerCls = 'px-4 py-3 border-b'
+  const headerStyle = { borderColor: 'var(--v2-border)', background: 'var(--v2-surface)' }
+  const bodyStyle = { background: 'var(--v2-surface)' }
+  const labelCls = 'text-xs font-semibold uppercase tracking-wide'
+
+  return (
+    <div className="h-full overflow-y-auto">
+      <div className="max-w-lg mx-auto p-6 space-y-4">
+
+        <div className="flex items-center gap-2 mb-2">
+          <FlaskConical size={18} style={{ color: 'var(--v2-accent)' }} />
+          <h1 className="text-lg font-semibold" style={{ color: 'var(--v2-text)' }}>Lab</h1>
         </div>
-    )
+
+        {/* Game selector */}
+        <div className={sectionCls} style={sectionStyle}>
+          <div className={headerCls} style={headerStyle}>
+            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Game</span>
+          </div>
+          <div className="px-4 py-4" style={bodyStyle}>
+            <select
+              value={labSelectedGame}
+              onChange={e => {
+                setLabSelectedGame(e.target.value)
+                setError(null)
+                setLaunched(false)
+              }}
+              className="text-sm px-3 py-1.5 rounded border outline-none w-full max-w-xs"
+              style={{
+                background: 'var(--v2-hover)',
+                borderColor: 'var(--v2-border)',
+                color: 'var(--v2-text)',
+              }}
+              onFocus={e => (e.currentTarget.style.borderColor = 'var(--v2-accent)')}
+              onBlur={e => (e.currentTarget.style.borderColor = 'var(--v2-border)')}
+            >
+              {GAMES.map(g => (
+                <option key={g.rom} value={g.rom} style={{ background: 'var(--v2-surface)' }}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Launch */}
+        <div className={sectionCls} style={sectionStyle}>
+          <div className={headerCls} style={headerStyle}>
+            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Training Mode</span>
+          </div>
+          <div className="px-4 py-4 space-y-3" style={bodyStyle}>
+            <button
+              onClick={handleLaunch}
+              disabled={launching}
+              className="flex items-center gap-2 px-4 py-2 rounded font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
+              onMouseEnter={e => { if (!launching) e.currentTarget.style.background = 'var(--v2-accent-hover)' }}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
+            >
+              <Play size={14} />
+              {launching ? 'Launching...' : 'Launch Training Mode'}
+            </button>
+
+            {error && (
+              <p className="text-red-400 text-xs">{error}</p>
+            )}
+            {launched && !error && (
+              <p className="text-green-400 text-xs">Emulator launched successfully.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Emulator path */}
+        <div className={sectionCls} style={sectionStyle}>
+          <div className={headerCls} style={headerStyle}>
+            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Emulator</span>
+          </div>
+          <div className="px-4 py-4 space-y-2" style={bodyStyle}>
+            <p className="text-xs font-mono break-all" style={{ color: 'var(--v2-muted)' }}>
+              {emulatorPath || 'Using default bundled path'}
+            </p>
+            <button
+              onClick={pickEmulator}
+              className="flex items-center gap-1.5 text-xs transition-colors"
+              style={{ color: 'var(--v2-muted)' }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
+            >
+              <FolderOpen size={13} />
+              Browse for emulator...
+            </button>
+          </div>
+        </div>
+
+        {/* Lua script — available for all games */}
+        <div className={sectionCls} style={sectionStyle}>
+          <div className={headerCls} style={headerStyle}>
+            <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Lua Script</span>
+          </div>
+          <div className="px-4 py-4 space-y-2" style={bodyStyle}>
+            <p className="text-xs font-mono break-all" style={{ color: 'var(--v2-muted)' }}>
+              {displayedLuaPath || (isSfiii ? 'Default' : 'None selected')}
+            </p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={pickLua}
+                className="flex items-center gap-1.5 text-xs transition-colors"
+                style={{ color: 'var(--v2-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
+              >
+                <FolderOpen size={13} />
+                Browse for script...
+              </button>
+              {hasCustomLua && (
+                <button
+                  onClick={resetLua}
+                  className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors"
+                >
+                  <Trash2 size={13} />
+                  {isSfiii ? 'Reset to default' : 'Remove script'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Palette extractor */}
+        {SHOW_PALETTE_EXTRACTOR && (
+        <div className={sectionCls} style={sectionStyle}>
+          <div className={headerCls} style={headerStyle}>
+            <div className="flex items-center gap-2">
+              <Palette size={13} style={{ color: 'var(--v2-muted)' }} />
+              <span className={labelCls} style={{ color: 'var(--v2-muted)' }}>Palette Extractor</span>
+            </div>
+          </div>
+          <div className="px-4 py-4 space-y-3" style={bodyStyle}>
+
+            {/* PNG picker */}
+            <div className="space-y-1">
+              <p className="text-xs font-mono break-all" style={{ color: palPngPath ? 'var(--v2-text)' : 'var(--v2-muted)' }}>
+                {palPngPath || 'No file selected'}
+              </p>
+              <button
+                onClick={pickPalettePng}
+                className="flex items-center gap-1.5 text-xs transition-colors"
+                style={{ color: 'var(--v2-muted)' }}
+                onMouseEnter={e => (e.currentTarget.style.color = 'var(--v2-text)')}
+                onMouseLeave={e => (e.currentTarget.style.color = 'var(--v2-muted)')}
+              >
+                <FolderOpen size={13} />
+                Browse for PNG...
+              </button>
+            </div>
+
+            {/* Color index */}
+            {palPngPath && (
+              <div className="flex items-center gap-3">
+                <label className="text-xs" style={{ color: 'var(--v2-muted)' }}>Color index</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={9}
+                  value={palColorIndex}
+                  onChange={e => setPalColorIndex(parseInt(e.target.value, 10) || 0)}
+                  className="w-16 text-xs px-2 py-1 rounded border outline-none text-center"
+                  style={{
+                    background: 'var(--v2-hover)',
+                    borderColor: 'var(--v2-border)',
+                    color: 'var(--v2-text)',
+                  }}
+                />
+                <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>→ color{palColorIndex}.json</span>
+              </div>
+            )}
+
+            {/* Replicate toggle */}
+            {palPngPath && (
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={palReplicate}
+                  onChange={e => setPalReplicate(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="text-xs" style={{ color: 'var(--v2-muted)' }}>
+                  Replicate to all slots (same colors in slot 0 &amp; 6)
+                </span>
+              </label>
+            )}
+
+            {/* Extract button */}
+            {palPngPath && (
+              <button
+                onClick={handleExtract}
+                disabled={palExtracting}
+                className="flex items-center gap-2 px-4 py-2 rounded font-medium text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: 'var(--v2-accent)', color: 'var(--v2-accent-fg)' }}
+                onMouseEnter={e => { if (!palExtracting) e.currentTarget.style.background = 'var(--v2-accent-hover)' }}
+                onMouseLeave={e => (e.currentTarget.style.background = 'var(--v2-accent)')}
+              >
+                <Palette size={14} />
+                {palExtracting ? 'Extracting...' : 'Extract Palette'}
+              </button>
+            )}
+
+            {/* Error */}
+            {palError && (
+              <p className="text-red-400 text-xs">{palError}</p>
+            )}
+
+            {/* Result */}
+            {palResult && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5 text-xs text-green-400">
+                  <CheckCircle2 size={13} />
+                  <span className="font-mono break-all">{palResult.out_path}</span>
+                </div>
+                <p className="text-xs" style={{ color: 'var(--v2-muted)' }}>
+                  {palResult.total_palette_entries} palette entries found
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {palResult.previews.map(([slot, [r, g, b]]) => (
+                    <div key={slot} className="flex items-center gap-1.5">
+                      <div
+                        className="w-4 h-4 rounded-sm border"
+                        style={{
+                          background: `rgb(${r},${g},${b})`,
+                          borderColor: 'var(--v2-border)',
+                        }}
+                      />
+                      <span className="text-xs font-mono" style={{ color: 'var(--v2-muted)' }}>
+                        slot {slot} — rgb({r},{g},{b})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+        )}
+
+      </div>
+    </div>
+  )
 }

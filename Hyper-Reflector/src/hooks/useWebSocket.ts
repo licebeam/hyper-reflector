@@ -1,0 +1,1694 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { listen } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
+import { useSettingsStore } from '../state/store'
+// @ts-ignore
+import keys from '../private/keys'
+import type { V2User, V2Message, V2Lobby, ConnectionStatus } from '../types'
+import {
+  initWebRTC,
+  startCall,
+  answerCall,
+  declineCall as webrtcDeclineCall,
+  closeConnectionWithUser,
+} from '../webRTC/WebPeer'
+import { isMockUserId, startMockMatch, startProxyMatch } from '../match'
+import api from '../external-api/requests'
+import { auth } from '../utils/firebase'
+import { isTauriEnv } from '../utils/pathSettings'
+import {
+  readMatchCommandFile,
+  clearMatchCommandFile,
+  readMatchStatsFile,
+  clearMatchStatsFile,
+} from '../utils/matchFiles'
+import { parseMatchData } from '../utils/matchParser'
+import { buildCondensedMatchPayload } from '../utils/matchUtils'
+import { peerLatencyManager } from '../webRTC/peerLatencyManager'
+
+
+
+const DEFAULT_LOBBY_ID = 'Hyper Reflector'
+const MAX_MESSAGES = 50
+const MAX_SUBSCRIPTIONS = 5
+const STORAGE_KEY = 'v2_subscribed_lobbies'
+const PASSWORDS_STORAGE_KEY = 'v2_lobby_passwords'
+
+// ── Mock users for the debug/bot lobby ────────────────────────────────────────
+
+const MOCK_USER_1: V2User = {
+  uid: 'mock-opponent',
+  userName: 'Mock Opponent',
+  accountElo: 1625,
+  countryCode: 'US',
+  userTitle: { bgColor: '#1f1f24', border: '#37373f', color: '#f2f2f7', title: 'Training Partner' },
+  lastKnownPings: [{ id: 'mock-opponent-2', ping: 92 }],
+  knownAliases: ['TrainingBot', 'MockOpponent'],
+  userProfilePic: '',
+  gravEmail: '',
+  userEmail: 'mock@hyper-reflector.test',
+  isRankQueued: false,
+  winStreak: 99,
+  longestWinStreak: 99,
+}
+
+const MOCK_USER_2: V2User = {
+  uid: 'mock-opponent-2',
+  userName: 'Mock Challenger',
+  accountElo: 1580,
+  countryCode: 'JP',
+  userTitle: { bgColor: '#1f1f24', border: '#37373f', color: '#f2f2f7', title: 'Training Rival' },
+  lastKnownPings: [{ id: 'mock-opponent', ping: 92 }],
+  knownAliases: ['PracticeBot', 'MockChallenger'],
+  userProfilePic: '',
+  gravEmail: '',
+  userEmail: 'mock2@hyper-reflector.test',
+  isRankQueued: false,
+}
+
+function getMockUser(uid: string): V2User | null {
+  if (uid === MOCK_USER_1.uid) return MOCK_USER_1
+  if (uid === MOCK_USER_2.uid) return MOCK_USER_2
+  return null
+}
+
+function injectMockUsers(users: V2User[], lobbyId: string, viewer: V2User | null): V2User[] {
+  if (lobbyId.trim().toLowerCase() !== 'debug') return users
+  const existing = new Set(users.map(u => u.uid))
+  const result = [...users]
+  const mockDefs: [V2User, number][] = [
+    [MOCK_USER_1, 46],
+    [MOCK_USER_2, 128],
+  ]
+  for (const [mock, ping] of mockDefs) {
+    if (!existing.has(mock.uid)) {
+      const clone: V2User = {
+        ...mock,
+        lastKnownPings: viewer
+          ? [...mock.lastKnownPings, { id: viewer.uid, ping }]
+          : mock.lastKnownPings,
+      }
+      result.push(clone)
+      existing.add(mock.uid)
+    }
+  }
+  return result
+}
+
+// ── User normalizer ───────────────────────────────────────────────────────────
+
+function normalizeUser(data: any): V2User | null {
+  if (!data || (!data.uid && !data.id)) return null
+  return {
+    uid: data.uid || data.id || 'unknown',
+    userName: data.userName || data.name || data.uid || 'Unknown',
+    accountElo: typeof data.accountElo === 'number' ? data.accountElo : 1200,
+    countryCode: typeof data.countryCode === 'string' ? data.countryCode : '',
+    userTitle: data.userTitle,
+    // The roster only ever carries the backend's geo-distance estimate — real
+    // WebRTC measurements stay local to the measuring client and never get
+    // broadcast — so anything arriving here without an explicit tag is an estimate.
+    lastKnownPings: Array.isArray(data.lastKnownPings)
+      ? data.lastKnownPings.map((p: any) => ({ ...p, source: p?.source ?? 'estimated' }))
+      : [],
+    knownAliases: Array.isArray(data.knownAliases) ? data.knownAliases : [],
+    userProfilePic: data.userProfilePic || '',
+    gravEmail: data.gravEmail || '',
+    userEmail: data.userEmail || '',
+    isRankQueued: data.isRankQueued === true,
+    isAfk: data.isAfk === true,
+    currentMatchId: typeof data.currentMatchId === 'string' && data.currentMatchId ? data.currentMatchId : undefined,
+    winStreak: typeof data.winStreak === 'number' ? data.winStreak : undefined,
+    longestWinStreak: typeof data.longestWinStreak === 'number' ? data.longestWinStreak : undefined,
+  }
+}
+
+function loadSavedPasswords(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(PASSWORDS_STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    if (typeof parsed === 'object' && parsed !== null) return parsed
+  } catch {}
+  return {}
+}
+
+function loadSavedLobbies(): string[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    const parsed = saved ? (JSON.parse(saved) as string[]) : []
+    const valid = Array.isArray(parsed)
+      ? parsed.filter(id => typeof id === 'string' && id.trim())
+      : []
+    if (!valid.includes(DEFAULT_LOBBY_ID)) valid.unshift(DEFAULT_LOBBY_ID)
+    return valid.slice(0, MAX_SUBSCRIPTIONS)
+  } catch {
+    return [DEFAULT_LOBBY_ID]
+  }
+}
+
+// ── Sound helpers ─────────────────────────────────────────────────────────────
+
+function playChallengeSound(muted: boolean) {
+  if (muted) return
+  const { notifChallengeSound, notifChallengeSoundPath } = useSettingsStore.getState()
+  if (!notifChallengeSound || !notifChallengeSoundPath) return
+  invoke('play_sound', { path: notifChallengeSoundPath }).catch(() => {})
+}
+
+function playMentionSound(muted: boolean) {
+  if (muted) return
+  const { notifiAtSound, notifAtSoundPath } = useSettingsStore.getState()
+  if (!notifiAtSound || !notifAtSoundPath) return
+  invoke('play_sound', { path: notifAtSoundPath }).catch(() => {})
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type RankQueuePendingData = {
+  matchId: string
+  playerA: { uid: string; userName: string; countryCode: string; accountElo: number; ping: number | null }
+  playerB: { uid: string; userName: string; countryCode: string; accountElo: number; ping: number | null }
+  expiresAt: number
+  isMock?: boolean
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
+export function useWebSocket(user: V2User | null, notifMuted = false) {
+  const socketRef = useRef<WebSocket | null>(null)
+  const userRef = useRef(user)
+  const notifMutedRef = useRef(notifMuted)
+
+  // Per-lobby message/user state (plain objects for easy spread-clone)
+  const allLobbyMessagesRef = useRef<Record<string, V2Message[]>>({})
+  const allLobbyUsersRef = useRef<Record<string, V2User[]>>({})
+  const [allLobbyMessages, setAllLobbyMessages] = useState<Record<string, V2Message[]>>({})
+  const [allLobbyUsers, setAllLobbyUsers] = useState<Record<string, V2User[]>>({})
+
+  const initialLobbies = useRef(loadSavedLobbies())
+  const [subscribedLobbyIds, setSubscribedLobbyIds] = useState<string[]>(initialLobbies.current)
+  // Always start on the default lobby tab regardless of saved tab order
+  const [activeLobbyId, setActiveLobbyId] = useState(DEFAULT_LOBBY_ID)
+  const [status, setStatus] = useState<ConnectionStatus>('disconnected')
+  const [lobbyList, setLobbyList] = useState<V2Lobby[]>([])
+  const [isInMatch, setIsInMatch] = useState(false)
+  const [isRankQueued, setIsRankQueued] = useState(false)
+  const isRankQueuedRef = useRef(false)
+  const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean; networkType?: string }>>([])
+  const [measuringUids, setMeasuringUids] = useState<ReadonlySet<string>>(new Set())
+  const [unreachableUids, setUnreachableUids] = useState<ReadonlySet<string>>(new Set())
+  const [rankQueuePending, setRankQueuePending] = useState<RankQueuePendingData | null>(null)
+  const initialPasswords = useRef(loadSavedPasswords())
+  const [lobbyPasswords, setLobbyPasswords] = useState<Record<string, string>>(initialPasswords.current)
+  const lobbyPasswordsRef = useRef<Record<string, string>>(initialPasswords.current)
+  const [lobbyJoinError, setLobbyJoinError] = useState<string | null>(null)
+
+  // Reconnect state
+  const [reconnectTick, setReconnectTick] = useState(0)
+  const reconnectAttemptRef = useRef(0)
+  const reconnectStartRef = useRef<number | null>(null)
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const intentionalCloseRef = useRef(false)
+  const MAX_RECONNECT_MS = 5 * 60 * 1000
+
+  // Stable refs for use inside async/socket callbacks
+  const lobbyListRef = useRef<V2Lobby[]>([])
+  const subscribedLobbyIdsRef = useRef(initialLobbies.current)
+  const activeLobbyIdRef = useRef(DEFAULT_LOBBY_ID)
+  const isInMatchRef = useRef(false)
+  // True while we're mid WebRTC handshake (offer/answer/candidates) but before a `match-start`.
+  const isHandshakeInProgressRef = useRef(false)
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
+  const opponentUidRef = useRef<string | null>(null)
+  const lastMatchOpponentUidRef = useRef<string | null>(null)
+  const pendingOffersRef = useRef(new Map<string, { from: string; offer: RTCSessionDescriptionInit }>())
+  const pendingByUserRef = useRef(new Map<string, string>())
+  const pendingCandidatesRef = useRef(new Map<string, RTCIceCandidateInit[]>())
+  const sentMatchRequestRef = useRef(new Set<string>())
+  const outgoingChallengeStatusMsgRef = useRef(new Map<string, string>())
+  const rankQueuePendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const rankQueueGameNameRef = useRef<string>('sfiii3nr1')
+
+  // Match tracking for hyper_track_match file polling
+  const activeMatchIdRef = useRef<string | null>(null)
+  const casualSessionRef = useRef(new Map<string, string>())
+  const localPlayerSlotRef = useRef<0 | 1>(0)
+  const lastMatchUuidRef = useRef<string | null>(null)
+  const matchUploadPendingRef = useRef(false)
+  const wasRankedMatchRef = useRef(false)
+
+  // Keep refs in sync
+  useEffect(() => { userRef.current = user }, [user])
+  useEffect(() => { notifMutedRef.current = notifMuted }, [notifMuted])
+
+  // ── Ping measurement wiring ───────────────────────────────────────────────────
+
+  // Set up the callback once — updates lobby user pings when a measurement completes
+  useEffect(() => {
+    peerLatencyManager.onPingRecorded = (targetUid, ping, isUnstable, networkType) => {
+      const myUid = userRef.current?.uid
+      setSelfPings(prev => {
+        const filtered = prev.filter(p => p.id !== targetUid)
+        return [...filtered, { id: targetUid, ping, isUnstable, networkType, source: 'measured' as const }]
+      })
+      if (myUid) {
+        setAllLobbyUsers(prev => {
+          const next: Record<string, V2User[]> = {}
+          for (const [lid, users] of Object.entries(prev)) {
+            next[lid] = users.map(u => {
+              if (u.uid !== myUid) return u
+              const filteredPings = (u.lastKnownPings ?? []).filter(p => p.id !== targetUid)
+              return { ...u, lastKnownPings: [...filteredPings, { id: targetUid, ping, isUnstable, networkType, source: 'measured' as const }] }
+            })
+          }
+          allLobbyUsersRef.current = next
+          return next
+        })
+      }
+    }
+    peerLatencyManager.onMeasuringChanged = (uid, measuring) => {
+      setMeasuringUids(prev => {
+        const next = new Set(prev)
+        if (measuring) next.add(uid)
+        else next.delete(uid)
+        return next
+      })
+    }
+    peerLatencyManager.onReachabilityChanged = (uid, unreachable) => {
+      setUnreachableUids(prev => {
+        const next = new Set(prev)
+        if (unreachable) next.add(uid)
+        else next.delete(uid)
+        return next
+      })
+    }
+    return () => {
+      peerLatencyManager.onPingRecorded = undefined
+      peerLatencyManager.onMeasuringChanged = undefined
+      peerLatencyManager.onReachabilityChanged = undefined
+    }
+  }, [])
+
+  // Sync viewer, peers, and match status into the manager
+  useEffect(() => { peerLatencyManager.setViewer(user as any) }, [user])
+  useEffect(() => { peerLatencyManager.setInMatch(isInMatch) }, [isInMatch])
+
+  // Persist subscribed lobbies and passwords to localStorage whenever they change
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(subscribedLobbyIds)) } catch {}
+  }, [subscribedLobbyIds])
+
+  useEffect(() => {
+    try { localStorage.setItem(PASSWORDS_STORAGE_KEY, JSON.stringify(lobbyPasswords)) } catch {}
+  }, [lobbyPasswords])
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
+  const setLobbyUsersForId = useCallback((lobbyId: string, users: V2User[]) => {
+    allLobbyUsersRef.current = { ...allLobbyUsersRef.current, [lobbyId]: users }
+    setAllLobbyUsers(prev => ({ ...prev, [lobbyId]: users }))
+  }, [])
+
+  const addMessageToLobby = useCallback((lobbyId: string, msg: V2Message) => {
+    const existing = allLobbyMessagesRef.current[lobbyId] ?? []
+    const next = [...existing, msg].slice(-MAX_MESSAGES)
+    allLobbyMessagesRef.current = { ...allLobbyMessagesRef.current, [lobbyId]: next }
+    setAllLobbyMessages(prev => ({ ...prev, [lobbyId]: next }))
+  }, [])
+
+  const setActiveLobbyIdBoth = useCallback((id: string) => {
+    activeLobbyIdRef.current = id
+    setActiveLobbyId(id)
+  }, [])
+
+  const setIsInMatchBoth = useCallback((val: boolean, opponentUid?: string) => {
+    isInMatchRef.current = val
+    setIsInMatch(val)
+
+    if (!val) {
+      const socket = socketRef.current
+      const currentUser = userRef.current
+      if (wasRankedMatchRef.current) {
+        // Ranked match ended — re-queue the player automatically
+        wasRankedMatchRef.current = false
+        isRankQueuedRef.current = true
+        setIsRankQueued(true)
+        if (socket?.readyState === WebSocket.OPEN && currentUser?.uid) {
+          try {
+            socket.send(JSON.stringify({
+              type: 'updateSocketState',
+              data: {
+                uid: currentUser.uid,
+                lobbyId: activeLobbyIdRef.current,
+                stateToUpdate: { key: 'isRankQueued', value: true },
+                rankQueueGameName: rankQueueGameNameRef.current,
+              },
+            }))
+          } catch {}
+        }
+      } else if (isRankQueuedRef.current) {
+        // Challenge match ended while rank-queued — clear the queue
+        isRankQueuedRef.current = false
+        setIsRankQueued(false)
+        if (socket?.readyState === WebSocket.OPEN && currentUser?.uid) {
+          try {
+            socket.send(JSON.stringify({
+              type: 'updateSocketState',
+              data: {
+                uid: currentUser.uid,
+                lobbyId: activeLobbyIdRef.current,
+                stateToUpdate: { key: 'isRankQueued', value: false },
+              },
+            }))
+          } catch {}
+        }
+      }
+    }
+
+    // Both the current user AND the opponent get stamped with the same matchId so they
+    // form a pair in the PlayerList "In Match" section.
+    const matchId = val && opponentUid ? `local-match-${opponentUid}` : undefined
+    const myUid = userRef.current?.uid
+
+    if (opponentUid) {
+      setAllLobbyUsers(prev => {
+        const next: Record<string, V2User[]> = {}
+        for (const [lid, users] of Object.entries(prev)) {
+          next[lid] = users.map(u => {
+            if (u.uid === opponentUid || (myUid && u.uid === myUid)) {
+              return { ...u, currentMatchId: matchId }
+            }
+            return u
+          })
+        }
+        allLobbyUsersRef.current = next
+        return next
+      })
+    } else if (!val) {
+      // Match ended — clear all local match IDs (opponent + self)
+      setAllLobbyUsers(prev => {
+        const next: Record<string, V2User[]> = {}
+        for (const [lid, users] of Object.entries(prev)) {
+          next[lid] = users.map(u =>
+            u.currentMatchId?.startsWith('local-match-') ? { ...u, currentMatchId: undefined } : u
+          )
+        }
+        allLobbyUsersRef.current = next
+        return next
+      })
+    }
+  }, [])
+
+  const closePeerConnection = useCallback(() => {
+    isHandshakeInProgressRef.current = false
+    if (opponentUidRef.current) {
+      closeConnectionWithUser(opponentUidRef.current).catch(() => {})
+      opponentUidRef.current = null
+    }
+    if (peerConnectionRef.current) {
+      try { peerConnectionRef.current.close() } catch {}
+      peerConnectionRef.current = null
+    }
+  }, [])
+
+  const addSystemMessage = useCallback((text: string) => {
+    addMessageToLobby(activeLobbyIdRef.current, {
+      id: `sys-${Date.now()}-${Math.random()}`,
+      role: 'system',
+      text,
+      timeStamp: Date.now(),
+    })
+  }, [addMessageToLobby])
+
+  const resolveUserNameForUid = useCallback((uid: string): string => {
+    const lobbyId = activeLobbyIdRef.current || DEFAULT_LOBBY_ID
+    const activeUsers = allLobbyUsersRef.current[lobbyId] ?? []
+    const foundActive = activeUsers.find(u => u.uid === uid)
+    if (foundActive?.userName) return foundActive.userName
+    for (const users of Object.values(allLobbyUsersRef.current)) {
+      const found = users.find(u => u.uid === uid)
+      if (found?.userName) return found.userName
+    }
+    return uid
+  }, [])
+
+  // Patch a challenge message wherever it lives across all lobbies
+  const updateChallengeMessage = useCallback((messageId: string, patch: Partial<V2Message>) => {
+    setAllLobbyMessages(prev => {
+      const next = { ...prev }
+      for (const lid of Object.keys(next)) {
+        if (next[lid].some(m => m.id === messageId)) {
+          next[lid] = next[lid].map(m => m.id === messageId ? { ...m, ...patch } : m)
+          allLobbyMessagesRef.current = next
+          break
+        }
+      }
+      return next
+    })
+  }, [])
+
+  // Decline every pending challenge except the one being accepted
+  const declineAllPendingExcept = useCallback((exceptMessageId?: string) => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    for (const [msgId, { from }] of pendingOffersRef.current.entries()) {
+      if (msgId === exceptMessageId) continue
+      if (socket?.readyState === WebSocket.OPEN && currentUser?.uid) {
+        try { webrtcDeclineCall(socket, from, currentUser.uid) } catch {}
+      }
+      updateChallengeMessage(msgId, { challengeStatus: 'declined', challengeResponder: currentUser?.userName })
+      pendingByUserRef.current.delete(from)
+      pendingCandidatesRef.current.delete(from)
+      pendingOffersRef.current.delete(msgId)
+    }
+  }, [updateChallengeMessage])
+
+  // Clear the rank queue pending state and its timer
+  const clearRankQueuePending = useCallback(() => {
+    if (rankQueuePendingTimerRef.current) {
+      clearTimeout(rankQueuePendingTimerRef.current)
+      rankQueuePendingTimerRef.current = null
+    }
+    setRankQueuePending(null)
+  }, [])
+
+  // ── Socket lifecycle ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!user) {
+      setStatus('disconnected')
+      if (socketRef.current) {
+        socketRef.current.close()
+        socketRef.current = null
+      }
+      return
+    }
+
+    // Reset the intentional-close flag at the start of every new connection attempt.
+    // Without this, the cleanup from a prior attempt leaves the flag set to true,
+    // and the new socket's onclose bails out without scheduling another reconnect.
+    intentionalCloseRef.current = false
+    setStatus('connecting')
+    const url = `ws://${keys.COTURN_IP}:${keys.SIGNAL_PORT ?? '3004'}`
+    const socket = new WebSocket(url)
+    socketRef.current = socket
+
+    peerLatencyManager.attachSocket(socket)
+
+    socket.onopen = () => {
+      // Successful connection — clear reconnect state
+      reconnectAttemptRef.current = 0
+      reconnectStartRef.current = null
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
+      // Clear stale WebRTC state from any previous session so a reconnected
+      // socket doesn't try to use dead offers/candidates from before the drop.
+      sentMatchRequestRef.current.clear()
+      pendingOffersRef.current.clear()
+      pendingByUserRef.current.clear()
+      pendingCandidatesRef.current.clear()
+      isHandshakeInProgressRef.current = false
+      outgoingChallengeStatusMsgRef.current.clear()
+
+      // Mark any still-pending challenge UI messages as declined so they don't
+      // remain interactive after the connection dropped and offers are gone.
+      const staleMessages: Record<string, V2Message[]> = {}
+      let anyStale = false
+      for (const [lid, msgs] of Object.entries(allLobbyMessagesRef.current)) {
+        const patched = msgs.map(m => {
+          if (m.role === 'challenge' && !m.challengeStatus) {
+            anyStale = true
+            return { ...m, challengeStatus: 'declined' as const }
+          }
+          return m
+        })
+        staleMessages[lid] = patched
+      }
+      if (anyStale) {
+        allLobbyMessagesRef.current = staleMessages
+        setAllLobbyMessages(staleMessages)
+      }
+      if (peerConnectionRef.current) {
+        try { peerConnectionRef.current.close() } catch {}
+        peerConnectionRef.current = null
+      }
+      setStatus('connected')
+      const primaryLobby = subscribedLobbyIdsRef.current[0] ?? DEFAULT_LOBBY_ID
+      socket.send(JSON.stringify({
+        type: 'join',
+        user: { ...userRef.current, lobbyId: primaryLobby },
+        pass: lobbyPasswordsRef.current[primaryLobby] ?? '',
+      }))
+      // Re-subscribe to any additional saved lobbies
+      for (const lobbyId of subscribedLobbyIdsRef.current.slice(1)) {
+        try {
+          socket.send(JSON.stringify({
+            type: 'subscribeLobby',
+            lobbyId,
+            pass: lobbyPasswordsRef.current[lobbyId] ?? '',
+            user: { ...userRef.current, lobbyId },
+          }))
+        } catch {}
+      }
+    }
+
+    socket.onerror = () => setStatus('error')
+    socket.onclose = () => {
+      if (socketRef.current === socket) socketRef.current = null
+      setStatus('disconnected')
+
+      // Don't reconnect if the close was intentional (user logout / effect cleanup)
+      if (intentionalCloseRef.current || !userRef.current) {
+        intentionalCloseRef.current = false
+        return
+      }
+
+      // Start the 5-minute reconnect window on first failure
+      const now = Date.now()
+      if (reconnectStartRef.current === null) reconnectStartRef.current = now
+      const elapsed = now - reconnectStartRef.current
+
+      if (elapsed < MAX_RECONNECT_MS) {
+        const delay = Math.min(2000 * Math.pow(2, reconnectAttemptRef.current), 30_000)
+        reconnectAttemptRef.current++
+        reconnectTimerRef.current = setTimeout(() => setReconnectTick(t => t + 1), delay)
+      } else {
+        // 5 minutes elapsed — give up and reset so a future login starts fresh
+        reconnectStartRef.current = null
+        reconnectAttemptRef.current = 0
+      }
+    }
+
+    socket.onmessage = async (event: MessageEvent) => {
+      try {
+        const payload = JSON.parse(event.data as string)
+        if (!payload?.type) return
+
+        const myUid = userRef.current?.uid
+
+        switch (payload.type) {
+
+          case 'connected-users': {
+            if (!Array.isArray(payload.users)) break
+            const targetLobby =
+              typeof payload.lobbyId === 'string' && payload.lobbyId.trim()
+                ? payload.lobbyId.trim()
+                : activeLobbyIdRef.current
+            const normalized = (payload.users as any[])
+              .map((u: any) => normalizeUser(u))
+              .filter((u: V2User | null): u is V2User => u !== null)
+            setLobbyUsersForId(targetLobby, injectMockUsers(normalized, targetLobby, userRef.current))
+            break
+          }
+
+          case 'getRoomMessage': {
+            const sender = payload.sender || {}
+            const msgLobbyId =
+              typeof sender.lobbyId === 'string' && sender.lobbyId.trim()
+                ? sender.lobbyId.trim()
+                : activeLobbyIdRef.current
+            const messageText = String(payload.message || '')
+            addMessageToLobby(msgLobbyId, {
+              id: payload.id || `msg-${Date.now()}`,
+              role: 'user',
+              text: messageText,
+              timeStamp: typeof payload.timeStamp === 'number' ? payload.timeStamp : Date.now(),
+              senderUid: sender.uid,
+              userName: sender.userName || sender.name || sender.uid || 'Unknown',
+            })
+            const currentUserName = userRef.current?.userName
+            if (currentUserName && messageText.toLowerCase().includes(`@${currentUserName.toLowerCase()}`)) {
+              playMentionSound(notifMutedRef.current)
+            }
+            break
+          }
+
+          case 'lobby-user-counts': {
+            const rawLobbies = payload.updates ?? payload.lobbies
+            if (!Array.isArray(rawLobbies)) break
+            const lobbyMap = new Map<string, V2Lobby>()
+            for (const entry of rawLobbies) {
+              if (typeof entry?.name === 'string' && entry.name.trim()) {
+                const name = entry.name.trim()
+                lobbyMap.set(name, {
+                  name,
+                  users: typeof entry.users === 'number' ? entry.users : 0,
+                  isPrivate: entry.isPrivate === true,
+                  gameName: typeof entry.gameName === 'string' && entry.gameName ? entry.gameName : undefined,
+                  ownerUid: typeof entry.ownerUid === 'string' && entry.ownerUid ? entry.ownerUid : undefined,
+                })
+              }
+            }
+            if (!lobbyMap.has(DEFAULT_LOBBY_ID)) {
+              lobbyMap.set(DEFAULT_LOBBY_ID, { name: DEFAULT_LOBBY_ID, users: 0 })
+            }
+            const nextList = Array.from(lobbyMap.values())
+            lobbyListRef.current = nextList
+            setLobbyList(nextList)
+            break
+          }
+
+          case 'error': {
+            const errMsg = typeof payload.message === 'string' ? payload.message : 'An error occurred'
+            setLobbyJoinError(errMsg)
+            break
+          }
+
+          case 'lobby-joined': {
+            const newId = typeof payload.lobbyId === 'string' ? payload.lobbyId.trim() : ''
+            if (!newId) break
+            setLobbyJoinError(null)
+
+            if (payload.isSubscription) {
+              // Only switch active tab for genuinely new subscriptions, not reconnect restores
+              const isNew = !subscribedLobbyIdsRef.current.includes(newId)
+              setSubscribedLobbyIds(prev => {
+                if (prev.includes(newId)) return prev
+                const next = [...prev, newId].slice(0, MAX_SUBSCRIPTIONS)
+                subscribedLobbyIdsRef.current = next
+                return next
+              })
+              if (isNew) setActiveLobbyIdBoth(newId)
+              if (!allLobbyMessagesRef.current[newId]) {
+                allLobbyMessagesRef.current = { ...allLobbyMessagesRef.current, [newId]: [] }
+                setAllLobbyMessages(prev => ({ ...prev, [newId]: [] }))
+              }
+              if (!allLobbyUsersRef.current[newId]) {
+                const withMocks = injectMockUsers([], newId, userRef.current)
+                allLobbyUsersRef.current = { ...allLobbyUsersRef.current, [newId]: withMocks }
+                setAllLobbyUsers(prev => ({ ...prev, [newId]: withMocks }))
+              }
+            } else {
+              // Single-lobby switch (changeLobby / createLobby): replace everything
+              subscribedLobbyIdsRef.current = [newId]
+              setSubscribedLobbyIds([newId])
+              setActiveLobbyIdBoth(newId)
+              allLobbyMessagesRef.current = { [newId]: [] }
+              setAllLobbyMessages({ [newId]: [] })
+              allLobbyUsersRef.current = { [newId]: injectMockUsers([], newId, userRef.current) }
+              setAllLobbyUsers({ [newId]: injectMockUsers([], newId, userRef.current) })
+            }
+            break
+          }
+
+          case 'lobby-closed': {
+            if (typeof payload.lobbyId !== 'string') break
+            const closedId = payload.lobbyId.trim()
+            setLobbyList(prev => {
+              const next = prev.filter(l => l.name !== closedId)
+              if (!next.some(l => l.name === DEFAULT_LOBBY_ID)) {
+                next.push({ name: DEFAULT_LOBBY_ID, users: 0 })
+              }
+              return next
+            })
+            setSubscribedLobbyIds(prev => {
+              const next = prev.filter(id => id !== closedId)
+              if (next.length === 0) next.push(DEFAULT_LOBBY_ID)
+              subscribedLobbyIdsRef.current = next
+              return next
+            })
+            if (activeLobbyIdRef.current === closedId) {
+              setActiveLobbyIdBoth(subscribedLobbyIdsRef.current[0] ?? DEFAULT_LOBBY_ID)
+            }
+            break
+          }
+
+          case 'update-user-pinged': {
+            // This channel only ever carries the backend's geo-distance estimate —
+            // real measurements come from peerLatencyManager and never touch the socket.
+            const data = payload.data
+            if (!data || typeof data !== 'object') break
+            if (data.isNewPing) {
+              if (typeof data.id === 'string' || typeof data.id === 'number') {
+                const peerId = String(data.id)
+                setSelfPings(prev => {
+                  const filtered = prev.filter(p => p.id !== peerId)
+                  return [...filtered, { id: peerId, ping: data.ping ?? 0, isUnstable: Boolean(data.isUnstable), source: 'estimated' as const }]
+                })
+              }
+            } else if (Array.isArray(data.lastKnownPings)) {
+              // The backend silently omits any peer it can't geo-estimate this round
+              // (e.g. their geo lookup hasn't landed yet) — merge instead of replacing
+              // so a peer we already had a ping for doesn't regress to "unknown" just
+              // because this particular recomputation skipped them.
+              const freshPings = data.lastKnownPings.map((p: any) => ({ ...p, source: 'estimated' as const }))
+              const freshIds = new Set(freshPings.map((p: any) => p.id))
+              setSelfPings(prev => [...prev.filter(p => !freshIds.has(p.id)), ...freshPings])
+              const myUid = userRef.current?.uid
+              if (myUid) {
+                for (const [lid, users] of Object.entries(allLobbyUsersRef.current)) {
+                  const mine = users.find(u => u.uid === myUid)
+                  if (mine) {
+                    const carriedOver = (mine.lastKnownPings ?? []).filter((p: any) => !freshIds.has(p.id))
+                    const merged = [...carriedOver, ...freshPings]
+                    setLobbyUsersForId(lid, users.map(u => u.uid === myUid ? { ...u, lastKnownPings: merged } : u))
+                  }
+                }
+              }
+            }
+            break
+          }
+
+          case 'rank-queue-pending': {
+            const { matchId, playerA, playerB } = payload
+            if (!matchId || !playerA || !playerB) break
+            isRankQueuedRef.current = false
+            setIsRankQueued(false)
+            clearRankQueuePending()
+            setRankQueuePending({ matchId, playerA, playerB, expiresAt: Date.now() + 30_000 })
+            rankQueuePendingTimerRef.current = setTimeout(() => {
+              setRankQueuePending(null)
+              // Auto-decline on timeout
+              if (socketRef.current?.readyState === WebSocket.OPEN && userRef.current?.uid) {
+                try { socketRef.current.send(JSON.stringify({ type: 'rank-queue-decline', matchId, uid: userRef.current.uid })) } catch {}
+              }
+            }, 30_000)
+            break
+          }
+
+          case 'rank-queue-timeout':
+          case 'rank-queue-cancelled':
+            clearRankQueuePending()
+            wasRankedMatchRef.current = false
+            addSystemMessage(
+              payload.type === 'rank-queue-cancelled' && payload.reason === 'opponent-declined'
+                ? 'Your opponent declined the ranked match.'
+                : 'Ranked match expired.'
+            )
+            break
+
+          case 'webrtc-ping-offer': {
+            if (!myUid || !payload.from || !payload.offer) break
+            // TODO: also decline if the challenger is spectating once spectating exists
+            if (
+              isInMatchRef.current ||
+              isRankQueuedRef.current ||
+              isHandshakeInProgressRef.current ||
+              useSettingsStore.getState().isUserMuted(payload.from as string)
+            ) {
+              try { socket.send(JSON.stringify({ type: 'webrtc-ping-decline', to: payload.from, from: myUid })) } catch {}
+              break
+            }
+
+            const existingMsgId = pendingByUserRef.current.get(payload.from as string)
+            const messageId = existingMsgId || `incoming-challenge-${payload.from}-${Date.now()}`
+
+            pendingOffersRef.current.set(messageId, { from: payload.from, offer: payload.offer })
+            pendingByUserRef.current.set(payload.from as string, messageId)
+            pendingCandidatesRef.current.set(payload.from as string, [])
+
+            let challengerName = String(payload.from)
+            for (const users of Object.values(allLobbyUsersRef.current)) {
+              const found = users.find(u => u.uid === payload.from)
+              if (found) { challengerName = found.userName; break }
+            }
+
+            const senderLobbyId = (payload.lobbyId as string | undefined) && subscribedLobbyIdsRef.current.includes(payload.lobbyId as string)
+              ? (payload.lobbyId as string)
+              : activeLobbyIdRef.current
+            const activeLobbyGame = lobbyListRef.current.find(l => l.name === senderLobbyId)?.gameName
+
+            if (existingMsgId) {
+              updateChallengeMessage(existingMsgId, {
+                timeStamp: Date.now(),
+                challengeStatus: undefined,
+                challengeResponder: undefined,
+                challengeGameName: activeLobbyGame,
+              })
+            } else {
+              playChallengeSound(notifMutedRef.current)
+              addMessageToLobby(senderLobbyId, {
+                id: messageId,
+                role: 'challenge',
+                text: `${challengerName} wants to challenge you!`,
+                timeStamp: Date.now(),
+                userName: challengerName,
+                senderUid: payload.from as string,
+                challengeChallengerId: payload.from as string,
+                challengeOpponentId: myUid,
+                challengeGameName: activeLobbyGame,
+              })
+            }
+            break
+          }
+
+          case 'webrtc-ping-answer': {
+            if (!payload.from || !payload.answer) break
+            try {
+              if (peerConnectionRef.current) {
+                await peerConnectionRef.current.setRemoteDescription(
+                  new RTCSessionDescription(payload.answer as RTCSessionDescriptionInit)
+                )
+                opponentUidRef.current = payload.from as string
+
+                // Flush queued ICE candidates now that remote description is set
+                const queued = pendingCandidatesRef.current.get(payload.from as string) || []
+                for (const candidate of queued) {
+                  try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate)) } catch {}
+                }
+                pendingCandidatesRef.current.delete(payload.from as string)
+              }
+            } catch (err) {
+              console.error('[v2] Failed to set remote description from answer:', err)
+            }
+
+            // Update the "You challenged X" local feedback message (caller side)
+            // to confirm the opponent accepted by answering the offer.
+            if (payload.from) {
+              const fromUid = payload.from as string
+              const msgId = outgoingChallengeStatusMsgRef.current.get(fromUid)
+              if (msgId) {
+                const displayName = resolveUserNameForUid(fromUid)
+                updateChallengeMessage(msgId, {
+                  text: `${displayName} accepted your challenge.`,
+                  timeStamp: Date.now(),
+                })
+                outgoingChallengeStatusMsgRef.current.delete(fromUid)
+              }
+            }
+
+            const lobbyForMatch = activeLobbyIdRef.current || DEFAULT_LOBBY_ID
+            const inferredGameName = lobbyListRef.current.find(l => l.name === lobbyForMatch)?.gameName
+            const requesterUid = userRef.current?.uid
+
+            if (
+              !isInMatchRef.current &&
+              requesterUid &&
+              payload.from &&
+              !isMockUserId(payload.from as string) &&
+              !sentMatchRequestRef.current.has(payload.from as string)
+            ) {
+              isHandshakeInProgressRef.current = true
+              socket.send(JSON.stringify({
+                type: 'request-match',
+                challengerId: requesterUid,
+                opponentId: payload.from,
+                requestedBy: requesterUid,
+                lobbyId: lobbyForMatch,
+                gameName: inferredGameName,
+              }))
+              sentMatchRequestRef.current.add(payload.from as string)
+            }
+            break
+          }
+
+          case 'webrtc-ping-candidate': {
+            if (!payload.candidate || !payload.from) break
+            try {
+              const pc = peerConnectionRef.current
+              const knownOpponent = opponentUidRef.current === payload.from
+              const hasRemoteDesc = !!pc?.remoteDescription
+              if (pc && knownOpponent && hasRemoteDesc) {
+                await pc.addIceCandidate(
+                  new RTCIceCandidate(payload.candidate as RTCIceCandidateInit)
+                )
+              } else {
+                // Queue: remote description not yet set, or opponent not yet identified
+                const queued = pendingCandidatesRef.current.get(payload.from as string) || []
+                queued.push(payload.candidate as RTCIceCandidateInit)
+                pendingCandidatesRef.current.set(payload.from as string, queued)
+              }
+            } catch (err) {
+              console.error('[v2] Failed to add ICE candidate:', err)
+            }
+            break
+          }
+
+          case 'webrtc-ping-decline': {
+            if (payload.from) {
+              const fromUid = payload.from as string
+              const msgId = outgoingChallengeStatusMsgRef.current.get(fromUid)
+              if (msgId) {
+                const displayName = resolveUserNameForUid(fromUid)
+                updateChallengeMessage(msgId, {
+                  text: `${displayName} declined your challenge.`,
+                  timeStamp: Date.now(),
+                })
+                outgoingChallengeStatusMsgRef.current.delete(fromUid)
+              }
+              if (opponentUidRef.current === payload.from) closePeerConnection()
+              sentMatchRequestRef.current.delete(payload.from as string)
+              isHandshakeInProgressRef.current = false
+              addSystemMessage('Challenge was declined.')
+            }
+            break
+          }
+
+          case 'match-start': {
+            if (isInMatchRef.current) break
+            const matchId = typeof payload.matchId === 'string' ? payload.matchId : undefined
+            const opponentUid = typeof payload.opponentUid === 'string' ? payload.opponentUid : undefined
+            const rawSlot = payload.playerSlot !== undefined ? Number(payload.playerSlot) : undefined
+            if (!matchId || !opponentUid || rawSlot === undefined) break
+            const playerSlot: 0 | 1 = rawSlot === 0 ? 0 : 1
+            const serverHost = typeof payload.serverHost === 'string' && payload.serverHost ? payload.serverHost : undefined
+            const serverPort = payload.serverPort !== undefined ? Number(payload.serverPort) : undefined
+            const gameName = typeof payload.gameName === 'string' && payload.gameName ? payload.gameName : undefined
+            // Clear any pending ranked match popup now that the match is starting
+            clearRankQueuePending()
+            isHandshakeInProgressRef.current = false
+            activeMatchIdRef.current = matchId
+            localPlayerSlotRef.current = playerSlot
+            setIsInMatchBoth(true, opponentUid)
+            try {
+              await startProxyMatch({ matchId, opponentUid, playerSlot, serverHost, serverPort, gameName })
+            } catch (err) {
+              console.error('[v2] Failed to start proxy match:', err)
+              isHandshakeInProgressRef.current = false
+              setIsInMatchBoth(false)
+            }
+            sentMatchRequestRef.current.delete(opponentUid)
+            break
+          }
+
+          case 'match-force-close':
+          case 'matchEndedClose': {
+            setIsInMatchBoth(false)
+            closePeerConnection()
+            break
+          }
+
+          case 'match-start-error': {
+            isHandshakeInProgressRef.current = false
+            wasRankedMatchRef.current = false
+            setIsInMatchBoth(false)
+            if (typeof payload.opponentId === 'string') sentMatchRequestRef.current.delete(payload.opponentId)
+            if (typeof payload.challengerId === 'string') sentMatchRequestRef.current.delete(payload.challengerId)
+            addSystemMessage('Match failed to start. Please try again.')
+            break
+          }
+
+          case 'peer-latency-offer':
+          case 'peer-latency-answer':
+          case 'peer-latency-candidate':
+          case 'peer-latency-decline':
+            peerLatencyManager.handleSignal(payload)
+            break
+
+          default:
+            break
+        }
+      } catch (err) {
+        console.error('[v2] Failed to process socket message:', err)
+      }
+    }
+
+    return () => {
+      intentionalCloseRef.current = true
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
+      socket.close()
+      if (socketRef.current === socket) socketRef.current = null
+      peerLatencyManager.attachSocket(null)
+    }
+  }, [user?.uid, reconnectTick, setLobbyUsersForId, addMessageToLobby, setActiveLobbyIdBoth, setIsInMatchBoth, closePeerConnection, addSystemMessage, updateChallengeMessage, clearRankQueuePending, resolveUserNameForUid])
+
+  // ── Mock challenge interval (debug lobby only) ────────────────────────────
+
+  useEffect(() => {
+    if (!user?.uid) return
+
+    const MOCK_INTERVAL_MS = 8000
+    const MOCK_CHALLENGE_LINES = [
+      'wants to run a FT3 if you are up for it.',
+      'is sending over a challenge request right now.',
+      'thinks you owe them a rematch.',
+    ]
+    const MOCK_MENTION_LINES = [
+      'Hey @{player}, ready for a quick set?',
+      'I have a new combo to test on you, @{player}.',
+      'Your defense is looking sharp @{player}, mind if I poke at it?',
+      'Anyone else here? Guess it is just you and me @{player}.',
+    ]
+
+    const tick = () => {
+      const lobbyId = activeLobbyIdRef.current
+      if (lobbyId.trim().toLowerCase() !== 'debug') return
+      if (isInMatchRef.current) return
+      if (Math.random() >= 0.5) return
+
+      const mockUser = Math.random() < 0.5 ? MOCK_USER_1 : MOCK_USER_2
+      const now = Date.now()
+      const myUid = userRef.current?.uid
+      const myName = userRef.current?.userName ?? 'Player'
+      if (!myUid) return
+
+      if (useSettingsStore.getState().isUserMuted(mockUser.uid)) return
+
+      // 50/50 between a challenge and an @mention
+      if (Math.random() < 0.5) {
+        // — Challenge —
+        const existing = allLobbyMessagesRef.current[lobbyId] ?? []
+        const hasPending = existing.some(
+          m => m.role === 'challenge' && m.senderUid === mockUser.uid && !m.challengeStatus
+        )
+        if (hasPending) return
+
+        const activeLobbyGame = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName
+        const line = MOCK_CHALLENGE_LINES[Math.floor(Math.random() * MOCK_CHALLENGE_LINES.length)]
+        const messageId = `mock-challenge-${mockUser.uid}-${now}`
+
+        pendingOffersRef.current.set(messageId, {
+          from: mockUser.uid,
+          offer: {} as RTCSessionDescriptionInit,
+        })
+        pendingByUserRef.current.set(mockUser.uid, messageId)
+
+        playChallengeSound(notifMutedRef.current)
+        addMessageToLobby(lobbyId, {
+          id: messageId,
+          role: 'challenge',
+          text: `${mockUser.userName} ${line}`,
+          timeStamp: now,
+          userName: mockUser.userName,
+          senderUid: mockUser.uid,
+          challengeChallengerId: mockUser.uid,
+          challengeOpponentId: myUid,
+          challengeGameName: activeLobbyGame,
+        })
+      } else {
+        // — @mention —
+        const line = MOCK_MENTION_LINES[Math.floor(Math.random() * MOCK_MENTION_LINES.length)]
+        const text = line.replace('{player}', myName)
+
+        playMentionSound(notifMutedRef.current)
+        addMessageToLobby(lobbyId, {
+          id: `mock-mention-${mockUser.uid}-${now}`,
+          role: 'user',
+          text,
+          timeStamp: now,
+          userName: mockUser.userName,
+          senderUid: mockUser.uid,
+        })
+      }
+    }
+
+    const id = window.setInterval(tick, MOCK_INTERVAL_MS)
+    return () => window.clearInterval(id)
+  }, [user?.uid, addMessageToLobby])
+
+  // ── Tauri emulator-exit listener ─────────────────────────────────────────
+
+  useEffect(() => {
+    if (typeof (window as any).__TAURI_INTERNALS__ === 'undefined') return
+    let unlistenEnd: (() => void) | null = null
+    let unlistenEndUi: (() => void) | null = null
+
+    const handleEnd = () => {
+      setIsInMatchBoth(false)
+      closePeerConnection()
+      const socket = socketRef.current
+      const uid = userRef.current?.uid
+      if (socket?.readyState === WebSocket.OPEN && uid) {
+        try { socket.send(JSON.stringify({ type: 'matchEnd', userUID: uid })) } catch {}
+      }
+    }
+
+    listen('endMatch', handleEnd).then(fn => { unlistenEnd = fn }).catch(() => {})
+    listen('endMatchUI', handleEnd).then(fn => { unlistenEndUi = fn }).catch(() => {})
+
+    return () => {
+      unlistenEnd?.()
+      unlistenEndUi?.()
+    }
+  }, [setIsInMatchBoth, closePeerConnection])
+
+  // ── Public API ────────────────────────────────────────────────────────────────
+
+  const sendMessage = useCallback((text: string): boolean => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return false
+    try {
+      socket.send(JSON.stringify({
+        type: 'sendMessage',
+        message: text,
+        messageId: `${currentUser.uid}-${Date.now()}`,
+        sender: { ...currentUser, lobbyId: activeLobbyIdRef.current },
+      }))
+      return true
+    } catch { return false }
+  }, [])
+
+  const subscribeLobby = useCallback((lobbyId: string, pass?: string): boolean => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return false
+    if (subscribedLobbyIdsRef.current.includes(lobbyId)) {
+      setActiveLobbyIdBoth(lobbyId)
+      return true
+    }
+    if (subscribedLobbyIdsRef.current.length >= MAX_SUBSCRIPTIONS) return false
+    try {
+      socket.send(JSON.stringify({
+        type: 'subscribeLobby',
+        lobbyId,
+        pass: pass ?? '',
+        user: { ...currentUser, lobbyId },
+      }))
+      if (pass) { lobbyPasswordsRef.current = { ...lobbyPasswordsRef.current, [lobbyId]: pass }; setLobbyPasswords(lobbyPasswordsRef.current) }
+      return true
+    } catch { return false }
+  }, [setActiveLobbyIdBoth])
+
+  const unsubscribeLobby = useCallback((lobbyId: string): void => {
+    const socket = socketRef.current
+    if (socket?.readyState === WebSocket.OPEN) {
+      try { socket.send(JSON.stringify({ type: 'unsubscribeLobby', lobbyId })) } catch {}
+    }
+    setSubscribedLobbyIds(prev => {
+      const next = prev.filter(id => id !== lobbyId)
+      if (next.length === 0) next.push(DEFAULT_LOBBY_ID)
+      subscribedLobbyIdsRef.current = next
+      return next
+    })
+    if (activeLobbyIdRef.current === lobbyId) {
+      setActiveLobbyIdBoth(subscribedLobbyIdsRef.current[0] ?? DEFAULT_LOBBY_ID)
+    }
+    setAllLobbyMessages(prev => { const n = { ...prev }; delete n[lobbyId]; allLobbyMessagesRef.current = n; return n })
+    setAllLobbyUsers(prev => { const n = { ...prev }; delete n[lobbyId]; allLobbyUsersRef.current = n; return n })
+    const { [lobbyId]: _, ...remainingPasswords } = lobbyPasswordsRef.current
+    lobbyPasswordsRef.current = remainingPasswords
+    setLobbyPasswords(remainingPasswords)
+  }, [setActiveLobbyIdBoth])
+
+  const createLobby = useCallback((lobbyId: string, pass: string, isPrivate: boolean, gameName?: string): boolean => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return false
+    try {
+      socket.send(JSON.stringify({
+        type: 'createLobby',
+        lobbyId,
+        pass,
+        isPrivate,
+        gameName: gameName || undefined,
+        user: { ...currentUser, lobbyId },
+      }))
+      if (pass) { lobbyPasswordsRef.current = { ...lobbyPasswordsRef.current, [lobbyId]: pass }; setLobbyPasswords(lobbyPasswordsRef.current) }
+      return true
+    } catch { return false }
+  }, [])
+
+  const sendChallenge = useCallback(async (targetUid: string): Promise<void> => {
+    const currentUser = userRef.current
+    if (!currentUser?.uid || isInMatchRef.current || isRankQueuedRef.current) return
+
+    const lobbyIdForMessage = activeLobbyIdRef.current || DEFAULT_LOBBY_ID
+    const opponentName = isMockUserId(targetUid)
+      ? (getMockUser(targetUid)?.userName ?? targetUid)
+      : resolveUserNameForUid(targetUid)
+
+    const statusMsgId = `sys-challenge-${Date.now()}-${Math.random()}`
+    outgoingChallengeStatusMsgRef.current.set(targetUid, statusMsgId)
+    addMessageToLobby(lobbyIdForMessage, {
+      id: statusMsgId,
+      role: 'system',
+      text: `You challenged ${opponentName}.`,
+      timeStamp: Date.now(),
+    })
+
+    if (isMockUserId(targetUid)) {
+      const lobbyId = activeLobbyIdRef.current
+      const gameName = lobbyListRef.current.find(l => l.name === lobbyId)?.gameName ?? null
+      console.log('current lobby game name', gameName)
+      const mockUser = getMockUser(targetUid)
+      const mockMatchId = `mock-${Date.now()}`
+      activeMatchIdRef.current = mockMatchId
+      localPlayerSlotRef.current = 0
+      setIsInMatchBoth(true, targetUid)
+      try {
+        await startMockMatch({ matchId: mockMatchId, opponentName: mockUser?.userName ?? 'Bot', gameName, playerSlot: 0 })
+      } catch (err) {
+        console.error('[v2] Failed to start mock match:', err)
+        setIsInMatchBoth(false)
+      }
+      return
+    }
+
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) return
+    const existingSessionId = casualSessionRef.current.get(targetUid)
+    const sessionId = existingSessionId || `casual-${targetUid}-${Date.now()}`
+    casualSessionRef.current.set(targetUid, sessionId)
+    activeMatchIdRef.current = sessionId
+    closePeerConnection()
+    sentMatchRequestRef.current.delete(targetUid)
+    isHandshakeInProgressRef.current = true
+
+    try {
+      const peer = await initWebRTC(currentUser.uid, targetUid, socket)
+      peerConnectionRef.current = peer
+      opponentUidRef.current = targetUid
+      lastMatchOpponentUidRef.current = targetUid
+      localPlayerSlotRef.current = 0
+      await startCall(peer, socket, targetUid, currentUser.uid, true, activeLobbyIdRef.current)
+    } catch (err) {
+      console.error('[v2] Failed to initiate challenge:', err)
+      isHandshakeInProgressRef.current = false
+      closePeerConnection()
+    }
+  }, [setIsInMatchBoth, closePeerConnection, addMessageToLobby, resolveUserNameForUid])
+
+  const acceptChallenge = useCallback(async (messageId: string): Promise<void> => {
+    const currentUser = userRef.current
+    if (!currentUser?.uid || isInMatchRef.current) return
+
+    const pendingOffer = pendingOffersRef.current.get(messageId)
+    if (!pendingOffer) {
+      addSystemMessage('Could not accept challenge (offer missing). Ask them to re-challenge.')
+      updateChallengeMessage(messageId, { challengeStatus: 'declined', challengeResponder: currentUser.userName })
+      return
+    }
+    const { from, offer } = pendingOffer
+
+    if (isMockUserId(from)) {
+      pendingOffersRef.current.delete(messageId)
+      pendingByUserRef.current.delete(from)
+      pendingCandidatesRef.current.delete(from)
+      const mockUser = getMockUser(from)
+      const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
+      console.log(gameName, 'on accept')
+      activeMatchIdRef.current = messageId
+      localPlayerSlotRef.current = 1
+      setIsInMatchBoth(true, from)
+      try {
+        await startMockMatch({ matchId: messageId, opponentName: mockUser?.userName ?? 'Bot', gameName, playerSlot: 1 })
+      } catch (err) {
+        console.error('[v2] Failed to start mock match from accept:', err)
+        setIsInMatchBoth(false)
+      }
+      return
+    }
+
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      addSystemMessage('Could not accept challenge (not connected).')
+      updateChallengeMessage(messageId, { challengeStatus: 'declined', challengeResponder: currentUser.userName })
+      pendingOffersRef.current.delete(messageId)
+      pendingByUserRef.current.delete(from)
+      pendingCandidatesRef.current.delete(from)
+      return
+    }
+
+    declineAllPendingExcept(messageId)
+    updateChallengeMessage(messageId, { challengeStatus: 'accepted', challengeResponder: currentUser.userName })
+    activeMatchIdRef.current = messageId
+    isHandshakeInProgressRef.current = true
+
+    if (isRankQueuedRef.current) {
+      isRankQueuedRef.current = false
+      setIsRankQueued(false)
+      clearRankQueuePending()
+      const socket2 = socketRef.current
+      if (socket2?.readyState === WebSocket.OPEN) {
+        try {
+          socket2.send(JSON.stringify({
+            type: 'updateSocketState',
+            data: { uid: currentUser.uid, lobbyId: activeLobbyIdRef.current, stateToUpdate: { key: 'isRankQueued', value: false } },
+          }))
+        } catch {}
+      }
+    }
+
+    if (peerConnectionRef.current) {
+      try { peerConnectionRef.current.close() } catch {}
+      peerConnectionRef.current = null
+    }
+
+    try {
+      const peer = await initWebRTC(currentUser.uid, from, socket)
+      peerConnectionRef.current = peer
+      opponentUidRef.current = from
+      lastMatchOpponentUidRef.current = from
+      localPlayerSlotRef.current = 1
+
+      await peer.setRemoteDescription(new RTCSessionDescription(offer))
+
+      const queued = pendingCandidatesRef.current.get(from) || []
+      for (const candidate of queued) {
+        try { await peer.addIceCandidate(new RTCIceCandidate(candidate)) } catch {}
+      }
+      pendingCandidatesRef.current.delete(from)
+
+      await answerCall(peer, socket, from, currentUser.uid)
+    } catch (err) {
+      console.error('[v2] Failed to accept challenge:', err)
+      isHandshakeInProgressRef.current = false
+      closePeerConnection()
+      if (socket.readyState === WebSocket.OPEN && currentUser.uid) {
+        try { await webrtcDeclineCall(socket, from, currentUser.uid) } catch {}
+      }
+    } finally {
+      pendingOffersRef.current.delete(messageId)
+      pendingByUserRef.current.delete(from)
+      pendingCandidatesRef.current.delete(from)
+    }
+  }, [setIsInMatchBoth, closePeerConnection, updateChallengeMessage, declineAllPendingExcept, addSystemMessage, clearRankQueuePending])
+
+  const declineChallenge = useCallback(async (messageId: string): Promise<void> => {
+    const currentUser = userRef.current
+    const pendingOffer = pendingOffersRef.current.get(messageId)
+    updateChallengeMessage(messageId, { challengeStatus: 'declined', challengeResponder: currentUser?.userName })
+
+    if (!pendingOffer) return
+    const { from } = pendingOffer
+    const socket = socketRef.current
+
+    if (socket?.readyState === WebSocket.OPEN && currentUser?.uid) {
+      try { await webrtcDeclineCall(socket, from, currentUser.uid) } catch (err) {
+        console.error('[v2] Failed to send decline:', err)
+      }
+    }
+
+    pendingOffersRef.current.delete(messageId)
+    pendingByUserRef.current.delete(from)
+    pendingCandidatesRef.current.delete(from)
+  }, [updateChallengeMessage])
+
+  const markMatchEnded = useCallback(() => {
+    setIsInMatchBoth(false)
+    closePeerConnection()
+  }, [setIsInMatchBoth, closePeerConnection])
+
+  const mockRankTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleRankQueue = useCallback((isQueue: boolean, gameName?: string): void => {
+    console.log('ranked queue selected game', gameName)
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return
+    if (isQueue && isInMatchRef.current) return
+
+    isRankQueuedRef.current = isQueue
+    setIsRankQueued(isQueue)
+    if (isQueue) rankQueueGameNameRef.current = gameName ?? 'sfiii3nr1'
+
+    try {
+      socket.send(JSON.stringify({
+        type: 'updateSocketState',
+        data: {
+          uid: currentUser.uid,
+          lobbyId: activeLobbyIdRef.current,
+          stateToUpdate: { key: 'isRankQueued', value: isQueue },
+          rankQueueGameName: isQueue ? (gameName ?? 'sfiii3nr1') : undefined,
+        },
+      }))
+    } catch {}
+
+    // Clear any existing mock rank timer
+    if (mockRankTimerRef.current) {
+      clearTimeout(mockRankTimerRef.current)
+      mockRankTimerRef.current = null
+    }
+
+    if (!isQueue) {
+      // If cancelling the queue, also dismiss any pending popup
+      clearRankQueuePending()
+      return
+    }
+
+    // In the debug lobby, simulate a match-found popup after ~3s
+    if (activeLobbyIdRef.current.trim().toLowerCase() === 'debug') {
+      mockRankTimerRef.current = setTimeout(() => {
+        if (isInMatchRef.current || !userRef.current) return
+        const myUser = userRef.current
+        const mockUser = MOCK_USER_1
+        const mockMatchId = `mock-rank-${Date.now()}`
+        clearRankQueuePending()
+        setRankQueuePending({
+          matchId: mockMatchId,
+          playerA: { uid: myUser.uid, userName: myUser.userName, countryCode: myUser.countryCode, accountElo: myUser.accountElo, ping: 46 },
+          playerB: { uid: mockUser.uid, userName: mockUser.userName, countryCode: mockUser.countryCode, accountElo: mockUser.accountElo, ping: 46 },
+          expiresAt: Date.now() + 30_000,
+          isMock: true,
+        })
+        rankQueuePendingTimerRef.current = setTimeout(() => {
+          setRankQueuePending(null)
+        }, 30_000)
+      }, 3000)
+    }
+  }, [clearRankQueuePending])
+
+  const rankQueueAccept = useCallback(async (matchId: string, isMock?: boolean): Promise<void> => {
+    if (isInMatchRef.current) return
+    clearRankQueuePending()
+    declineAllPendingExcept()
+
+    if (isMock) {
+      if (!userRef.current) return
+      const gameName = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)?.gameName ?? null
+      wasRankedMatchRef.current = true
+      activeMatchIdRef.current = matchId
+      localPlayerSlotRef.current = 0
+      setIsInMatchBoth(true, MOCK_USER_1.uid)
+      console.log(gameName, 'ranked accept')
+      try {
+        await startMockMatch({ matchId, opponentName: MOCK_USER_1.userName, gameName, playerSlot: 0 })
+      } catch (err) {
+        console.error('[v2] Failed to start mock ranked match:', err)
+        setIsInMatchBoth(false)
+      }
+      return
+    }
+
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !userRef.current) return
+    try {
+      wasRankedMatchRef.current = true
+      socket.send(JSON.stringify({ type: 'rank-queue-accept', matchId, uid: userRef.current.uid }))
+    } catch {}
+  }, [clearRankQueuePending, setIsInMatchBoth, declineAllPendingExcept])
+
+  const rankQueueDecline = useCallback((matchId: string, isMock?: boolean): void => {
+    clearRankQueuePending()
+
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return
+
+    if (!isMock) {
+      try {
+        socket.send(JSON.stringify({ type: 'rank-queue-decline', matchId, uid: currentUser.uid }))
+      } catch {}
+    }
+
+    isRankQueuedRef.current = true
+    setIsRankQueued(true)
+    try {
+      socket.send(JSON.stringify({
+        type: 'updateSocketState',
+        data: {
+          uid: currentUser.uid,
+          lobbyId: activeLobbyIdRef.current,
+          stateToUpdate: { key: 'isRankQueued', value: true },
+          rankQueueGameName: rankQueueGameNameRef.current,
+        },
+      }))
+    } catch {}
+  }, [clearRankQueuePending])
+
+  const setAfk = useCallback((val: boolean): void => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser) return
+
+    // Optimistic update — immediately reflect in every lobby so the UI doesn't
+    // wait for the server roundtrip before moving the user to the AFK section.
+    const myUid = currentUser.uid
+    setAllLobbyUsers(prev => {
+      const next: Record<string, V2User[]> = {}
+      for (const [lid, users] of Object.entries(prev)) {
+        next[lid] = users.map(u => u.uid === myUid ? { ...u, isAfk: val } : u)
+      }
+      allLobbyUsersRef.current = next
+      return next
+    })
+
+    try {
+      socket.send(JSON.stringify({
+        type: 'updateSocketState',
+        data: {
+          uid: currentUser.uid,
+          lobbyId: activeLobbyIdRef.current,
+          stateToUpdate: { key: 'isAfk', value: val },
+        },
+      }))
+    } catch {}
+  }, [])
+
+  const reorderLobbies = useCallback((newOrder: string[]) => {
+    subscribedLobbyIdsRef.current = newOrder
+    setSubscribedLobbyIds(newOrder)
+  }, [])
+
+  const pushProfileUpdate = useCallback((updatedUser: V2User): void => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) return
+    try {
+      socket.send(JSON.stringify({ type: 'updateProfile', user: updatedUser }))
+    } catch {}
+  }, [])
+
+  const updateLobbyGame = useCallback((lobbyId: string, gameName: string): void => {
+    const socket = socketRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN) return
+    try {
+      socket.send(JSON.stringify({ type: 'updateLobbyGame', lobbyId, gameName }))
+      const updated = lobbyListRef.current.map(l =>
+        l.name === lobbyId ? { ...l, gameName: gameName || undefined } : l
+      )
+      lobbyListRef.current = updated
+      setLobbyList(updated)
+    } catch {}
+  }, [])
+
+  // Derived: active-tab slice
+  const lobbyUsers = allLobbyUsers[activeLobbyId] ?? []
+  const messages = allLobbyMessages[activeLobbyId] ?? []
+
+  // Keep peerLatencyManager peers in sync with the active lobby
+  useEffect(() => {
+    peerLatencyManager.setPeers(lobbyUsers as any)
+  }, [lobbyUsers])
+
+  const handleMatchStats = useCallback(async (rawData: string) => {
+    if (!rawData?.trim()) return
+    matchUploadPendingRef.current = true
+    try {
+      const parsed = parseMatchData(rawData)
+      if (!parsed) return
+
+      const pickValue = (entry: unknown): string | number | undefined => {
+        if (Array.isArray(entry)) {
+          const last = entry[entry.length - 1]
+          return typeof last === 'string' || typeof last === 'number' ? last : undefined
+        }
+        return typeof entry === 'string' || typeof entry === 'number' ? entry : undefined
+      }
+
+      const rawMatchUuid = pickValue(parsed['match-uuid'])
+      const matchUuid = rawMatchUuid !== undefined ? String(rawMatchUuid) : undefined
+      if (matchUuid && lastMatchUuidRef.current === matchUuid) return
+      if (matchUuid) lastMatchUuidRef.current = matchUuid
+
+      const viewer = userRef.current
+      if (!viewer?.uid || !auth.currentUser) return
+
+      const opponentUid = opponentUidRef.current || lastMatchOpponentUidRef.current
+      const isPlayerOne = localPlayerSlotRef.current === 0
+      if (!isPlayerOne) {
+        console.info('[match-tracker] skipping upload — not the designated uploader')
+        return
+      }
+
+      const resolvedOpponentUid = opponentUid || 'unknown-opponent'
+      const matchId = activeMatchIdRef.current || matchUuid || `local-${viewer.uid}-${Date.now()}`
+
+      const condensed = buildCondensedMatchPayload(parsed)
+      await api.uploadMatchData(auth, {
+        matchId,
+        player1: isPlayerOne ? viewer.uid : resolvedOpponentUid,
+        player2: isPlayerOne ? resolvedOpponentUid : viewer.uid,
+        matchData: { raw: JSON.stringify(condensed) },
+      })
+      lastMatchOpponentUidRef.current = null
+    } catch (error) {
+      console.error('[match-tracker] Failed to upload match data', error)
+    } finally {
+      matchUploadPendingRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isTauriEnv()) return
+
+    let cancelled = false
+    let busy = false
+
+    const poll = async () => {
+      if (cancelled || busy || matchUploadPendingRef.current) return
+      busy = true
+      try {
+        const activeLobby = lobbyListRef.current.find(l => l.name === activeLobbyIdRef.current)
+        const gameRom = activeLobby?.gameName ?? 'sfiii3nr1'
+        if (gameRom !== 'sfiii3nr1') return
+
+        const command = await readMatchCommandFile()
+        if (!command?.trim()) return
+        await clearMatchCommandFile()
+        if (!command.toLowerCase().includes('read-tracking-file')) return
+
+        const { winSound, winSoundPath } = useSettingsStore.getState()
+        if (winSound && winSoundPath) {
+          invoke('play_sound', { path: winSoundPath }).catch(() => {})
+        }
+
+        const rawStats = await readMatchStatsFile()
+        await clearMatchStatsFile()
+        if (rawStats?.trim()) {
+          console.info('[match-tracker] received stats payload; uploading…')
+          await handleMatchStats(rawStats)
+        }
+      } catch (error) {
+        console.error('[match-tracker] Failed to process match tracking data', error)
+      } finally {
+        busy = false
+      }
+    }
+
+    const intervalId = window.setInterval(() => { void poll() }, 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [handleMatchStats, userRef.current?.uid])
+
+  const isReconnecting = status === 'disconnected' && reconnectAttemptRef.current > 0
+
+  const measurePingNow = useCallback((uid: string) => {
+    peerLatencyManager.triggerMeasureNow(uid)
+  }, [])
+
+  return {
+    status,
+    isReconnecting,
+    subscribedLobbyIds,
+    activeLobbyId,
+    setActiveLobbyId: setActiveLobbyIdBoth,
+    lobbyUsers,
+    messages,
+    allLobbyMessages,
+    allLobbyUsers,
+    lobbyList,
+    isInMatch,
+    isRankQueued,
+    selfPings,
+    rankQueuePending,
+    sendMessage,
+    subscribeLobby,
+    unsubscribeLobby,
+    reorderLobbies,
+    updateLobbyGame,
+    pushProfileUpdate,
+    createLobby,
+    sendChallenge,
+    acceptChallenge,
+    declineChallenge,
+    markMatchEnded,
+    toggleRankQueue,
+    rankQueueAccept,
+    rankQueueDecline,
+    setAfk,
+    lobbyPasswords,
+    lobbyJoinError,
+    clearLobbyJoinError: () => setLobbyJoinError(null),
+    measuringUids,
+    unreachableUids,
+    measurePingNow,
+  }
+}

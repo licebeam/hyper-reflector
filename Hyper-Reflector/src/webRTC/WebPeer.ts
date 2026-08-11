@@ -65,7 +65,8 @@ export async function startCall(
     signalingSocket: WebSocket,
     to: string,
     from: string,
-    isCaller?: boolean // debug feature
+    isCaller?: boolean, // debug feature
+    lobbyId?: string
 ) {
     if (!isCaller) return
 
@@ -81,6 +82,7 @@ export async function startCall(
                 to,
                 from,
                 offer,
+                lobbyId,
             })
         )
     }
@@ -131,59 +133,16 @@ async function addDataChannel(peerConnection: RTCPeerConnection, to: string, fro
         channel.send('Hi!')
     }
 
-    // channel.onmessage = (event) => {
-    //     console.log('Data message from', to, '=>', event.data)
-    // }
-
     channel.onmessage = (event) => {
         try {
             const data = JSON.parse(event.data)
-            if (data.type === 'ping') {
-                // Echo back the ping with type 'pong'
-                channel.send(JSON.stringify({ type: 'pong', time: data.time }))
-            } else if (data.type === 'pong') {
-                const now = Date.now()
-                const rtt = now - data.time
-                console.log(`Ping RTT from ${to}: ${rtt} ms`)
-            } else {
-                console.log('Data message from', to, '=>', data)
-            }
+            console.log('Data message from', to, '=>', data)
         } catch (e) {
             console.log('Raw message from', to, '=>', event.data)
         }
     }
 
     dataChannels.push({ to, from, channel })
-}
-
-export function webCheckData(peerConnection: RTCPeerConnection) {
-    // This is for debug purposes
-    // if (peerConnection) {
-    //     console.log('signalling state', peerConnection.signalingState)
-    //     console.log('ice gathering state', peerConnection.iceGatheringState)
-    //     console.log('ice connection state', peerConnection.iceConnectionState)
-    //     console.log('remote state', peerConnection.currentRemoteDescription)
-    //     console.log('local state', peerConnection.currentLocalDescription)
-    //     if (dataChannels && dataChannels.length) {
-    //         console.log('data channel id? ', dataChannels[0]?.channel?.id || 'no id')
-    //         console.log(
-    //             'data channel is ready? ',
-    //             dataChannels[0]?.channel?.readyState || 'no channel'
-    //         )
-    //         console.log('data channels ', dataChannels)
-    //     }
-    //     console.log('peer connections ', peerConnection)
-    // }
-}
-
-export function sendDataChannelMessage(message: string) {
-    console.log('attempting to send a data channel message', dataChannels)
-    if (dataChannels.length && dataChannels[0]?.channel?.readyState === 'open') {
-        console.log('sending message along')
-        dataChannels[0].channel.send(message)
-    } else {
-        console.log('no channel to send on, state: ', dataChannels[0]?.channel || 'null channel')
-    }
 }
 
 export async function closeConnectionWithUser(toUID: string) {
@@ -216,26 +175,3 @@ export async function closeConnectionWithUser(toUID: string) {
     }
 }
 
-export async function closeAllPeers(peerConnection: RTCPeerConnection) {
-    console.log('closing peers')
-    peerConnection.close()
-    clients = [] // todo replace this with actual logic
-    dataChannels = []
-}
-
-export function pingUser(toUID: string) {
-    const entry = dataChannels[0] // todo update this to search
-    if (!entry || entry.channel.readyState !== 'open') {
-        console.warn(`No open data channel to ${toUID} to ping.`)
-        return
-    }
-
-    const timestamp = Date.now()
-    const message = {
-        type: 'ping',
-        time: timestamp,
-    }
-
-    entry.channel.send(JSON.stringify(message))
-    console.log(`Sent ping to ${toUID} at ${timestamp}`)
-}
