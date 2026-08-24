@@ -12,7 +12,7 @@ import {
   declineCall as webrtcDeclineCall,
   closeConnectionWithUser,
 } from '../webRTC/WebPeer'
-import { isMockUserId, startMockMatch, startProxyMatch } from '../match'
+import { isMockUserId, startMockMatch, startMockSpectateMatch, startProxyMatch } from '../match'
 import api from '../external-api/requests'
 import { auth } from '../utils/firebase'
 import { isTauriEnv } from '../utils/pathSettings'
@@ -72,6 +72,13 @@ function getMockUser(uid: string): V2User | null {
   return null
 }
 
+// Shown as a permanent "in match" pair in the debug lobby's PlayerList so there's always
+// something to click Spectate on. Purely a display fixture — it doesn't correspond to any
+// actually-running processes until Spectate is clicked (see AppV2's handleSpectateMockPair,
+// which calls startMockSpectateMatch — that's what actually launches the two of them against
+// each other, plus a third process watching).
+const MOCK_DEMO_MATCH_ID = 'mock-demo-match'
+
 function injectMockUsers(users: V2User[], lobbyId: string, viewer: V2User | null): V2User[] {
   if (lobbyId.trim().toLowerCase() !== 'debug') return users
   const existing = new Set(users.map(u => u.uid))
@@ -84,6 +91,7 @@ function injectMockUsers(users: V2User[], lobbyId: string, viewer: V2User | null
     if (!existing.has(mock.uid)) {
       const clone: V2User = {
         ...mock,
+        currentMatchId: MOCK_DEMO_MATCH_ID,
         lastKnownPings: viewer
           ? [...mock.lastKnownPings, { id: viewer.uid, ping }]
           : mock.lastKnownPings,
@@ -1691,6 +1699,20 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     peerLatencyManager.triggerMeasureNow(uid)
   }, [])
 
+  // Dev/test tool (debug lobby only, see LobbyPage's gating): launches a full spectating
+  // pipeline — two local bot processes playing each other plus a third watching them via the
+  // spectate relay — with no real opponent or backend matchmaking involved. See
+  // startMockSpectateMatch (../match) for what actually gets spawned.
+  const startMockSpectateTest = useCallback(async (): Promise<void> => {
+    const lobbyId = activeLobbyIdRef.current
+    if (lobbyId.trim().toLowerCase() !== 'debug') return
+    try {
+      await startMockSpectateMatch({ gameName: lobbyListRef.current.find(l => l.name === lobbyId)?.gameName ?? null })
+    } catch (err) {
+      console.error('[v2] Failed to start mock spectate test:', err)
+    }
+  }, [])
+
   return {
     status,
     isReconnecting,
@@ -1731,5 +1753,6 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     sendTournamentSubscribe,
     sendTournamentUnsubscribe,
     notifyTournamentChanged,
+    startMockSpectateTest,
   }
 }

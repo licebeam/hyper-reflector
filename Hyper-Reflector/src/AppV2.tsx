@@ -244,6 +244,7 @@ function AppV2Inner() {
     lobbyPasswords,
     lobbyJoinError,
     clearLobbyJoinError,
+    startMockSpectateTest,
   } = useWebSocket(user, notifMuted);
 
   // Ensure bundled default sound paths are populated (especially after reset).
@@ -369,6 +370,13 @@ function AppV2Inner() {
 
   const handleChallenge = (uid: string) => {
     void sendChallenge(uid);
+  };
+
+  // matchId isn't used yet — only the mock pairing is ever spectatable right now, and
+  // startMockSpectateTest already knows what to launch for it. Once real matches are
+  // spectatable this will need to branch on matchId instead of always going to the mock path.
+  const handleSpectateMatch = (_matchId: string) => {
+    void startMockSpectateTest();
   };
 
   const handleAcceptChallenge = (messageId: string) => {
@@ -524,6 +532,7 @@ function AppV2Inner() {
                   measuringUids={measuringUids}
                   unreachableUids={unreachableUids}
                   onMeasurePing={measurePingNow}
+                  onSpectateMatch={activeLobbyId.trim().toLowerCase() === 'debug' ? handleSpectateMatch : undefined}
                 />
               )}
               {page === "home" && <HomePage currentUser={user} />}

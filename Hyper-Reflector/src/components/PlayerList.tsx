@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BellOff, Coffee, Flame, Swords, User } from "lucide-react";
+import { BellOff, Coffee, Flame, Radio, Swords, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "../state/store";
 
@@ -408,9 +408,21 @@ function PlayerRow({
 
 // ── In-match pair row ──────────────────────────────────────────────────────────
 
-function MatchPairRow({ players }: { players: V2User[] }) {
+function MatchPairRow({
+  players,
+  currentUserUid,
+  onSpectate,
+}: {
+  players: V2User[];
+  currentUserUid?: string;
+  onSpectate?: (matchId: string) => void;
+}) {
   const { t } = useTranslation();
   const [p1, p2] = players;
+  // Never offer to spectate a pairing that includes the viewer themselves — they're either
+  // already playing it (nonsensical to also watch) or this is stale local state.
+  const canSpectate = !!(onSpectate && p1 && p2 && p1.currentMatchId &&
+    p1.uid !== currentUserUid && p2.uid !== currentUserUid);
   return (
     <div
       className="flex items-center gap-2 px-3 py-2.5 border-b"
@@ -446,6 +458,19 @@ function MatchPairRow({ players }: { players: V2User[] }) {
           <span className="text-[10px]" style={{ color: "var(--v2-muted)" }}>{t("playerList.unknownOpponent")}</span>
         )}
       </div>
+      {canSpectate && (
+        <button
+          onClick={() => onSpectate!(p1.currentMatchId!)}
+          className="flex items-center gap-1 text-[10px] px-1.5 py-1 rounded font-medium transition-colors shrink-0"
+          style={{ background: "var(--v2-hover)", color: "var(--v2-muted)" }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = "var(--v2-text)"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = "var(--v2-muted)"; }}
+          title="Debug: launches this match for real (two local bot processes) plus a third process watching it via the spectate relay."
+        >
+          <Radio size={10} strokeWidth={2.5} />
+          Spectate
+        </button>
+      )}
     </div>
   );
 }
@@ -497,6 +522,7 @@ type PlayerListProps = {
   measuringUids?: ReadonlySet<string>;
   unreachableUids?: ReadonlySet<string>;
   onMeasurePing?: (uid: string) => void;
+  onSpectateMatch?: (matchId: string) => void;
 };
 
 export function PlayerList({
@@ -509,6 +535,7 @@ export function PlayerList({
   measuringUids,
   unreachableUids,
   onMeasurePing,
+  onSpectateMatch,
 }: PlayerListProps) {
   const { t } = useTranslation();
   const showStreak = !lobbyGame || lobbyGame === STREAK_GAME
@@ -611,7 +638,12 @@ export function PlayerList({
           </div>
           <div className="overflow-y-scroll flex-1 min-h-0">
             {matchPairs.map((players, i) => (
-              <MatchPairRow key={players[0]?.uid ?? i} players={players} />
+              <MatchPairRow
+                key={players[0]?.uid ?? i}
+                players={players}
+                currentUserUid={currentUser?.uid}
+                onSpectate={onSpectateMatch}
+              />
             ))}
           </div>
         </div>

@@ -17,6 +17,10 @@ type LobbyPageProps = {
   measuringUids?: ReadonlySet<string>;
   unreachableUids?: ReadonlySet<string>;
   onMeasurePing?: (uid: string) => void;
+  // Dev/test tool — see startMockSpectateMatch (../match). The "Spectate" button on an
+  // in-match pair only renders when this is provided; AppV2 only provides it in the debug
+  // lobby, where the mock opponents are always shown paired up (useWebSocket/injectMockUsers).
+  onSpectateMatch?: (matchId: string) => void;
 };
 
 export function LobbyPage({
@@ -34,6 +38,7 @@ export function LobbyPage({
   measuringUids,
   unreachableUids,
   onMeasurePing,
+  onSpectateMatch,
 }: LobbyPageProps) {
   return (
     <div className="flex h-full overflow-hidden">
@@ -64,6 +69,7 @@ export function LobbyPage({
           measuringUids={measuringUids}
           unreachableUids={unreachableUids}
           onMeasurePing={onMeasurePing}
+          onSpectateMatch={onSpectateMatch}
         />
       </div>
     </div>
