@@ -48,3 +48,75 @@ export type V2Lobby = {
   gameName?: string   // ROM key stored in lobbyMeta
   ownerUid?: string   // UID of the user who created this lobby
 }
+
+// ── Tournament ─────────────────────────────────────────────────────────────────
+
+export type TournamentFormat = 'single-elim' | 'double-elim'
+
+export type TournamentStatus =
+  | 'registration_open'
+  | 'seeding'
+  | 'in_progress'
+  | 'paused'
+  | 'completed'
+  | 'cancelled'
+
+export type Tournament = {
+  id: string
+  name: string
+  description: string
+  gameName: string | null
+  format: TournamentFormat
+  organizerUid: string
+  maxParticipants: number | null
+  status: TournamentStatus
+  startDate?: string | null
+  timezone?: string | null
+  createdAt?: number
+  startedAt?: number | null
+  completedAt?: number | null
+  cancelledAt?: number | null
+}
+
+export type TournamentRegistration = {
+  id: string   // == uid
+  uid: string
+  userName: string
+  countryCode: string
+  accountElo: number
+  seed: number | null
+  isMock?: boolean
+  registeredAt?: number
+}
+
+export type TournamentMatchSlot = {
+  uid: string | null
+  userName: string | null
+  isBye: boolean
+}
+
+export type TournamentMatch = {
+  id: string
+  bracketType: 'winners' | 'losers' | 'grand-finals'
+  round: number
+  matchIndex: number
+  slot1: TournamentMatchSlot | null
+  slot2: TournamentMatchSlot | null
+  winnerUid: string | null
+  loserUid: string | null
+  status: 'pending' | 'ready' | 'reported' | 'bye'
+  nextMatchId: string | null
+  nextMatchSlot: 1 | 2 | null
+  nextLoserMatchId: string | null
+  nextLoserMatchSlot: 1 | 2 | null
+}
+
+export type TournamentHistoryEntry = {
+  id: string   // == tournamentId
+  tournamentName: string
+  format: TournamentFormat
+  placement: number | null
+  note: string | null
+  participantCount: number
+  completedAt?: number
+}

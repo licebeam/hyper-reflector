@@ -197,6 +197,9 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   const [selfPings, setSelfPings] = useState<Array<{ id: string; ping: number | string; isUnstable?: boolean; networkType?: string }>>([])
   const [measuringUids, setMeasuringUids] = useState<ReadonlySet<string>>(new Set())
   const [unreachableUids, setUnreachableUids] = useState<ReadonlySet<string>>(new Set())
+  // Tournament viewer relay: tournamentId -> timestamp of the last change signal
+  // received for it. useTournamentSocket watches this to know when to refetch.
+  const [tournamentChangeSignals, setTournamentChangeSignals] = useState<Record<string, number>>({})
   const [rankQueuePending, setRankQueuePending] = useState<RankQueuePendingData | null>(null)
   const initialPasswords = useRef(loadSavedPasswords())
   const [lobbyPasswords, setLobbyPasswords] = useState<Record<string, string>>(initialPasswords.current)
@@ -987,6 +990,14 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
             peerLatencyManager.handleSignal(payload)
             break
 
+          case 'tournament-changed': {
+            const tournamentId = payload.tournamentId
+            if (typeof tournamentId === 'string') {
+              setTournamentChangeSignals(prev => ({ ...prev, [tournamentId]: Date.now() }))
+            }
+            break
+          }
+
           default:
             break
         }
@@ -1118,6 +1129,32 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
   }, [setIsInMatchBoth, closePeerConnection])
 
   // ── Public API ────────────────────────────────────────────────────────────────
+
+  // Tournament viewer relay — thin transport only, no tournament domain logic
+  // here (that lives in useTournamentSocket.ts + the REST calls in requests.ts).
+  // These exist because the relay must ride this hook's own socket connection:
+  // the backend targets a user by whatever ws it registered during 'join', so a
+  // second independent connection wouldn't be reachable by the relay at all.
+  const sendTournamentSubscribe = useCallback((tournamentId: string): void => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser?.uid) return
+    try { socket.send(JSON.stringify({ type: 'tournament-subscribe', tournamentId, uid: currentUser.uid })) } catch {}
+  }, [])
+
+  const sendTournamentUnsubscribe = useCallback((tournamentId: string): void => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser?.uid) return
+    try { socket.send(JSON.stringify({ type: 'tournament-unsubscribe', tournamentId, uid: currentUser.uid })) } catch {}
+  }, [])
+
+  const notifyTournamentChanged = useCallback((tournamentId: string): void => {
+    const socket = socketRef.current
+    const currentUser = userRef.current
+    if (!socket || socket.readyState !== WebSocket.OPEN || !currentUser?.uid) return
+    try { socket.send(JSON.stringify({ type: 'tournament-changed', tournamentId, uid: currentUser.uid })) } catch {}
+  }, [])
 
   const sendMessage = useCallback((text: string): boolean => {
     const socket = socketRef.current
@@ -1690,5 +1727,9 @@ export function useWebSocket(user: V2User | null, notifMuted = false) {
     measuringUids,
     unreachableUids,
     measurePingNow,
+    tournamentChangeSignals,
+    sendTournamentSubscribe,
+    sendTournamentUnsubscribe,
+    notifyTournamentChanged,
   }
 }

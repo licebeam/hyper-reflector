@@ -221,6 +221,10 @@ function AppV2Inner() {
     measuringUids,
     unreachableUids,
     measurePingNow,
+    tournamentChangeSignals,
+    sendTournamentSubscribe,
+    sendTournamentUnsubscribe,
+    notifyTournamentChanged,
     isInMatch,
     isRankQueued,
     rankQueuePending,
@@ -551,7 +555,15 @@ function AppV2Inner() {
                     onViewProfile={handleViewProfile}
                   />
                 ))}
-              {page === "pools" && <TournamentPage />}
+              {page === "pools" && (
+                <TournamentPage
+                  currentUser={effectiveUser}
+                  tournamentChangeSignals={tournamentChangeSignals}
+                  sendTournamentSubscribe={sendTournamentSubscribe}
+                  sendTournamentUnsubscribe={sendTournamentUnsubscribe}
+                  notifyTournamentChanged={notifyTournamentChanged}
+                />
+              )}
             </main>
           </div>
         </div>

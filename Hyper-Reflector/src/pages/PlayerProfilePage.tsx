@@ -5,13 +5,14 @@ import {
   ChevronUp,
   RefreshCcw,
   Save,
+  Trophy,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import api from "../external-api/requests";
 import { validateName } from "../utils/validation";
 import { auth } from "../utils/firebase";
-import type { V2User } from "../types";
+import type { V2User, TournamentHistoryEntry } from "../types";
 import { CountryFlag } from "../components/CountryFlag";
 import { UserTitle } from "../components/UserTitle";
 import { MeterChart } from "../components/MeterChart";
@@ -277,6 +278,10 @@ export function PlayerProfilePage({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [replayFrames, setReplayFrames] = useState<ReplayFrame[] | null>(null);
+  const [tournamentHistoryOpen, setTournamentHistoryOpen] = useState(false);
+  const [tournamentHistory, setTournamentHistory] = useState<TournamentHistoryEntry[]>([]);
+  const [tournamentHistoryCursor, setTournamentHistoryCursor] = useState<string | null>(null);
+  const [tournamentHistoryLoading, setTournamentHistoryLoading] = useState(false);
 
   // ── Load profile ─────────────────────────────────────────────────────────────
 
@@ -291,6 +296,8 @@ export function PlayerProfilePage({
     setSaveError(null);
     setExpandedMatchId(null);
     setMatchDetailCache({});
+    setTournamentHistory([]);
+    setTournamentHistoryCursor(null);
     try {
       const [userData, statsData, titlesData] = await Promise.all([
         api.getUserData(auth, profileUid),
@@ -382,6 +389,31 @@ export function PlayerProfilePage({
     if (matchesOpen && matches.length === 0)
       void fetchMatches("initial", null, null);
   }, [matchesOpen, fetchMatches, matches.length]);
+
+  // ── Load tournament history ──────────────────────────────────────────────────
+
+  const fetchTournamentHistory = useCallback(
+    async (reset: boolean) => {
+      if (!auth.currentUser) return;
+      setTournamentHistoryLoading(true);
+      try {
+        const res = await api.getPlayerTournamentHistory(auth, profileUid, 10, reset ? null : tournamentHistoryCursor);
+        const entries: TournamentHistoryEntry[] = res?.entries ?? [];
+        setTournamentHistory((prev) => (reset ? entries : [...prev, ...entries]));
+        setTournamentHistoryCursor(res?.nextCursor ?? null);
+      } catch (err) {
+        console.error("[v2] PlayerProfilePage: fetchTournamentHistory failed", err);
+      } finally {
+        setTournamentHistoryLoading(false);
+      }
+    },
+    [profileUid, tournamentHistoryCursor],
+  );
+
+  useEffect(() => {
+    if (tournamentHistoryOpen && tournamentHistory.length === 0) void fetchTournamentHistory(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tournamentHistoryOpen]);
 
   useEffect(() => {
     if (!SHOW_POSITION_REPLAY_PROTOTYPE) return;
@@ -1327,6 +1359,88 @@ export function PlayerProfilePage({
                     </div>
                   );
                 })
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Tournament history */}
+        <div
+          className="rounded-lg border"
+          style={{
+            background: "var(--v2-surface)",
+            borderColor: "var(--v2-border)",
+          }}
+        >
+          <button
+            onClick={() => setTournamentHistoryOpen((p) => !p)}
+            className="w-full flex items-center justify-between px-5 py-3 text-left"
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: "var(--v2-text)" }}>
+              <Trophy size={13} style={{ color: "var(--v2-muted)" }} />
+              {t("tournamentPage.tournamentHistory")}
+            </span>
+            {tournamentHistoryOpen ? (
+              <ChevronUp size={14} style={{ color: "var(--v2-muted)" }} />
+            ) : (
+              <ChevronDown size={14} style={{ color: "var(--v2-muted)" }} />
+            )}
+          </button>
+          {tournamentHistoryOpen && (
+            <div className="px-5 pb-5 space-y-2">
+              {tournamentHistoryLoading && tournamentHistory.length === 0 ? (
+                <div className="flex justify-center py-4">
+                  <div
+                    className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+                    style={{ borderColor: "var(--v2-accent)", borderTopColor: "transparent" }}
+                  />
+                </div>
+              ) : tournamentHistory.length === 0 ? (
+                <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+                  {t("tournamentPage.noTournamentHistory")}
+                </p>
+              ) : (
+                tournamentHistory.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="rounded border px-3 py-2 flex items-center justify-between gap-2"
+                    style={{ borderColor: "var(--v2-border)" }}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate" style={{ color: "var(--v2-text)" }}>
+                        {entry.tournamentName}
+                      </p>
+                      <p className="text-xs" style={{ color: "var(--v2-muted)" }}>
+                        {entry.format === "double-elim" ? t("tournamentPage.formatDoubleElim") : t("tournamentPage.formatSingleElim")}
+                        {" · "}
+                        {entry.completedAt ? new Date(entry.completedAt).toLocaleDateString() : t("playerProfilePage.unknownDate")}
+                      </p>
+                    </div>
+                    <span
+                      className="text-xs px-2 py-1 rounded shrink-0"
+                      style={{
+                        color: entry.placement === 1 ? "var(--v2-accent)" : "var(--v2-muted)",
+                        background: "color-mix(in srgb, currentColor 15%, transparent)",
+                      }}
+                    >
+                      {entry.placement === 1
+                        ? t("tournamentPage.placementFirst")
+                        : entry.placement === 2
+                        ? t("tournamentPage.placementSecond")
+                        : entry.note ?? "—"}
+                    </span>
+                  </div>
+                ))
+              )}
+              {tournamentHistoryCursor && (
+                <button
+                  onClick={() => void fetchTournamentHistory(false)}
+                  disabled={tournamentHistoryLoading}
+                  className="w-full text-xs py-2 rounded border transition-colors disabled:opacity-40"
+                  style={{ borderColor: "var(--v2-border)", color: "var(--v2-muted)" }}
+                >
+                  {t("tournamentPage.loadMore")}
+                </button>
               )}
             </div>
           )}

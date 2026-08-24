@@ -610,6 +610,101 @@ async function setSidePreference(
     }
 }
 
+// ── Tournament ─────────────────────────────────────────────────────────────────
+// All /tournament/* routes follow the same POST + idToken-in-body convention as
+// the rest of this file. Kept together here (rather than a separate client
+// module) so callers keep using the one `api.*` surface everywhere else does.
+
+async function tournamentPost(auth, path: string, body: Record<string, unknown> = {}) {
+    if (!checkCurrentAuthState(auth)) return { error: 'not-logged-in' }
+    const idToken = await auth.currentUser.getIdToken().then((res) => res)
+    try {
+        const response = await fetch(`http://${SERVER}:${keys.API_PORT}/tournament/${path}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: idToken || 'not real', ...body }),
+        })
+        const data = await response.json()
+        if (!response.ok) {
+            return { error: data?.error || 'Server error' }
+        }
+        return data
+    } catch (error) {
+        console.log(error)
+        console.error(error.message)
+        return { error: error.message || 'Server error' }
+    }
+}
+
+function createTournament(auth, params: { name: string; description?: string; gameName?: string; format: 'single-elim' | 'double-elim'; maxParticipants?: number | null; startDate?: string | null; timezone?: string | null }) {
+    return tournamentPost(auth, 'create', params)
+}
+function getTournament(auth, tournamentId: string) {
+    return tournamentPost(auth, 'get', { tournamentId })
+}
+function listTournaments(auth, limit = 25, cursor: string | null = null) {
+    return tournamentPost(auth, 'list', { limit, cursor })
+}
+function listTournamentRegistrations(auth, tournamentId: string) {
+    return tournamentPost(auth, 'registrations', { tournamentId })
+}
+function listTournamentMatches(auth, tournamentId: string) {
+    return tournamentPost(auth, 'matches', { tournamentId })
+}
+function registerForTournament(auth, tournamentId: string) {
+    return tournamentPost(auth, 'register', { tournamentId })
+}
+function withdrawFromTournament(auth, tournamentId: string) {
+    return tournamentPost(auth, 'withdraw', { tournamentId })
+}
+function generateTournamentBracket(auth, tournamentId: string, seedBy?: 'registration' | 'rating') {
+    return tournamentPost(auth, 'generate-bracket', { tournamentId, seedBy })
+}
+function assignTournamentSlot(auth, tournamentId: string, matchId: string, slotNum: 1 | 2, uid: string | null) {
+    return tournamentPost(auth, 'assign-slot', { tournamentId, matchId, slotNum, uid })
+}
+function addMockTournamentPlayers(auth, tournamentId: string, count: number) {
+    return tournamentPost(auth, 'add-mock-players', { tournamentId, count })
+}
+function removeTournamentRegistration(auth, tournamentId: string, uid: string) {
+    return tournamentPost(auth, 'remove-registration', { tournamentId, uid })
+}
+function startTournament(auth, tournamentId: string, seedBy?: 'registration' | 'rating') {
+    return tournamentPost(auth, 'start', { tournamentId, seedBy })
+}
+function pauseTournament(auth, tournamentId: string) {
+    return tournamentPost(auth, 'pause', { tournamentId })
+}
+function resumeTournament(auth, tournamentId: string) {
+    return tournamentPost(auth, 'resume', { tournamentId })
+}
+function cancelTournament(auth, tournamentId: string) {
+    return tournamentPost(auth, 'cancel', { tournamentId })
+}
+function reportTournamentMatch(auth, tournamentId: string, matchId: string, winnerUid: string) {
+    return tournamentPost(auth, 'report-match', { tournamentId, matchId, winnerUid })
+}
+function revertTournamentMatch(auth, tournamentId: string, matchId: string) {
+    return tournamentPost(auth, 'revert-match', { tournamentId, matchId })
+}
+function updateTournament(
+    auth,
+    tournamentId: string,
+    params: {
+        name?: string
+        description?: string
+        gameName?: string
+        startDate?: string | null
+        timezone?: string | null
+        maxParticipants?: number | null
+    }
+) {
+    return tournamentPost(auth, 'update', { tournamentId, ...params })
+}
+function getPlayerTournamentHistory(auth, uid: string, limit = 10, cursor: string | null = null) {
+    return tournamentPost(auth, 'player-history', { uid, limit, cursor })
+}
+
 async function getLeaderboard(
     auth,
     options: { sortBy?: 'elo' | 'wins'; cursor?: number | null; limit?: number } = {}
@@ -667,4 +762,24 @@ export default {
     getUserMatches,
     getGlobalSet,
     getGlobalStats,
+    //tournament
+    createTournament,
+    getTournament,
+    listTournaments,
+    listTournamentRegistrations,
+    listTournamentMatches,
+    registerForTournament,
+    withdrawFromTournament,
+    generateTournamentBracket,
+    assignTournamentSlot,
+    addMockTournamentPlayers,
+    removeTournamentRegistration,
+    startTournament,
+    pauseTournament,
+    resumeTournament,
+    cancelTournament,
+    reportTournamentMatch,
+    revertTournamentMatch,
+    updateTournament,
+    getPlayerTournamentHistory,
 }
